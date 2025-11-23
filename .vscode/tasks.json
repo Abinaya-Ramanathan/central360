@@ -1,0 +1,48 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Flutter: pub get",
+			"type": "shell",
+			"options": {
+				"cwd": "${workspaceFolder}/frontend"
+			},
+			"command": "flutter pub get",
+			"problemMatcher": []
+		},
+		{
+			"label": "Flutter: clean",
+			"type": "shell",
+			"options": {
+				"cwd": "${workspaceFolder}/frontend"
+			},
+			"command": "flutter clean",
+			"problemMatcher": []
+		},
+		{
+			"label": "Flutter: run (Windows)",
+			"type": "shell",
+			"options": {
+				"cwd": "${workspaceFolder}/frontend"
+			},
+			"command": "flutter run -d windows",
+			"problemMatcher": [],
+			"dependsOn": [
+				"Flutter: pub get"
+			]
+		},
+		{
+			"label": "Flutter: run (Chrome)",
+			"type": "shell",
+			"options": {
+				"cwd": "${workspaceFolder}/frontend"
+			},
+			"command": "flutter run -d chrome",
+			"problemMatcher": [],
+			"dependsOn": [
+				"Flutter: pub get"
+			]
+		}
+	]
+}
+

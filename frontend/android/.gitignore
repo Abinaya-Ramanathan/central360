@@ -1,0 +1,10 @@
+# Android Keystore Files
+# NEVER commit keystore files to version control!
+*.jks
+*.keystore
+*.key
+key.properties
+
+# Local configuration
+local.properties
+

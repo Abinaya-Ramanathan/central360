@@ -1,0 +1,5 @@
+-- Add SSMM sector
+INSERT INTO sectors (code, name) VALUES
+  ('SSMM', 'SRI SURYA MAHAL AND MINI HALL')
+ON CONFLICT (code) DO NOTHING;
+

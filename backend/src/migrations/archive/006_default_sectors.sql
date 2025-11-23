@@ -1,0 +1,9 @@
+-- Insert default sectors
+INSERT INTO sectors (code, name) VALUES
+  ('SSBM', 'SRI SURYA BLUE METALS'),
+  ('SSC', 'SRI SURYAAS CAFE'),
+  ('SSBP', 'SRI SURYA BHARATH PETROLEUM'),
+  ('SSR', 'SRI SURYA RICEMILL'),
+  ('SSACF', 'SRI SURYA AGRO AND CATTLE FARM')
+ON CONFLICT (code) DO NOTHING;
+

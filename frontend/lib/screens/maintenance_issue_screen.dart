@@ -1,0 +1,482 @@
+import 'package:flutter/material.dart';
+import '../models/maintenance_issue.dart';
+import '../models/sector.dart';
+import '../services/api_service.dart';
+import 'add_issue_dialog.dart';
+import 'home_screen.dart';
+import 'login_screen.dart';
+
+class MaintenanceIssueScreen extends StatefulWidget {
+  final String username;
+  final String? selectedSector;
+
+  const MaintenanceIssueScreen({
+    super.key,
+    required this.username,
+    this.selectedSector,
+  });
+
+  @override
+  State<MaintenanceIssueScreen> createState() => _MaintenanceIssueScreenState();
+}
+
+class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
+  List<MaintenanceIssue> _issues = [];
+  List<Sector> _sectors = [];
+  Map<int, bool> _editMode = {}; // Track which rows are in edit mode
+  Map<int, String> _editStatus = {}; // Track edited status
+  Map<int, DateTime?> _editDateResolved = {}; // Track edited date resolved
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSectors();
+    _loadIssues();
+  }
+
+  Future<void> _loadSectors() async {
+    try {
+      final sectors = await ApiService.getSectors();
+      if (mounted) {
+        setState(() {
+          _sectors = sectors;
+        });
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  String _getSectorName(String? sectorCode) {
+    if (sectorCode == null) return 'All Sectors';
+    final sector = _sectors.firstWhere(
+      (s) => s.code == sectorCode,
+      orElse: () => Sector(code: sectorCode, name: sectorCode),
+    );
+    return sector.name;
+  }
+
+  Future<void> _loadIssues() async {
+    setState(() => _isLoading = true);
+    try {
+      final issues = await ApiService.getMaintenanceIssues(
+        sector: widget.selectedSector,
+      );
+      if (mounted) {
+        setState(() {
+          _issues = issues;
+          _editMode.clear();
+          _editStatus.clear();
+          _editDateResolved.clear();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading issues: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _deleteIssue(int issueId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Issue'),
+        content: const Text('Are you sure you want to delete this issue?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await ApiService.deleteMaintenanceIssue(issueId);
+      await _loadIssues();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Issue deleted successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting issue: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _saveIssue(int issueId) async {
+    final issue = _issues.firstWhere((i) => i.id == issueId);
+    final newStatus = _editStatus[issueId] ?? issue.status;
+    final newDateResolved = _editDateResolved[issueId];
+
+    setState(() => _isLoading = true);
+    try {
+      await ApiService.updateMaintenanceIssue(
+        id: issueId,
+        issueDescription: issue.issueDescription,
+        dateCreated: issue.dateCreated,
+        status: newStatus,
+        dateResolved: newDateResolved,
+        sectorCode: issue.sectorCode,
+      );
+      if (mounted) {
+        setState(() {
+          _editMode[issueId] = false;
+          _editStatus.remove(issueId);
+          _editDateResolved.remove(issueId);
+        });
+        await _loadIssues();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Issue updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating issue: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _toggleEditMode(int issueId) {
+    setState(() {
+      if (_editMode[issueId] == true) {
+        // Cancel edit
+        _editMode[issueId] = false;
+        _editStatus.remove(issueId);
+        _editDateResolved.remove(issueId);
+      } else {
+        // Enter edit mode
+        final issue = _issues.firstWhere((i) => i.id == issueId);
+        _editMode[issueId] = true;
+        _editStatus[issueId] = issue.status;
+        _editDateResolved[issueId] = issue.dateResolved;
+      }
+    });
+  }
+
+  Future<void> _selectDateResolved(int issueId) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _editDateResolved[issueId] ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _editDateResolved[issueId] = picked;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Maintenance Issue Report'),
+        backgroundColor: Colors.teal.shade700,
+        foregroundColor: Colors.white,
+        actions: [
+          // Sector Display
+          if (widget.selectedSector != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.business, size: 18),
+                  const SizedBox(width: 4),
+                  Text(
+                    _getSectorName(widget.selectedSector),
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.business, size: 18),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'All Sectors',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          // User icon with username
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.person, size: 20),
+                const SizedBox(width: 4),
+                Text(
+                  widget.username,
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+          // Home icon
+          IconButton(
+            icon: const Icon(Icons.home),
+            tooltip: 'Home',
+            onPressed: () {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(
+                    username: widget.username,
+                  ),
+                ),
+              );
+            },
+          ),
+          // Logout icon
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Logout'),
+                  content: const Text('Are you sure you want to logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (context) => const LoginScreen(),
+                          ),
+                          (route) => false,
+                        );
+                      },
+                      child: const Text('Logout'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: _isLoading && _issues.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Expanded(
+                  child: _issues.isEmpty
+                      ? Center(
+                          child: Text(
+                            widget.selectedSector == null
+                                ? 'No maintenance issues found'
+                                : 'No maintenance issues in selected sector',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SingleChildScrollView(
+                            child: DataTable(
+                              columnSpacing: 20,
+                              columns: [
+                                if (widget.selectedSector == null)
+                                  const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Issue Description', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Date Created', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Date Resolved', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                              ],
+                              rows: _issues.where((issue) => issue.id != null).map((issue) {
+                                final issueId = issue.id!;
+                                final isEditMode = _editMode[issueId] == true;
+                                return DataRow(
+                                  cells: [
+                                    if (widget.selectedSector == null)
+                                      DataCell(Text(_getSectorName(issue.sectorCode))),
+                                    DataCell(
+                                      SizedBox(
+                                        width: 200,
+                                        child: Text(
+                                          issue.issueDescription ?? 'N/A',
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Text(
+                                        issue.dateCreated != null
+                                            ? issue.dateCreated!.toIso8601String().split('T')[0]
+                                            : 'N/A',
+                                      ),
+                                    ),
+                                    DataCell(
+                                      isEditMode
+                                          ? DropdownButton<String>(
+                                              value: _editStatus[issueId] ?? issue.status,
+                                              items: const [
+                                                DropdownMenuItem(
+                                                  value: 'Resolved',
+                                                  child: Text('Resolved'),
+                                                ),
+                                                DropdownMenuItem(
+                                                  value: 'Not resolved',
+                                                  child: Text('Not resolved'),
+                                                ),
+                                              ],
+                                              onChanged: (value) {
+                                                setState(() {
+                                                  _editStatus[issueId] = value!;
+                                                });
+                                              },
+                                            )
+                                          : Text(issue.status),
+                                    ),
+                                    DataCell(
+                                      isEditMode
+                                          ? InkWell(
+                                              onTap: () => _selectDateResolved(issueId),
+                                              child: InputDecorator(
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  contentPadding: EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  _editDateResolved[issueId] != null
+                                                      ? _editDateResolved[issueId]!
+                                                          .toIso8601String()
+                                                          .split('T')[0]
+                                                      : 'Select date',
+                                                ),
+                                              ),
+                                            )
+                                          : Text(
+                                              issue.dateResolved != null
+                                                  ? issue.dateResolved!.toIso8601String().split('T')[0]
+                                                  : 'N/A',
+                                            ),
+                                    ),
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isEditMode)
+                                            IconButton(
+                                              icon: const Icon(Icons.save, color: Colors.green),
+                                              onPressed: () => _saveIssue(issueId),
+                                            )
+                                          else
+                                            IconButton(
+                                              icon: const Icon(Icons.edit, color: Colors.blue),
+                                              onPressed: () => _toggleEditMode(issueId),
+                                            ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, color: Colors.red),
+                                            onPressed: () => _deleteIssue(issueId),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: widget.selectedSector == null
+                          ? null
+                          : () async {
+                              final result = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AddIssueDialog(
+                                  selectedSector: widget.selectedSector!,
+                                ),
+                              );
+                              if (result == true) {
+                                await _loadIssues();
+                              }
+                            },
+                      icon: const Icon(Icons.add),
+                      label: const Text(
+                        'Add Issue',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+

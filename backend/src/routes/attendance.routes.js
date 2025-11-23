@@ -1,0 +1,186 @@
+import { Router } from 'express';
+import db from '../db.js';
+
+const router = Router();
+
+// Get attendance records
+router.get('/', async (req, res) => {
+  try {
+    const { sector, month, date } = req.query;
+    let query = 'SELECT * FROM attendance WHERE 1=1';
+    const params = [];
+    let paramCount = 1;
+
+    if (sector) {
+      query += ` AND sector = $${paramCount++}`;
+      params.push(sector);
+    }
+    if (month) {
+      query += ` AND EXTRACT(MONTH FROM date) = $${paramCount++}`;
+      params.push(month);
+    }
+    if (date) {
+      // Use DATE() function to ensure proper date comparison
+      query += ` AND date::date = $${paramCount++}::date`;
+      params.push(date);
+    }
+
+    query += ' ORDER BY date DESC, employee_name';
+    console.log('Attendance query:', query);
+    console.log('Attendance params:', params);
+    const { rows } = await db.query(query, params);
+    console.log('Attendance results:', rows.length, 'records');
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error fetching attendance' });
+  }
+});
+
+// Create or update attendance
+router.post('/', async (req, res) => {
+  try {
+    const {
+      employee_id,
+      employee_name,
+      sector,
+      date,
+      status,
+      outstanding_advance,
+      advance_taken,
+      advance_paid,
+    } = req.body;
+
+    // Check if attendance record already exists
+    const existing = await db.query(
+      'SELECT * FROM attendance WHERE employee_id = $1 AND date = $2',
+      [employee_id, date]
+    );
+
+    if (existing.rows.length > 0) {
+      // Update existing record
+      const { rows } = await db.query(
+        `UPDATE attendance SET
+          status = $1, outstanding_advance = $2, advance_taken = $3, advance_paid = $4
+        WHERE employee_id = $5 AND date = $6
+        RETURNING *`,
+        [status, outstanding_advance, advance_taken, advance_paid, employee_id, date]
+      );
+      res.json(rows[0]);
+    } else {
+      // Create new record
+      const { rows } = await db.query(
+        `INSERT INTO attendance (
+          employee_id, employee_name, sector, date, status,
+          outstanding_advance, advance_taken, advance_paid
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *`,
+        [
+          employee_id,
+          employee_name,
+          sector,
+          date,
+          status,
+          outstanding_advance || 0,
+          advance_taken || 0,
+          advance_paid || 0,
+        ]
+      );
+      res.status(201).json(rows[0]);
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error saving attendance' });
+  }
+});
+
+// Get latest outstanding advance for an employee before a given date
+// This gets the outstanding_advance from the most recent attendance record BEFORE the given date
+router.get('/outstanding/:employeeId/:date', async (req, res) => {
+  try {
+    const { employeeId, date } = req.params;
+    // Get the outstanding_advance from the most recent record up to and including the given date
+    // This includes any transactions on the date itself
+    const { rows } = await db.query(
+      `SELECT outstanding_advance 
+       FROM attendance 
+       WHERE employee_id = $1 AND date <= $2::date
+       ORDER BY date DESC 
+       LIMIT 1`,
+      [employeeId, date]
+    );
+    // Return the outstanding_advance from the most recent record up to and including the given date
+    // This represents the cumulative outstanding as of the given date (including that date's transactions)
+    const outstanding = rows.length > 0 
+      ? parseFloat(rows[0].outstanding_advance) || 0 
+      : 0;
+    res.json({ outstanding_advance: outstanding });
+  } catch (err) {
+    console.error('Error fetching outstanding advance:', err);
+    res.status(500).json({ message: 'Error fetching outstanding advance' });
+  }
+});
+
+// Bulk update attendance
+router.post('/bulk', async (req, res) => {
+  try {
+    const { attendance_records } = req.body;
+
+    const results = [];
+    for (const record of attendance_records) {
+      const {
+        employee_id,
+        employee_name,
+        sector,
+        date,
+        status,
+        outstanding_advance,
+        advance_taken,
+        advance_paid,
+      } = record;
+
+      const existing = await db.query(
+        'SELECT * FROM attendance WHERE employee_id = $1 AND date = $2',
+        [employee_id, date]
+      );
+
+      if (existing.rows.length > 0) {
+        const { rows } = await db.query(
+          `UPDATE attendance SET
+            status = $1, outstanding_advance = $2, advance_taken = $3, advance_paid = $4
+          WHERE employee_id = $5 AND date = $6
+          RETURNING *`,
+          [status, outstanding_advance, advance_taken, advance_paid, employee_id, date]
+        );
+        results.push(rows[0]);
+      } else {
+        const { rows } = await db.query(
+          `INSERT INTO attendance (
+            employee_id, employee_name, sector, date, status,
+            outstanding_advance, advance_taken, advance_paid
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          RETURNING *`,
+          [
+            employee_id,
+            employee_name,
+            sector,
+            date,
+            status,
+            outstanding_advance || 0,
+            advance_taken || 0,
+            advance_paid || 0,
+          ]
+        );
+        results.push(rows[0]);
+      }
+    }
+
+    res.json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error bulk updating attendance' });
+  }
+});
+
+export default router;
+

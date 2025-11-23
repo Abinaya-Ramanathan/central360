@@ -1,0 +1,594 @@
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/env_config.dart';
+
+class PdfGenerator {
+  static Future<void> generateAndDownloadCateringPDF({
+    required String bookingId,
+    String? deliveryLocation,
+    String? morningFoodMenu,
+    int morningFoodCount = 0,
+    String? afternoonFoodMenu,
+    int afternoonFoodCount = 0,
+    String? eveningFoodMenu,
+    int eveningFoodCount = 0,
+  }) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          final List<pw.Widget> widgets = [
+            pw.Text(
+              'Catering Details',
+              style: pw.TextStyle(
+                fontSize: 24,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 20),
+            pw.Text('Booking ID: $bookingId', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          ];
+
+          // Add Delivery Location if it exists, right after Booking ID
+          if (deliveryLocation != null && deliveryLocation.isNotEmpty) {
+            widgets.add(pw.SizedBox(height: 10));
+            widgets.add(pw.Text('Delivery Location: $deliveryLocation', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
+          }
+
+          // Only add fields that have data, in the specified order
+          bool hasMorningData = (morningFoodCount > 0) || (morningFoodMenu != null && morningFoodMenu.isNotEmpty);
+          bool hasAfternoonData = (afternoonFoodCount > 0) || (afternoonFoodMenu != null && afternoonFoodMenu.isNotEmpty);
+          bool hasEveningData = (eveningFoodCount > 0) || (eveningFoodMenu != null && eveningFoodMenu.isNotEmpty);
+
+          if (hasMorningData) {
+            widgets.add(pw.SizedBox(height: 10));
+            widgets.add(pw.Text('Morning Food Count: ${morningFoodCount > 0 ? morningFoodCount : 0}', 
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
+            if (morningFoodMenu != null && morningFoodMenu.isNotEmpty) {
+              widgets.add(pw.SizedBox(height: 5));
+              widgets.add(pw.Text('Morning Food Menu:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
+              widgets.add(pw.Text(morningFoodMenu, style: pw.TextStyle(fontSize: 12)));
+            }
+          }
+
+          if (hasAfternoonData) {
+            widgets.add(pw.SizedBox(height: 10));
+            widgets.add(pw.Text('Afternoon Food Count: ${afternoonFoodCount > 0 ? afternoonFoodCount : 0}', 
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
+            if (afternoonFoodMenu != null && afternoonFoodMenu.isNotEmpty) {
+              widgets.add(pw.SizedBox(height: 5));
+              widgets.add(pw.Text('Afternoon Food Menu:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
+              widgets.add(pw.Text(afternoonFoodMenu, style: pw.TextStyle(fontSize: 12)));
+            }
+          }
+
+          if (hasEveningData) {
+            widgets.add(pw.SizedBox(height: 10));
+            widgets.add(pw.Text('Evening Food Count: ${eveningFoodCount > 0 ? eveningFoodCount : 0}', 
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
+            if (eveningFoodMenu != null && eveningFoodMenu.isNotEmpty) {
+              widgets.add(pw.SizedBox(height: 5));
+              widgets.add(pw.Text('Evening Food Menu:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
+              widgets.add(pw.Text(eveningFoodMenu, style: pw.TextStyle(fontSize: 12)));
+            }
+          }
+
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(40),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: widgets,
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
+  static Future<void> generateAndDownloadExpensePDF({
+    required List<Map<String, dynamic>> expenseData,
+    required DateTime date,
+    DateTime? dateTo,
+    String? sectorName,
+    bool showSectorColumn = false,
+    List<Map<String, dynamic>>? sectors,
+  }) async {
+    final pdf = pw.Document();
+    final dateFormat = DateFormat('yyyy-MM-dd');
+    final dateStr = dateFormat.format(date);
+    final dateToStr = dateTo != null ? dateFormat.format(dateTo) : dateStr;
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(40),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Daily Expense Report',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                if (dateTo != null && dateTo != date)
+                  pw.Text('Date Range: $dateStr to $dateToStr', style: pw.TextStyle(fontSize: 14))
+                else
+                  pw.Text('Date: $dateStr', style: pw.TextStyle(fontSize: 14)),
+                if (sectorName != null)
+                  pw.Text('Sector: $sectorName', style: pw.TextStyle(fontSize: 14)),
+                pw.SizedBox(height: 20),
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        if (showSectorColumn)
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text('Sector', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                          ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text('Item Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text('Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text('Reason', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    ...expenseData.map((record) {
+                      final amount = (record['amount'] is num)
+                          ? (record['amount'] as num).toDouble()
+                          : double.tryParse(record['amount']?.toString() ?? '0') ?? 0.0;
+                      return pw.TableRow(
+                        children: [
+                          if (showSectorColumn)
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(8),
+                              child: pw.Text(sectors != null ? _getSectorNameForPDF(record, sectors) : record['sector_code']?.toString() ?? 'N/A'),
+                            ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text(record['item_details']?.toString() ?? ''),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text(amount.toStringAsFixed(2)),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text(record['reason_for_purchase']?.toString() ?? ''),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    try {
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+      );
+    } catch (e) {
+      throw Exception('Failed to generate PDF: $e');
+    }
+  }
+
+  static Future<void> generateAndSendExpensePDFEmail({
+    required List<Map<String, dynamic>> expenseData,
+    required DateTime date,
+    DateTime? dateTo,
+    String? sectorName,
+    required String emailAddress,
+    bool showSectorColumn = false,
+    List<Map<String, dynamic>>? sectors,
+  }) async {
+    // Similar to credit email - generate PDF
+    // Note: This requires backend integration for actual email sending
+    final pdf = pw.Document();
+    final dateFormat = DateFormat('yyyy-MM-dd');
+    final dateStr = dateFormat.format(date);
+    final dateToStr = dateTo != null ? dateFormat.format(dateTo) : dateStr;
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(40),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Daily Expense Report',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                if (dateTo != null && dateTo != date)
+                  pw.Text('Date Range: $dateStr to $dateToStr', style: pw.TextStyle(fontSize: 14))
+                else
+                  pw.Text('Date: $dateStr', style: pw.TextStyle(fontSize: 14)),
+                if (sectorName != null)
+                  pw.Text('Sector: $sectorName', style: pw.TextStyle(fontSize: 14)),
+                pw.SizedBox(height: 20),
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        if (showSectorColumn)
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text('Sector', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                          ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text('Item Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text('Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text('Reason', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    ...expenseData.map((record) {
+                      final amount = (record['amount'] is num)
+                          ? (record['amount'] as num).toDouble()
+                          : double.tryParse(record['amount']?.toString() ?? '0') ?? 0.0;
+                      return pw.TableRow(
+                        children: [
+                          if (showSectorColumn)
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(8),
+                              child: pw.Text(sectors != null ? _getSectorNameForPDF(record, sectors) : record['sector_code']?.toString() ?? 'N/A'),
+                            ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text(record['item_details']?.toString() ?? ''),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text(amount.toStringAsFixed(2)),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text(record['reason_for_purchase']?.toString() ?? ''),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    // Convert PDF to base64 and send via API
+    final pdfBytes = await pdf.save();
+    final pdfBase64 = base64.encode(pdfBytes);
+    
+    try {
+      // Send email via backend API
+      await _sendEmailViaAPI(
+        emailAddress: emailAddress,
+        pdfBase64: pdfBase64,
+        subject: 'Daily Expense Report',
+        body: 'Please find attached the daily expense report.',
+      );
+    } catch (e) {
+      // If API fails, download the PDF as fallback
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+      );
+      rethrow;
+    }
+  }
+
+  static String _formatDateForPDF(dynamic dateValue) {
+    if (dateValue == null) return 'N/A';
+    try {
+      if (dateValue is String) {
+        // Handle ISO format with T separator or space separator
+        final dateStr = dateValue.split('T')[0].split(' ')[0];
+        return dateStr;
+      } else if (dateValue is DateTime) {
+        return dateValue.toIso8601String().split('T')[0];
+      } else {
+        // Try parsing as string first
+        final dateStr = dateValue.toString();
+        final parsed = DateTime.tryParse(dateStr);
+        if (parsed != null) {
+          return parsed.toIso8601String().split('T')[0];
+        }
+        // If it's already in date format, split by T or space
+        return dateStr.split('T')[0].split(' ')[0];
+      }
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
+  static String _getSectorNameForPDF(Map<String, dynamic> record, List<Map<String, dynamic>> sectors) {
+    final sectorCode = record['sector_code']?.toString();
+    if (sectorCode == null) return 'All Sectors';
+    try {
+      final sector = sectors.firstWhere(
+        (s) => s['code']?.toString() == sectorCode,
+      );
+      return sector['name']?.toString() ?? sectorCode;
+    } catch (e) {
+      // If not found, return the code itself
+      return sectorCode;
+    }
+  }
+
+  static Future<void> generateAndDownloadCreditPDF({
+    required List<Map<String, dynamic>> creditData,
+    String? sectorName,
+    bool showSectorColumn = false,
+    List<Map<String, dynamic>>? sectors,
+  }) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(40),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Credit Details Report',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                if (sectorName != null)
+                  pw.Text('Sector: $sectorName', style: pw.TextStyle(fontSize: 14)),
+                pw.SizedBox(height: 20),
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        if (showSectorColumn)
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Sector', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Phone', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Amount Settled', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Pending Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      ],
+                    ),
+                    ...creditData.map((record) {
+                      final creditAmount = (record['credit_amount'] is num)
+                          ? (record['credit_amount'] as num).toDouble()
+                          : double.tryParse(record['credit_amount']?.toString() ?? '0') ?? 0.0;
+                      final amountSettled = (record['amount_settled'] is num)
+                          ? (record['amount_settled'] as num).toDouble()
+                          : double.tryParse(record['amount_settled']?.toString() ?? '0') ?? 0.0;
+                      final pending = creditAmount - amountSettled;
+                      final creditDateStr = _formatDateForPDF(record['credit_date']);
+                      return pw.TableRow(
+                        children: [
+                          if (showSectorColumn)
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(8),
+                              child: pw.Text(sectors != null ? _getSectorNameForPDF(record, sectors) : record['sector_code']?.toString() ?? 'N/A'),
+                            ),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['phone_number']?.toString() ?? 'N/A')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(creditAmount.toStringAsFixed(2))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(creditDateStr)),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(amountSettled.toStringAsFixed(2))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(pending.toStringAsFixed(2))),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    try {
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+      );
+    } catch (e) {
+      throw Exception('Failed to generate PDF: $e');
+    }
+  }
+
+  static Future<void> generateAndSendCreditPDFEmail({
+    required List<Map<String, dynamic>> creditData,
+    String? sectorName,
+    required String emailAddress,
+    bool showSectorColumn = false,
+    List<Map<String, dynamic>>? sectors,
+  }) async {
+    // Generate PDF first
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(40),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Credit Details Report',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                if (sectorName != null)
+                  pw.Text('Sector: $sectorName', style: pw.TextStyle(fontSize: 14)),
+                pw.SizedBox(height: 20),
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        if (showSectorColumn)
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Sector', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Phone', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Amount Settled', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Pending Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      ],
+                    ),
+                    ...creditData.map((record) {
+                      final creditAmount = (record['credit_amount'] is num)
+                          ? (record['credit_amount'] as num).toDouble()
+                          : double.tryParse(record['credit_amount']?.toString() ?? '0') ?? 0.0;
+                      final amountSettled = (record['amount_settled'] is num)
+                          ? (record['amount_settled'] as num).toDouble()
+                          : double.tryParse(record['amount_settled']?.toString() ?? '0') ?? 0.0;
+                      final pending = creditAmount - amountSettled;
+                      final creditDateStr = _formatDateForPDF(record['credit_date']);
+                      return pw.TableRow(
+                        children: [
+                          if (showSectorColumn)
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(8),
+                              child: pw.Text(sectors != null ? _getSectorNameForPDF(record, sectors) : record['sector_code']?.toString() ?? 'N/A'),
+                            ),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['phone_number']?.toString() ?? 'N/A')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(creditAmount.toStringAsFixed(2))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(creditDateStr)),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(amountSettled.toStringAsFixed(2))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(pending.toStringAsFixed(2))),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    // Convert PDF to base64 and send via API
+    final pdfBytes = await pdf.save();
+    final pdfBase64 = base64.encode(pdfBytes);
+    
+    // Import API service dynamically to avoid circular dependency
+    try {
+      // Send email via backend API
+      await _sendEmailViaAPI(
+        emailAddress: emailAddress,
+        pdfBase64: pdfBase64,
+        subject: 'Credit Details Report',
+        body: 'Please find attached the credit details report.',
+      );
+    } catch (e) {
+      // If API fails, download the PDF as fallback
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+      );
+      rethrow;
+    }
+  }
+
+  static Future<void> _sendEmailViaAPI({
+    required String emailAddress,
+    required String pdfBase64,
+    required String subject,
+    required String body,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${EnvConfig.apiEndpoint}/email/send-pdf'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'emailAddress': emailAddress,
+          'pdfBase64': pdfBase64,
+          'subject': subject,
+          'body': body,
+        }),
+      );
+      
+      if (response.statusCode != 200) {
+        try {
+          final errorBody = json.decode(response.body);
+          final errorMessage = errorBody is Map ? (errorBody['message'] ?? errorBody['error'] ?? response.body) : response.body;
+          final errorStr = errorMessage.toString();
+          // Limit error message length to avoid display issues
+          final limitedError = errorStr.length > 200 ? '${errorStr.substring(0, 200)}...' : errorStr;
+          throw Exception(limitedError);
+        } catch (e) {
+          if (e is Exception) {
+            rethrow;
+          }
+          throw Exception('Failed to send email: ${response.body}');
+        }
+      }
+    } catch (e) {
+      if (e is http.ClientException) {
+        throw Exception('Network error: Unable to connect to server. Please check if the backend is running.');
+      } else if (e is Exception) {
+        rethrow;
+      } else {
+        throw Exception('Failed to send email: $e');
+      }
+    }
+  }
+}
+

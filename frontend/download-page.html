@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Central360</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .download-sections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .download-section {
+            border: 3px solid #f4ac2b;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .download-section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(244, 172, 43, 0.3);
+        }
+        
+        .download-section h2 {
+            color: #333;
+            font-size: 1.8em;
+            margin-bottom: 15px;
+        }
+        
+        .download-section p {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .download-button {
+            display: inline-block;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #f4ac2b 0%, #d9940f 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(244, 172, 43, 0.4);
+        }
+        
+        .download-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(244, 172, 43, 0.6);
+        }
+        
+        .instructions {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+        
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+            line-height: 2;
+        }
+        
+        .instructions li {
+            color: #555;
+            margin-bottom: 10px;
+        }
+        
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #f4ac2b;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+        
+        .note strong {
+            color: #856404;
+        }
+        
+        @media (max-width: 768px) {
+            .download-sections {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱💻 Download Central360</h1>
+            <p>Get the app for your device - Android Mobile or Windows Laptop/Desktop</p>
+        </div>
+        
+        <div class="download-sections">
+            <!-- Android Download Section -->
+            <div class="download-section">
+                <h2>📱 For Android Mobile</h2>
+                <p>Download and install on your Android phone or tablet</p>
+                <a href="https://github.com/YOUR_USERNAME/central360-releases/releases/latest/download/app-release.apk" class="download-button">
+                    Download APK
+                </a>
+                <p style="margin-top: 15px; font-size: 0.9em; color: #888;">
+                    File size: ~10-50 MB
+                </p>
+                <p style="margin-top: 10px; font-size: 0.85em; color: #666;">
+                    <a href="https://github.com/YOUR_USERNAME/central360-releases/releases" target="_blank" style="color: #667eea; text-decoration: none;">
+                        View All Versions →
+                    </a>
+                </p>
+            </div>
+            
+            <!-- Windows Download Section -->
+            <div class="download-section">
+                <h2>💻 For Windows Laptop/Desktop</h2>
+                <p>Download and install on Windows 10/11</p>
+                <a href="https://github.com/YOUR_USERNAME/central360-releases/releases/latest/download/central360-setup.exe" class="download-button">
+                    Download Installer
+                </a>
+                <p style="margin-top: 15px; font-size: 0.9em; color: #888;">
+                    File size: ~50-100 MB
+                </p>
+                <p style="margin-top: 10px; font-size: 0.85em; color: #666;">
+                    <a href="https://github.com/YOUR_USERNAME/central360-releases/releases" target="_blank" style="color: #667eea; text-decoration: none;">
+                        View All Versions →
+                    </a>
+                </p>
+            </div>
+        </div>
+        
+        <!-- Installation Instructions -->
+        <div class="instructions">
+            <h3>📝 Installation Instructions</h3>
+            
+            <h4 style="margin-top: 20px; color: #333;">📱 Android Mobile:</h4>
+            <ol>
+                <li>Download the APK file using the button above</li>
+                <li>Open "Downloads" folder on your phone</li>
+                <li>Tap the APK file to start installation</li>
+                <li>If prompted, allow installation from unknown sources (first time only):
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Settings → Security → Enable "Install from Unknown Sources"</li>
+                    </ul>
+                </li>
+                <li>Tap "Install" and wait for installation to complete</li>
+                <li>Open the app from your app drawer</li>
+                <li><strong>Done! ✅</strong></li>
+            </ol>
+            
+            <h4 style="margin-top: 30px; color: #333;">💻 Windows Laptop/Desktop:</h4>
+            <ol>
+                <li>Download the installer file using the button above</li>
+                <li>Open the downloaded .exe file</li>
+                <li>If Windows shows a security warning, click "More info" → "Run anyway"</li>
+                <li>Follow the installation wizard:
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Choose installation location (optional)</li>
+                        <li>Click "Install"</li>
+                        <li>Wait for installation to complete</li>
+                    </ul>
+                </li>
+                <li>Click "Launch" or find Central360 in Start Menu</li>
+                <li><strong>Done! ✅</strong></li>
+            </ol>
+            
+            <div class="note">
+                <strong>💡 Tip:</strong> If you see security warnings, it's normal. Your app is safe - Windows just needs confirmation that you trust the source.
+            </div>
+        </div>
+        
+        <!-- Support Section -->
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #eee;">
+            <p style="color: #666;">
+                <strong>Need Help?</strong> Contact us at: your-email@example.com
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+

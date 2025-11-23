@@ -1,0 +1,38 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Flutter: Windows",
+			"type": "dart",
+			"request": "launch",
+			"cwd": "${workspaceFolder}/frontend",
+			"program": "lib/main.dart",
+			"deviceId": "windows"
+		},
+		{
+			"name": "Flutter: Chrome",
+			"type": "dart",
+			"request": "launch",
+			"cwd": "${workspaceFolder}/frontend",
+			"program": "lib/main.dart",
+			"deviceId": "chrome"
+		},
+		{
+			"name": "Flutter: Android (select)",
+			"type": "dart",
+			"request": "launch",
+			"cwd": "${workspaceFolder}/frontend",
+			"program": "lib/main.dart"
+		}
+	],
+	"compounds": [
+		{
+			"name": "Flutter: All (Windows+Chrome)",
+			"configurations": [
+				"Flutter: Windows",
+				"Flutter: Chrome"
+			]
+		}
+	]
+}
+

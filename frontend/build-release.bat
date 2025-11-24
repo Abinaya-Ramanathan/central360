@@ -1,6 +1,7 @@
 @echo off
 REM Build Release Script for Central360 (Windows)
 REM Builds APK for Android and Windows executable
+setlocal enabledelayedexpansion
 
 echo 🚀 Building Central360 Release Versions...
 echo.
@@ -15,13 +16,17 @@ if %ERRORLEVEL% NEQ 0 (
 
 REM Get production API URL from user or use default
 if "%API_BASE_URL%"=="" (
-    set /p API_URL="Enter Production API URL (or press Enter for localhost): "
-    if "%API_URL%"=="" set API_URL=http://localhost:4000
+    set /p API_URL="Enter Production API Base URL (without /api/v1): "
+    if "!API_URL!"=="" set API_URL=http://localhost:4000
 ) else (
     set API_URL=%API_BASE_URL%
 )
 
-echo 📡 Using API URL: %API_URL%
+REM Remove /api/v1 if user included it
+set API_URL=!API_URL:/api/v1=!
+
+echo 📡 Using API Base URL: !API_URL!
+echo 📡 Full API URL will be: !API_URL!/api/v1
 echo.
 
 REM Clean previous builds
@@ -32,7 +37,7 @@ call flutter pub get
 REM Build Android APK
 echo.
 echo 📱 Building Android APK...
-call flutter build apk --release --dart-define=API_BASE_URL=%API_URL%
+call flutter build apk --release --dart-define=API_BASE_URL=!API_URL!
 
 if %ERRORLEVEL% EQU 0 (
     echo ✅ Android APK built successfully!
@@ -46,7 +51,7 @@ if %ERRORLEVEL% EQU 0 (
 REM Build Windows executable
 echo.
 echo 💻 Building Windows executable...
-call flutter build windows --release --dart-define=API_BASE_URL=%API_URL%
+call flutter build windows --release --dart-define=API_BASE_URL=!API_URL!
 
 if %ERRORLEVEL% EQU 0 (
     echo ✅ Windows executable built successfully!

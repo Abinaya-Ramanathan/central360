@@ -336,9 +336,15 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
         actions: [
           TextButton(
             onPressed: () {
-              for (var controller in morningControllers.values) controller.dispose();
-              for (var controller in afternoonControllers.values) controller.dispose();
-              for (var controller in eveningControllers.values) controller.dispose();
+              for (var controller in morningControllers.values) {
+                controller.dispose();
+              }
+              for (var controller in afternoonControllers.values) {
+                controller.dispose();
+              }
+              for (var controller in eveningControllers.values) {
+                controller.dispose();
+              }
               Navigator.pop(context, false);
             },
             child: const Text('Cancel'),
@@ -372,9 +378,15 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                   await ApiService.saveDailyProduction(productionRecord);
                 }
 
-                for (var controller in morningControllers.values) controller.dispose();
-                for (var controller in afternoonControllers.values) controller.dispose();
-                for (var controller in eveningControllers.values) controller.dispose();
+                for (var controller in morningControllers.values) {
+                  controller.dispose();
+                }
+                for (var controller in afternoonControllers.values) {
+                  controller.dispose();
+                }
+                for (var controller in eveningControllers.values) {
+                  controller.dispose();
+                }
 
                 if (mounted) {
                   Navigator.pop(context, true);
@@ -384,9 +396,15 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                   );
                 }
               } catch (e) {
-                for (var controller in morningControllers.values) controller.dispose();
-                for (var controller in afternoonControllers.values) controller.dispose();
-                for (var controller in eveningControllers.values) controller.dispose();
+                for (var controller in morningControllers.values) {
+                  controller.dispose();
+                }
+                for (var controller in afternoonControllers.values) {
+                  controller.dispose();
+                }
+                for (var controller in eveningControllers.values) {
+                  controller.dispose();
+                }
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

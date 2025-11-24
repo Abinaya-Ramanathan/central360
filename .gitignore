@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/pubspec.lock
+
+# Build outputs
+frontend/build/
+frontend/installer/
+backend/dist/
+*.exe
+*.dll
+
+# Environment files
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+frontend/temp_android_check/
+*.tmp
+*.temp
+
+# Railway
+.railway/
+

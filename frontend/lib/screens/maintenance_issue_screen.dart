@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/maintenance_issue.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'add_issue_dialog.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -9,11 +10,13 @@ import 'login_screen.dart';
 class MaintenanceIssueScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  final bool isMainAdmin;
 
   const MaintenanceIssueScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.isMainAdmin = false,
   });
 
   @override
@@ -23,9 +26,9 @@ class MaintenanceIssueScreen extends StatefulWidget {
 class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
   List<MaintenanceIssue> _issues = [];
   List<Sector> _sectors = [];
-  Map<int, bool> _editMode = {}; // Track which rows are in edit mode
-  Map<int, String> _editStatus = {}; // Track edited status
-  Map<int, DateTime?> _editDateResolved = {}; // Track edited date resolved
+  final Map<int, bool> _editMode = {}; // Track which rows are in edit mode
+  final Map<int, String> _editStatus = {}; // Track edited status
+  final Map<int, DateTime?> _editDateResolved = {}; // Track edited date resolved
   bool _isLoading = false;
 
   @override
@@ -232,14 +235,14 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
               ),
             )
           else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.business, size: 18),
-                  const SizedBox(width: 4),
-                  const Text(
+                  Icon(Icons.business, size: 18),
+                  SizedBox(width: 4),
+                  Text(
                     'All Sectors',
                     style: TextStyle(fontSize: 14),
                   ),
@@ -269,7 +272,10 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (context) => HomeScreen(
-                    username: widget.username,
+                    username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                    initialSector: widget.selectedSector,
+                    isAdmin: AuthService.isAdmin,
+                    isMainAdmin: AuthService.isMainAdmin,
                   ),
                 ),
               );
@@ -426,10 +432,11 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                                               icon: const Icon(Icons.edit, color: Colors.blue),
                                               onPressed: () => _toggleEditMode(issueId),
                                             ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.red),
-                                            onPressed: () => _deleteIssue(issueId),
-                                          ),
+                                          if (widget.isMainAdmin)
+                                            IconButton(
+                                              icon: const Icon(Icons.delete, color: Colors.red),
+                                              onPressed: () => _deleteIssue(issueId),
+                                            ),
                                         ],
                                       ),
                                     ),

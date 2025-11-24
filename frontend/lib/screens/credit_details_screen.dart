@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../models/sector.dart';
 import '../utils/pdf_generator.dart';
 import 'home_screen.dart';
@@ -9,11 +10,13 @@ import 'login_screen.dart';
 class CreditDetailsScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  final bool isMainAdmin;
 
   const CreditDetailsScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.isMainAdmin = false,
   });
 
   @override
@@ -34,7 +37,8 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _isAdmin = widget.username.toLowerCase() == 'admin' || widget.username.toLowerCase() == 'srisurya';
+    // Use AuthService to get admin status (based on password, not username)
+    _isAdmin = AuthService.isAdmin;
     _loadSectors();
     _loadData();
   }
@@ -886,14 +890,14 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
               ),
             )
           else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.business, size: 18),
-                  const SizedBox(width: 4),
-                  const Text(
+                  Icon(Icons.business, size: 18),
+                  SizedBox(width: 4),
+                  Text(
                     'All Sectors',
                     style: TextStyle(fontSize: 14),
                   ),
@@ -918,7 +922,12 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
             onPressed: () {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (context) => HomeScreen(username: widget.username),
+                  builder: (context) => HomeScreen(
+                    username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                    initialSector: widget.selectedSector,
+                    isAdmin: AuthService.isAdmin,
+                    isMainAdmin: AuthService.isMainAdmin,
+                  ),
                 ),
               );
             },
@@ -1286,7 +1295,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                                                     tooltip: 'Edit',
                                                     onPressed: () => _toggleEditMode(index),
                                                   ),
-                                                  if (_isAdmin)
+                                                  if (widget.isMainAdmin)
                                                     IconButton(
                                                       icon: const Icon(Icons.delete, color: Colors.red, size: 20),
                                                       tooltip: 'Delete',

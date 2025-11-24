@@ -5,7 +5,9 @@ import '../models/sector.dart';
 import 'edit_product_dialog.dart';
 
 class ManageProductsDialog extends StatefulWidget {
-  const ManageProductsDialog({super.key});
+  final bool isMainAdmin;
+
+  const ManageProductsDialog({super.key, required this.isMainAdmin});
 
   @override
   State<ManageProductsDialog> createState() => _ManageProductsDialogState();
@@ -170,14 +172,15 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
                                           tooltip: 'Edit',
                                           onPressed: () => _editProduct(product),
                                         ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                          tooltip: 'Delete',
-                                          onPressed: () => _deleteProduct(
-                                            product['id'] as int,
-                                            product['product_name']?.toString() ?? 'Product',
+                                        if (widget.isMainAdmin)
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                            tooltip: 'Delete',
+                                            onPressed: () => _deleteProduct(
+                                              product['id'] as int,
+                                              product['product_name']?.toString() ?? 'Product',
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                   ),

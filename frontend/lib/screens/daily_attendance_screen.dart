@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -151,12 +153,10 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
     try {
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
-      print('Loading attendance data for date: $dateStr, sector: ${widget.selectedSector}');
       final records = await ApiService.getAttendance(
         sector: widget.selectedSector,
         date: dateStr,
       );
-      print('API returned ${records.length} records');
 
       // Create a map of loaded records by employee_id for quick lookup
       // Store both string and int versions to handle any format
@@ -170,11 +170,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
         if (empId is int) {
           loadedRecords[empId.toString()] = record;
         }
-        print('Loaded record for employee_id: $empId (type: ${empId.runtimeType}), status: ${record['status']}, date: ${record['date']}, sector: ${record['sector']}');
       }
-      print('Total records loaded: ${records.length}, Employees in UI: ${_employees.length}');
-      print('Employee IDs in UI: ${_employees.map((e) => '${e.id} (type: ${e.id.runtimeType})').toList()}');
-      print('Loaded record IDs: ${loadedRecords.keys.toList()}');
 
       // Update attendance data for all employees
       for (var emp in _employees) {
@@ -228,7 +224,6 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
           final paid = parseDecimal(record['advance_paid']);
           final status = record['status'];
           
-          print('✓ Updating data for employee ${emp.name} (id: $empIdStr): status=$status, taken=$taken, paid=$paid, previous_outstanding=$previousOutstanding');
           
           // Calculate outstanding: previous day's outstanding + today's taken - today's paid
           final newOutstanding = previousOutstanding + taken - paid;
@@ -241,9 +236,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
             'advance_paid': paid,
           };
           
-          print('  → Updated _attendanceData[${emp.id}]: status=${_attendanceData[emp.id]!['status']}, outstanding=${_attendanceData[emp.id]!['outstanding_advance']}');
         } else {
-          print('✗ No saved record found for employee ${emp.name} (id: $empIdStr). Available record IDs: ${loadedRecords.keys.toList()}');
           // Employee has no saved data for this date - keep defaults but preserve previous_outstanding
           _attendanceData[emp.id] = {
             'status': null, // No status selected yet
@@ -258,17 +251,10 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
       _recalculateOutstanding();
       // Force UI update to show loaded data
       if (mounted) {
-        setState(() {
-          print('UI state updated. Current _attendanceData keys: ${_attendanceData.keys.toList()}');
-          // Print first employee's data for debugging
-          if (_attendanceData.isNotEmpty) {
-            final firstKey = _attendanceData.keys.first;
-            print('Sample data for first employee (id: $firstKey): ${_attendanceData[firstKey]}');
-          }
-        });
+        setState(() {});
       }
     } catch (e) {
-      print('Error loading attendance data: $e');
+      debugPrint('Error loading attendance data: $e');
       // Don't show error to user, just log it
     }
   }
@@ -458,14 +444,14 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
               ),
             )
           else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.business, size: 18),
-                  const SizedBox(width: 4),
-                  const Text(
+                  Icon(Icons.business, size: 18),
+                  SizedBox(width: 4),
+                  Text(
                     'All Sectors',
                     style: TextStyle(fontSize: 14),
                   ),
@@ -495,7 +481,10 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (context) => HomeScreen(
-                    username: widget.username,
+                    username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                    initialSector: widget.selectedSector,
+                    isAdmin: AuthService.isAdmin,
+                    isMainAdmin: AuthService.isMainAdmin,
                   ),
                 ),
               );

@@ -30,12 +30,16 @@
 
 ### **2.1. Build Android APK**
 
-**Open Command Prompt** and run:
+**Open Command Prompt or PowerShell** and run:
 
 ```cmd
 cd F:\central360\frontend
-build-release.bat
+.\build-release.bat
 ```
+
+**Note:** 
+- **PowerShell**: Use `.\build-release.bat` (with `.\` prefix)
+- **Command Prompt**: Use `build-release.bat` (without prefix)
 
 **When asked for API URL**, enter your production backend URL:
 ```
@@ -308,7 +312,7 @@ When you release a new version:
 1. **Build new files:**
    ```cmd
    cd F:\central360\frontend
-   build-release.bat
+   .\build-release.bat
    ```
    (Enter production API URL when asked)
 

@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/vehicle_license.dart';
 import '../models/driver_license.dart';
 import '../models/engine_oil_service.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../models/sector.dart';
 import 'home_screen.dart';
@@ -14,11 +16,13 @@ import 'add_engine_oil_service_dialog.dart';
 class VehicleDriverLicenseScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  final bool isMainAdmin;
 
   const VehicleDriverLicenseScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.isMainAdmin = false,
   });
 
   @override
@@ -49,7 +53,8 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _isAdmin = widget.username.toLowerCase() == 'admin' || widget.username.toLowerCase() == 'srisurya';
+    // Use AuthService to get admin status (based on password, not username)
+    _isAdmin = AuthService.isAdmin;
     _initializeNotifications();
     _loadSectors();
     _loadAllData();
@@ -62,7 +67,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
       await NotificationService().requestNotificationPermission();
     } catch (e) {
       // Silently handle errors (notifications might not work on all platforms)
-      print('Notification initialization error: $e');
+      debugPrint('Notification initialization error: $e');
     }
   }
 
@@ -104,7 +109,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
       await NotificationService().checkEngineOilServiceExpiries(_engineOilServices);
     } catch (e) {
       // Silently handle errors - notifications are non-critical
-      print('Error checking expiries: $e');
+      debugPrint('Error checking expiries: $e');
     }
   }
 
@@ -189,7 +194,14 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
               icon: const Icon(Icons.home),
               onPressed: () {
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => HomeScreen(username: widget.username)),
+                  MaterialPageRoute(
+                    builder: (context) => HomeScreen(
+                      username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                      initialSector: widget.selectedSector,
+                      isAdmin: AuthService.isAdmin,
+                      isMainAdmin: AuthService.isMainAdmin,
+                    ),
+                  ),
                 );
               },
             ),
@@ -552,7 +564,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                                     tooltip: 'Edit',
                                     onPressed: () => _editDriverLicense(license),
                                   ),
-                                  if (_isAdmin)
+                                  if (widget.isMainAdmin)
                                     IconButton(
                                       icon: const Icon(Icons.delete, color: Colors.red, size: 20),
                                       tooltip: 'Delete',
@@ -713,7 +725,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                                     tooltip: 'Edit',
                                     onPressed: () => _editEngineOilService(service),
                                   ),
-                                  if (_isAdmin)
+                                  if (widget.isMainAdmin)
                                     IconButton(
                                       icon: const Icon(Icons.delete, color: Colors.red, size: 20),
                                       tooltip: 'Delete',

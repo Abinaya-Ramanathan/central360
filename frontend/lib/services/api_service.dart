@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../models/employee.dart';
@@ -143,27 +144,84 @@ class ApiService {
   }
 
   static Future<Sector> createSector(Sector sector) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/sectors'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'code': sector.code, 'name': sector.name}),
-    );
-    if (response.statusCode == 201) {
-      return Sector.fromJson(json.decode(response.body));
-    }
-    // Extract error message from response body
-    String errorMessage = 'Failed to create sector';
     try {
-      final errorBody = json.decode(response.body);
-      if (errorBody is Map && errorBody.containsKey('message')) {
-        errorMessage = errorBody['message'];
-      } else {
-        errorMessage = response.body;
+      debugPrint('Creating sector: ${sector.code} - ${sector.name}');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/sectors'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'code': sector.code, 'name': sector.name}),
+      );
+      
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+      
+      if (response.statusCode == 201) {
+        return Sector.fromJson(json.decode(response.body));
       }
+      
+      // Extract error message from response body
+      String errorMessage = 'Failed to create sector';
+      String fullErrorDetails = 'Status: ${response.statusCode}\nBody: ${response.body}';
+      
+      try {
+        if (response.body.isNotEmpty) {
+          final errorBody = json.decode(response.body);
+          debugPrint('Error body: $errorBody');
+          
+          if (errorBody is Map<String, dynamic>) {
+            // Try message first (most common format)
+            if (errorBody.containsKey('message') && errorBody['message'] != null) {
+              errorMessage = errorBody['message'].toString();
+            } 
+            // Try error field
+            else if (errorBody.containsKey('error') && errorBody['error'] != null) {
+              errorMessage = errorBody['error'].toString();
+            } 
+            // Try any string value in the map
+            else if (errorBody.isNotEmpty) {
+              for (var value in errorBody.values) {
+                if (value is String && value.isNotEmpty) {
+                  errorMessage = value;
+                  break;
+                }
+              }
+            }
+            // Include full error details
+            fullErrorDetails = 'Status: ${response.statusCode}\n${errorBody.toString()}';
+          } else if (errorBody is String) {
+            errorMessage = errorBody;
+            fullErrorDetails = 'Status: ${response.statusCode}\n$errorBody';
+          } else {
+            errorMessage = response.body;
+          }
+        } else {
+          errorMessage = 'Failed to create sector (HTTP ${response.statusCode})';
+        }
+      } catch (e) {
+        debugPrint('Error parsing response: $e');
+        errorMessage = response.body.isNotEmpty 
+            ? response.body 
+            : 'Failed to create sector (HTTP ${response.statusCode})';
+        fullErrorDetails = 'Status: ${response.statusCode}\nParse Error: $e\nBody: ${response.body}';
+      }
+      
+      debugPrint('Throwing error: $errorMessage');
+      // Store full details in exception message for debugging
+      throw Exception('$errorMessage\n\n[Debug: $fullErrorDetails]');
+    } on SocketException catch (e) {
+      debugPrint('SocketException: $e');
+      throw Exception('Network error: Unable to connect to server. Please check your internet connection and ensure the backend is running at $baseUrl');
+    } on HttpException catch (e) {
+      debugPrint('HttpException: $e');
+      throw Exception('HTTP error: ${e.message}');
     } catch (e) {
-      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to create sector';
+      debugPrint('Unexpected error: $e');
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Unexpected error: ${e.toString()}');
     }
-    throw Exception(errorMessage);
   }
 
   static Future<void> deleteSector(String code) async {
@@ -1253,6 +1311,219 @@ class ApiService {
       return;
     }
     throw Exception('Failed to delete engine oil service');
+  }
+
+  // Stock Items
+  static Future<List<Map<String, dynamic>>> getStockItems({String? sector}) async {
+    final queryParams = <String, String>{};
+    if (sector != null) queryParams['sector'] = sector;
+
+    final uri = Uri.parse('$baseUrl/stock-items').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load stock items');
+  }
+
+  static Future<Map<String, dynamic>> createStockItem(
+    String itemName,
+    String sectorCode, {
+    String? vehicleType,
+    String? partNumber,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/stock-items'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'item_name': itemName,
+        'sector_code': sectorCode,
+        if (vehicleType != null) 'vehicle_type': vehicleType,
+        if (partNumber != null) 'part_number': partNumber,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    String errorMessage = 'Failed to create stock item';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to create stock item';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<Map<String, dynamic>> updateStockItem(
+    String id,
+    String itemName,
+    String sectorCode, {
+    String? vehicleType,
+    String? partNumber,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/stock-items/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'item_name': itemName,
+        'sector_code': sectorCode,
+        if (vehicleType != null) 'vehicle_type': vehicleType,
+        if (partNumber != null) 'part_number': partNumber,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    String errorMessage = 'Failed to update stock item';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to update stock item';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<void> deleteStockItem(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/stock-items/$id'),
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    String errorMessage = 'Failed to delete stock item';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete stock item';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Daily Stock
+  static Future<List<Map<String, dynamic>>> getDailyStock({
+    int? month,
+    String? date,
+    String? sector,
+  }) async {
+    final queryParams = <String, String>{};
+    if (month != null) queryParams['month'] = month.toString();
+    if (date != null) queryParams['date'] = date;
+    if (sector != null) queryParams['sector'] = sector;
+
+    final uri = Uri.parse('$baseUrl/daily-stock').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load daily stock');
+  }
+
+  static Future<void> updateDailyStock(List<Map<String, dynamic>> updates, {String? date}) async {
+    final queryParams = <String, String>{};
+    if (date != null) queryParams['date'] = date;
+    
+    final uri = Uri.parse('$baseUrl/daily-stock').replace(queryParameters: queryParams);
+    final response = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'updates': updates}),
+    );
+    if (response.statusCode == 200) {
+      return;
+    }
+    String errorMessage = 'Failed to update daily stock';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to update daily stock';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Overall Stock
+  static Future<List<Map<String, dynamic>>> getOverallStock({
+    int? month,
+    String? date,
+    String? sector,
+  }) async {
+    final queryParams = <String, String>{};
+    if (month != null) queryParams['month'] = month.toString();
+    if (date != null) queryParams['date'] = date;
+    if (sector != null) queryParams['sector'] = sector;
+
+    final uri = Uri.parse('$baseUrl/overall-stock').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load overall stock');
+  }
+
+  static Future<void> updateOverallStock(List<Map<String, dynamic>> updates, {String? date}) async {
+    final queryParams = <String, String>{};
+    if (date != null) queryParams['date'] = date;
+    
+    final uri = Uri.parse('$baseUrl/overall-stock').replace(queryParameters: queryParams);
+    final response = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'updates': updates}),
+    );
+    if (response.statusCode == 200) {
+      return;
+    }
+    String errorMessage = 'Failed to update overall stock';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to update overall stock';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Stock Statement
+  static Future<List<Map<String, dynamic>>> generateStockStatement({
+    required String fromDate,
+    required String toDate,
+    String? sector,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/stock-statement/generate'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'from_date': fromDate,
+        'to_date': toDate,
+        if (sector != null) 'sector': sector,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    String errorMessage = 'Failed to generate stock statement';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to generate stock statement';
+    }
+    throw Exception(errorMessage);
   }
 }
 

@@ -8,20 +8,28 @@ import 'vehicle_driver_license_screen.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
 import '../services/sector_service.dart';
+import '../services/auth_service.dart';
 import 'add_sector_dialog.dart';
 import 'add_product_dialog.dart';
 import 'manage_products_dialog.dart';
 import 'manage_sectors_dialog.dart';
+import 'add_stock_item_dialog.dart';
+import 'manage_stock_items_dialog.dart';
+import 'stock_management_screen.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
   final String? initialSector;
+  final bool isAdmin;
+  final bool isMainAdmin;
 
   const HomeScreen({
     super.key,
     required this.username,
     this.initialSector,
+    this.isAdmin = false,
+    this.isMainAdmin = false,
   });
 
   @override
@@ -33,11 +41,15 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Sector> _sectors = [];
   String? _selectedSector;
   bool _isAdmin = false;
+  bool _isMainAdmin = false;
 
   @override
   void initState() {
     super.initState();
-    _isAdmin = widget.username.toLowerCase() == 'admin' || widget.username.toLowerCase() == 'srisurya';
+    // Admin privileges are determined by backend based on password
+    // Use AuthService if available, otherwise fall back to widget parameters
+    _isAdmin = AuthService.isAdmin || widget.isAdmin;
+    _isMainAdmin = AuthService.isMainAdmin || widget.isMainAdmin;
     if (widget.initialSector != null) {
       _selectedSector = widget.initialSector;
     }
@@ -64,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Central360'),
+        title: const Text('Company360'),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
         actions: [
@@ -85,14 +97,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.business, size: 18),
-                  const SizedBox(width: 4),
-                  const Text(
+                  Icon(Icons.business, size: 18),
+                  SizedBox(width: 4),
+                  Text(
                     'All Sectors',
                     style: TextStyle(fontSize: 14),
                   ),
@@ -175,11 +187,11 @@ class _HomeScreenState extends State<HomeScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  Row(
+                  const Row(
                     children: [
-                      const Icon(Icons.business, color: Colors.blue),
-                      const SizedBox(width: 12),
-                      const Text(
+                      Icon(Icons.business, color: Colors.blue),
+                      SizedBox(width: 12),
+                      Text(
                         'Select Sector:',
                         style: TextStyle(
                           fontSize: 16,
@@ -193,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _selectedSector,
+                          initialValue: _selectedSector,
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -264,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onPressed: () {
                             showDialog(
                               context: context,
-                              builder: (context) => const ManageSectorsDialog(),
+                              builder: (context) => ManageSectorsDialog(isMainAdmin: _isMainAdmin),
                             ).then((_) => _loadSectors());
                           },
                           icon: const Icon(Icons.business),
@@ -293,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             }
                           },
                           icon: const Icon(Icons.add_shopping_cart),
-                          label: const Text('Add Products'),
+                          label: const Text('Add Production Item'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange.shade700,
                             foregroundColor: Colors.white,
@@ -311,13 +323,60 @@ class _HomeScreenState extends State<HomeScreen> {
                           onPressed: () {
                             showDialog(
                               context: context,
-                              builder: (context) => const ManageProductsDialog(),
+                              builder: (context) => ManageProductsDialog(isMainAdmin: _isMainAdmin),
                             );
                           },
                           icon: const Icon(Icons.inventory_2),
-                          label: const Text('Manage Products'),
+                          label: const Text('Manage Production Item'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.purple.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final result = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => const AddStockItemDialog(),
+                            );
+                            if (result == true) {
+                              // Stock item created successfully
+                            }
+                          },
+                          icon: const Icon(Icons.add_box),
+                          label: const Text('Add Stock Item'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.brown.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => ManageStockItemsDialog(isMainAdmin: _isMainAdmin),
+                            );
+                          },
+                          icon: const Icon(Icons.inventory),
+                          label: const Text('Manage Stock Item'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey.shade700,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -365,6 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           builder: (context) => EmployeeDetailsScreen(
                                             username: widget.username,
                                             selectedSector: _selectedSector,
+                                            isMainAdmin: _isMainAdmin,
                                           ),
                                         ),
                                       );
@@ -428,6 +488,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         builder: (context) => MaintenanceIssueScreen(
                                           username: widget.username,
                                           selectedSector: _selectedSector,
+                                          isMainAdmin: _isMainAdmin,
                                         ),
                                       ),
                                     );
@@ -459,6 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         builder: (context) => CreditDetailsScreen(
                                           username: widget.username,
                                           selectedSector: _selectedSector,
+                                          isMainAdmin: _isMainAdmin,
                                         ),
                                       ),
                                     );
@@ -470,6 +532,37 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.indigo.shade700,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Stock Management - available for all users
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => StockManagementScreen(
+                                          username: widget.username,
+                                          selectedSector: _selectedSector,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.warehouse),
+                                  label: const Text(
+                                    'Stock Management',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.amber.shade700,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -491,6 +584,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           builder: (context) => MahalBookingScreen(
                                             username: widget.username,
                                             selectedSector: _selectedSector,
+                                            isMainAdmin: _isMainAdmin,
                                           ),
                                         ),
                                       );
@@ -521,10 +615,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => VehicleDriverLicenseScreen(
-                                            username: widget.username,
-                                            selectedSector: _selectedSector,
-                                          ),
+                                        builder: (context) => VehicleDriverLicenseScreen(
+                                          username: widget.username,
+                                          selectedSector: _selectedSector,
+                                          isMainAdmin: _isMainAdmin,
+                                        ),
                                         ),
                                       );
                                     },

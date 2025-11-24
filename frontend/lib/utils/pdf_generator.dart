@@ -53,7 +53,7 @@ class PdfGenerator {
             if (morningFoodMenu != null && morningFoodMenu.isNotEmpty) {
               widgets.add(pw.SizedBox(height: 5));
               widgets.add(pw.Text('Morning Food Menu:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
-              widgets.add(pw.Text(morningFoodMenu, style: pw.TextStyle(fontSize: 12)));
+              widgets.add(pw.Text(morningFoodMenu, style: const pw.TextStyle(fontSize: 12)));
             }
           }
 
@@ -64,7 +64,7 @@ class PdfGenerator {
             if (afternoonFoodMenu != null && afternoonFoodMenu.isNotEmpty) {
               widgets.add(pw.SizedBox(height: 5));
               widgets.add(pw.Text('Afternoon Food Menu:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
-              widgets.add(pw.Text(afternoonFoodMenu, style: pw.TextStyle(fontSize: 12)));
+              widgets.add(pw.Text(afternoonFoodMenu, style: const pw.TextStyle(fontSize: 12)));
             }
           }
 
@@ -75,7 +75,7 @@ class PdfGenerator {
             if (eveningFoodMenu != null && eveningFoodMenu.isNotEmpty) {
               widgets.add(pw.SizedBox(height: 5));
               widgets.add(pw.Text('Evening Food Menu:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
-              widgets.add(pw.Text(eveningFoodMenu, style: pw.TextStyle(fontSize: 12)));
+              widgets.add(pw.Text(eveningFoodMenu, style: const pw.TextStyle(fontSize: 12)));
             }
           }
 
@@ -126,11 +126,11 @@ class PdfGenerator {
                 ),
                 pw.SizedBox(height: 10),
                 if (dateTo != null && dateTo != date)
-                  pw.Text('Date Range: $dateStr to $dateToStr', style: pw.TextStyle(fontSize: 14))
+                  pw.Text('Date Range: $dateStr to $dateToStr', style: const pw.TextStyle(fontSize: 14))
                 else
-                  pw.Text('Date: $dateStr', style: pw.TextStyle(fontSize: 14)),
+                  pw.Text('Date: $dateStr', style: const pw.TextStyle(fontSize: 14)),
                 if (sectorName != null)
-                  pw.Text('Sector: $sectorName', style: pw.TextStyle(fontSize: 14)),
+                  pw.Text('Sector: $sectorName', style: const pw.TextStyle(fontSize: 14)),
                 pw.SizedBox(height: 20),
                 pw.Table(
                   border: pw.TableBorder.all(),
@@ -182,7 +182,7 @@ class PdfGenerator {
                           ),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ],
@@ -235,11 +235,11 @@ class PdfGenerator {
                 ),
                 pw.SizedBox(height: 10),
                 if (dateTo != null && dateTo != date)
-                  pw.Text('Date Range: $dateStr to $dateToStr', style: pw.TextStyle(fontSize: 14))
+                  pw.Text('Date Range: $dateStr to $dateToStr', style: const pw.TextStyle(fontSize: 14))
                 else
-                  pw.Text('Date: $dateStr', style: pw.TextStyle(fontSize: 14)),
+                  pw.Text('Date: $dateStr', style: const pw.TextStyle(fontSize: 14)),
                 if (sectorName != null)
-                  pw.Text('Sector: $sectorName', style: pw.TextStyle(fontSize: 14)),
+                  pw.Text('Sector: $sectorName', style: const pw.TextStyle(fontSize: 14)),
                 pw.SizedBox(height: 20),
                 pw.Table(
                   border: pw.TableBorder.all(),
@@ -291,7 +291,7 @@ class PdfGenerator {
                           ),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ],
@@ -385,7 +385,7 @@ class PdfGenerator {
                   ),
                 ),
                 if (sectorName != null)
-                  pw.Text('Sector: $sectorName', style: pw.TextStyle(fontSize: 14)),
+                  pw.Text('Sector: $sectorName', style: const pw.TextStyle(fontSize: 14)),
                 pw.SizedBox(height: 20),
                 pw.Table(
                   border: pw.TableBorder.all(),
@@ -427,7 +427,7 @@ class PdfGenerator {
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(pending.toStringAsFixed(2))),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ],
@@ -473,7 +473,7 @@ class PdfGenerator {
                   ),
                 ),
                 if (sectorName != null)
-                  pw.Text('Sector: $sectorName', style: pw.TextStyle(fontSize: 14)),
+                  pw.Text('Sector: $sectorName', style: const pw.TextStyle(fontSize: 14)),
                 pw.SizedBox(height: 20),
                 pw.Table(
                   border: pw.TableBorder.all(),
@@ -515,7 +515,7 @@ class PdfGenerator {
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(pending.toStringAsFixed(2))),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ],

@@ -230,7 +230,7 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                 const SizedBox(height: 24),
                 // Mahal Detail Dropdown
                 DropdownButtonFormField<String>(
-                  value: _selectedMahalDetail,
+                  initialValue: _selectedMahalDetail,
                   decoration: InputDecoration(
                     labelText: 'Mahal Detail *',
                     prefixIcon: const Icon(Icons.location_city, color: Colors.purple),
@@ -400,7 +400,7 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                 const SizedBox(height: 16),
                 // Food Service Dropdown
                 DropdownButtonFormField<String>(
-                  value: _selectedFoodService,
+                  initialValue: _selectedFoodService,
                   decoration: InputDecoration(
                     labelText: 'Food Service',
                     prefixIcon: const Icon(Icons.restaurant, color: Colors.purple),
@@ -481,7 +481,7 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                 const SizedBox(height: 16),
                 // Order Status Dropdown
                 DropdownButtonFormField<String>(
-                  value: _selectedOrderStatus,
+                  initialValue: _selectedOrderStatus,
                   decoration: InputDecoration(
                     labelText: 'Order Status',
                     prefixIcon: const Icon(Icons.assignment, color: Colors.purple),

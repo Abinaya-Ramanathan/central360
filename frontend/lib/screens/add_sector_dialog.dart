@@ -56,15 +56,89 @@ class _AddSectorDialogState extends State<AddSectorDialog> {
           Navigator.of(context).pop(created);
         }
       } catch (e) {
-        // Extract error message without "Exception: " prefix
-        String errorMessage = e.toString().replaceFirst('Exception: ', '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds:4),
-          ),
-        );
+        // Extract error message - split main message from debug info
+        String fullError = e.toString().replaceFirst('Exception: ', '');
+        String errorMessage = fullError;
+        String debugInfo = '';
+        
+        // Check if there's debug info in the error
+        if (fullError.contains('\n\n[Debug:')) {
+          final parts = fullError.split('\n\n[Debug:');
+          errorMessage = parts[0].trim();
+          if (parts.length > 1) {
+            debugInfo = parts[1].replaceFirst(']', '').trim();
+          }
+        }
+        
+        // Log full error details for debugging
+        debugPrint('=== SECTOR CREATION ERROR ===');
+        debugPrint('Full error: $e');
+        debugPrint('Error message: $errorMessage');
+        debugPrint('Debug info: $debugInfo');
+        debugPrint('Sector code: ${_codeController.text}');
+        debugPrint('Sector name: ${_nameController.text}');
+        debugPrint('============================');
+        
+        // Show more detailed error in a dialog for better visibility
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Error Creating Sector', style: TextStyle(color: Colors.red)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      errorMessage,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    if (debugInfo.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Technical Details:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        debugInfo,
+                        style: const TextStyle(fontSize: 11, color: Colors.grey, fontFamily: 'monospace'),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Sector Details:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Code: ${_codeController.text}\nName: ${_nameController.text}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        // Also show snackbar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
       }
     }
   }

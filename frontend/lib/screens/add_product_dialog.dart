@@ -131,7 +131,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
               const SizedBox(height: 16),
               // Sector Dropdown
               DropdownButtonFormField<String>(
-                value: _selectedSectorCode,
+                initialValue: _selectedSectorCode,
                 decoration: InputDecoration(
                   labelText: 'Sector *',
                   prefixIcon: const Icon(Icons.business, color: Colors.green),

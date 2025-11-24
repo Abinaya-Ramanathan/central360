@@ -20,6 +20,10 @@ import vehicleLicensesRouter from './routes/vehicle_licenses.routes.js';
 import driverLicensesRouter from './routes/driver_licenses.routes.js';
 import engineOilServicesRouter from './routes/engine_oil_services.routes.js';
 import emailRouter from './routes/email.routes.js';
+import stockItemsRouter from './routes/stock_items.routes.js';
+import dailyStockRouter from './routes/daily_stock.routes.js';
+import overallStockRouter from './routes/overall_stock.routes.js';
+import stockStatementRouter from './routes/stock_statement.routes.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -57,6 +61,10 @@ app.use('/api/v1/vehicle-licenses', vehicleLicensesRouter);
 app.use('/api/v1/driver-licenses', driverLicensesRouter);
 app.use('/api/v1/engine-oil-services', engineOilServicesRouter);
 app.use('/api/v1/email', emailRouter);
+app.use('/api/v1/stock-items', stockItemsRouter);
+app.use('/api/v1/daily-stock', dailyStockRouter);
+app.use('/api/v1/overall-stock', overallStockRouter);
+app.use('/api/v1/stock-statement', stockStatementRouter);
 
 export default app;
 

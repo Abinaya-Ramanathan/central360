@@ -22,7 +22,7 @@ class EnvConfig {
 
   // Get API base URL with protocol
   static String get apiBaseUrl {
-    final url = baseUrl;
+    const url = baseUrl;
     // Ensure URL doesn't end with slash
     return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
   }

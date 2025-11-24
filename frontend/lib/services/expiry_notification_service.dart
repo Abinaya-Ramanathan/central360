@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../models/vehicle_license.dart';
 import '../models/driver_license.dart';
@@ -67,7 +68,7 @@ class ExpiryNotificationService {
       final mahalBookings = await ApiService.getMahalBookings();
       await _notificationService.checkMahalBookingEventDates(mahalBookings);
     } catch (e) {
-      print('Error checking expiry dates: $e');
+      debugPrint('Error checking expiry dates: $e');
       // Don't throw - just log the error
     }
   }
@@ -77,7 +78,7 @@ class ExpiryNotificationService {
     try {
       await _notificationService.checkVehicleExpiries(vehicleLicenses);
     } catch (e) {
-      print('Error checking vehicle expiry dates: $e');
+      debugPrint('Error checking vehicle expiry dates: $e');
     }
   }
 
@@ -86,7 +87,7 @@ class ExpiryNotificationService {
     try {
       await _notificationService.checkDriverExpiries(driverLicenses);
     } catch (e) {
-      print('Error checking driver expiry dates: $e');
+      debugPrint('Error checking driver expiry dates: $e');
     }
   }
 
@@ -95,7 +96,7 @@ class ExpiryNotificationService {
     try {
       await _notificationService.checkEngineOilServiceExpiries(services);
     } catch (e) {
-      print('Error checking engine oil service expiry dates: $e');
+      debugPrint('Error checking engine oil service expiry dates: $e');
     }
   }
 
@@ -104,7 +105,7 @@ class ExpiryNotificationService {
     try {
       await _notificationService.checkMahalBookingEventDates(bookings);
     } catch (e) {
-      print('Error checking mahal booking event dates: $e');
+      debugPrint('Error checking mahal booking event dates: $e');
     }
   }
 }

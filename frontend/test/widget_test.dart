@@ -7,12 +7,12 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:central360/main.dart';
+import 'package:company360/main.dart';
 
 void main() {
   testWidgets('App starts with login screen', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const Central360App());
+    await tester.pumpWidget(const Company360App());
 
     // Verify that login screen is displayed
     expect(find.text('Login'), findsOneWidget);

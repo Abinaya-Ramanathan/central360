@@ -171,11 +171,11 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
           DataColumn(label: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
           DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
         ],
-        rows: [
+        rows: const [
           DataRow(
             cells: [
-              DataCell(Text('No expense data available', style: const TextStyle(fontStyle: FontStyle.italic))),
-              const DataCell(SizedBox.shrink()),
+              DataCell(Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
+              DataCell(SizedBox.shrink()),
             ],
           ),
         ],
@@ -198,7 +198,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
               DataCell(Text('₹${_sectorExpenseSummary[sectorCode]!.toStringAsFixed(2)}')),
             ],
           );
-        }).toList(),
+        }),
         DataRow(
           color: WidgetStateProperty.all(Colors.purple.shade50),
           cells: [
@@ -236,7 +236,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
                 cells: [
                   if (showSectorColumn)
                     const DataCell(SizedBox.shrink()),
-                  DataCell(Text('No expense data available', style: const TextStyle(fontStyle: FontStyle.italic))),
+                  const DataCell(Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
                   const DataCell(SizedBox.shrink()),
                   const DataCell(SizedBox.shrink()),
                   const DataCell(SizedBox.shrink()),
@@ -278,7 +278,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
                     ),
                   ],
                 );
-              }).toList(),
+              }),
               DataRow(
                 color: WidgetStateProperty.all(Colors.purple.shade50),
                 cells: [
@@ -525,7 +525,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
     if (result == true) {
       final recordId = _parseIdFromDynamic(record['id']);
       await _saveExpenseData(
-        id: recordId != null ? recordId.toString() : null,
+        id: recordId?.toString(),
         itemDetails: itemDetailsController.text.trim(),
         amount: _parseDoubleValue(amountController.text),
         reason: reasonController.text.trim(),

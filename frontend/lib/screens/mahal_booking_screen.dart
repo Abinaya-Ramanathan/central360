@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/mahal_booking.dart';
 import '../models/catering_details.dart';
 import '../models/expense_details.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -15,11 +17,13 @@ import '../utils/pdf_generator.dart';
 class MahalBookingScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  final bool isMainAdmin;
 
   const MahalBookingScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.isMainAdmin = false,
   });
 
   @override
@@ -99,7 +103,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
       await NotificationService().checkMahalBookingEventDates(_eventDetails);
     } catch (e) {
       // Silently handle errors - notifications are non-critical
-      print('Error checking event dates: $e');
+      debugPrint('Error checking event dates: $e');
     }
   }
 
@@ -119,11 +123,11 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
           title: const Text('Mahal Booking and Catering Order'),
           backgroundColor: Colors.purple.shade700,
           foregroundColor: Colors.white,
-          bottom: TabBar(
+          bottom: const TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
             indicatorColor: Colors.orange,
-            tabs: const [
+            tabs: [
               Tab(text: 'Event Details'),
               Tab(text: 'Catering Details'),
               Tab(text: 'Expense Details'),
@@ -161,7 +165,14 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
               icon: const Icon(Icons.home),
               onPressed: () {
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => HomeScreen(username: widget.username)),
+                  MaterialPageRoute(
+                    builder: (context) => HomeScreen(
+                      username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                      initialSector: widget.selectedSector,
+                      isAdmin: AuthService.isAdmin,
+                      isMainAdmin: AuthService.isMainAdmin,
+                    ),
+                  ),
                 );
               },
             ),
@@ -244,17 +255,17 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
                           ),
                         ),
                         const DataColumn(label: Text('Event Timing')),
-                        DataColumn(label: Text('Event Name')),
-                        DataColumn(label: Text('Client Name')),
-                        DataColumn(label: Text('Client Phone 1')),
-                        DataColumn(label: Text('Client Phone 2')),
-                        DataColumn(label: Text('Client Address')),
-                        DataColumn(label: Text('Food Service')),
-                        DataColumn(label: Text('Advance Received')),
-                        DataColumn(label: Text('Quoted Amount')),
-                        DataColumn(label: Text('Amount Received')),
-                        DataColumn(label: Text('Order Status')),
-                        DataColumn(label: Text('Action')),
+                        const DataColumn(label: Text('Event Name')),
+                        const DataColumn(label: Text('Client Name')),
+                        const DataColumn(label: Text('Client Phone 1')),
+                        const DataColumn(label: Text('Client Phone 2')),
+                        const DataColumn(label: Text('Client Address')),
+                        const DataColumn(label: Text('Food Service')),
+                        const DataColumn(label: Text('Advance Received')),
+                        const DataColumn(label: Text('Quoted Amount')),
+                        const DataColumn(label: Text('Amount Received')),
+                        const DataColumn(label: Text('Order Status')),
+                        const DataColumn(label: Text('Action')),
                       ],
                       rows: (filteredEvents..sort((a, b) {
                         final comparison = a.eventDate.compareTo(b.eventDate);
@@ -262,7 +273,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
                       })).map((event) {
                         final isSelected = event.bookingId == _selectedBookingId;
                         return DataRow(
-                          color: isSelected ? MaterialStateProperty.all(Colors.yellow.shade100) : null,
+                          color: isSelected ? WidgetStateProperty.all(Colors.yellow.shade100) : null,
                           cells: [
                             DataCell(
                               InkWell(
@@ -289,7 +300,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
                                 children: [
                                   IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewEvent(event)),
                                   IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), onPressed: () => _editEvent(event)),
-                                  if (widget.username.toLowerCase() == 'admin' || widget.username.toLowerCase() == 'srisurya')
+                                  if (widget.isMainAdmin)
                                     IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () => _deleteEvent(event.bookingId!)),
                                 ],
                               ),
@@ -363,7 +374,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
                                   IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewCatering(catering)),
                                   IconButton(icon: const Icon(Icons.download, color: Colors.blue, size: 20), tooltip: 'Download PDF', onPressed: () => _downloadCateringPDF(catering)),
                                   IconButton(icon: const Icon(Icons.edit, color: Colors.orange, size: 20), tooltip: 'Edit', onPressed: () => _editCatering(catering)),
-                                  if (widget.username.toLowerCase() == 'admin' || widget.username.toLowerCase() == 'srisurya')
+                                  if (widget.isMainAdmin)
                                     IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteCatering(catering.bookingId)),
                                 ],
                               ),
@@ -457,7 +468,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
                                 children: [
                                   IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewExpense(expense)),
                                   IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), onPressed: () => _editExpense(expense)),
-                                  if (widget.username.toLowerCase() == 'admin' || widget.username.toLowerCase() == 'srisurya')
+                                  if (widget.isMainAdmin)
                                     IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () => _deleteExpense(expense.bookingId)),
                                 ],
                               ),

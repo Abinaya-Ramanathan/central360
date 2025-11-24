@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'services/notification_service.dart';
@@ -18,19 +19,19 @@ void main() async {
     await ExpiryNotificationService().initialize();
   } catch (e) {
     // Silently handle errors - notifications might not work on all platforms (e.g., Windows)
-    print('Notification initialization error: $e');
+    debugPrint('Notification initialization error: $e');
   }
   
-  runApp(const Central360App());
+  runApp(const Company360App());
 }
 
-class Central360App extends StatelessWidget {
-  const Central360App({super.key});
+class Company360App extends StatelessWidget {
+  const Company360App({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Central360',
+      title: 'Company360',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFF4AC2B)),
         useMaterial3: true,

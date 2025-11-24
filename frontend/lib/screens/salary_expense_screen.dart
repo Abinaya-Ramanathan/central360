@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/employee.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'month_year_picker.dart';
@@ -351,7 +353,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       setState(() {});
     } catch (e) {
       // Ignore errors, just continue with empty data
-      print('Error loading salary expenses: $e');
+      debugPrint('Error loading salary expenses: $e');
     }
   }
 
@@ -572,7 +574,10 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (context) => HomeScreen(
-                    username: widget.username,
+                    username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                    initialSector: widget.selectedSector,
+                    isAdmin: AuthService.isAdmin,
+                    isMainAdmin: AuthService.isMainAdmin,
                   ),
                 ),
               );

@@ -10,6 +10,14 @@ cd F:\central360\frontend
 build-release.bat
 ```
 
+**Windows PowerShell:**
+```powershell
+cd F:\central360\frontend
+.\build-release.bat
+```
+
+**Note:** PowerShell requires `.\` prefix to run scripts in the current directory.
+
 **What It Does:**
 1. ✅ Cleans previous builds
 2. ✅ Installs dependencies

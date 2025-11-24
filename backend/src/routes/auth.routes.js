@@ -15,8 +15,12 @@ router.post('/login', async (req, res) => {
     let isAdmin = false;
     let sectorCode = null;
 
-    // Check for admin login
-    if (username.toLowerCase() === 'srisurya' && password === 'admin') {
+    // Check for admin login - based on PASSWORD, not username
+    // Admin privileges: password is "admin" OR "abinaya" (case insensitive) - username doesn't matter
+    // Main Admin (delete privileges): password is "abinaya" (case insensitive) - username doesn't matter
+    const passwordLower = password.toLowerCase();
+    
+    if (passwordLower === 'admin' || passwordLower === 'abinaya') {
       isValid = true;
       isAdmin = true;
     } else {
@@ -37,8 +41,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
+    // Check if main admin - based on PASSWORD being "abinaya" (case insensitive)
+    const isMainAdmin = passwordLower === 'abinaya';
+
     const token = jwt.sign(
-      { sub: username, company: company || null, isAdmin, sectorCode },
+      { sub: username, company: company || null, isAdmin, isMainAdmin, sectorCode },
       process.env.JWT_SECRET || 'dev-secret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
     );
@@ -47,6 +54,7 @@ router.post('/login', async (req, res) => {
       token,
       username,
       isAdmin,
+      isMainAdmin,
       sectorCode 
     });
   } catch (err) {

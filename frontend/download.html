@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Company360</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 700px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .download-btn {
+            display: inline-block;
+            padding: 18px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            margin: 20px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        .info-section {
+            text-align: left;
+            margin-top: 40px;
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+        }
+        .info-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .info-section ol, .info-section ul {
+            margin-left: 20px;
+            line-height: 1.8;
+            color: #555;
+        }
+        .info-section li {
+            margin: 8px 0;
+        }
+        .version {
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #d63384;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Company360</h1>
+        <p class="subtitle">Comprehensive Business Management Application</p>
+        
+        <a href="https://github.com/YOUR_USERNAME/company360/releases/latest/download/company360-setup.exe" 
+           class="download-btn" 
+           download>
+            📥 Download Company360 v1.0.0
+        </a>
+        
+        <p class="version">Latest Version: 1.0.0</p>
+        
+        <div class="info-section">
+            <h3>📋 Installation Instructions</h3>
+            <ol>
+                <li>Click the download button above</li>
+                <li>Run the downloaded <code>company360-setup.exe</code> file</li>
+                <li>Follow the installation wizard</li>
+                <li>Launch Company360 from Start Menu or Desktop shortcut</li>
+            </ol>
+        </div>
+        
+        <div class="info-section">
+            <h3>💻 System Requirements</h3>
+            <ul>
+                <li><strong>OS:</strong> Windows 10 or later</li>
+                <li><strong>Architecture:</strong> 64-bit (x64)</li>
+                <li><strong>Internet:</strong> Required for backend API connection</li>
+                <li><strong>Disk Space:</strong> ~100 MB</li>
+            </ul>
+        </div>
+        
+        <div class="info-section">
+            <h3>✨ Features</h3>
+            <ul>
+                <li>Employee & Attendance Management</li>
+                <li>Stock Management (Daily & Overall)</li>
+                <li>Production Tracking</li>
+                <li>Expense & Credit Management</li>
+                <li>Mahal Bookings & Catering</li>
+                <li>Vehicle & Driver License Tracking</li>
+                <li>Maintenance Issue Management</li>
+                <li>PDF Reports & Statements</li>
+            </ul>
+        </div>
+        
+        <div class="info-section">
+            <h3>🔐 Login Credentials</h3>
+            <p><strong>Main Admin:</strong> username: <code>abinaya</code> | password: <code>abinaya</code></p>
+            <p><strong>Sub Admin:</strong> username: <code>admin</code> | password: <code>admin</code></p>
+            <p style="margin-top: 10px; color: #666; font-size: 0.9em;">* Passwords are case-insensitive</p>
+        </div>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #999; font-size: 0.9em;">
+            <p>Need help? Contact support or visit our GitHub repository</p>
+            <p style="margin-top: 10px;">
+                <a href="https://github.com/YOUR_USERNAME/company360" style="color: #667eea; text-decoration: none;">GitHub Repository</a>
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // Update download link with actual GitHub username
+        // Replace YOUR_USERNAME with your actual GitHub username
+        const githubUsername = 'YOUR_USERNAME';
+        const downloadBtn = document.querySelector('.download-btn');
+        downloadBtn.href = `https://github.com/${githubUsername}/company360/releases/latest/download/company360-setup.exe`;
+    </script>
+</body>
+</html>
+

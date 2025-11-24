@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../models/sector.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -240,16 +241,16 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
           DataColumn(label: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
           DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
         ],
-        rows: [
+        rows: const [
           DataRow(
             cells: [
               DataCell(
                 Text(
                   'No expense data available',
-                  style: const TextStyle(fontStyle: FontStyle.italic),
+                  style: TextStyle(fontStyle: FontStyle.italic),
                 ),
               ),
-              const DataCell(SizedBox.shrink()),
+              DataCell(SizedBox.shrink()),
             ],
           ),
         ],
@@ -273,7 +274,7 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
               DataCell(Text('₹${_sectorExpenseSummary[sectorCode]!.toStringAsFixed(2)}')),
             ],
           );
-        }).toList(),
+        }),
         // Total Expense Row
         DataRow(
           color: WidgetStateProperty.all(Colors.purple.shade50),
@@ -315,17 +316,17 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
       ],
       rows: _expenseData.isEmpty
           ? [
-              DataRow(
+              const DataRow(
                 cells: [
                   DataCell(
                     Text(
                       'No expense data available',
-                      style: const TextStyle(fontStyle: FontStyle.italic),
+                      style: TextStyle(fontStyle: FontStyle.italic),
                     ),
                   ),
-                  const DataCell(SizedBox.shrink()),
-                  const DataCell(SizedBox.shrink()),
-                  const DataCell(SizedBox.shrink()),
+                  DataCell(SizedBox.shrink()),
+                  DataCell(SizedBox.shrink()),
+                  DataCell(SizedBox.shrink()),
                 ],
               ),
             ]
@@ -355,7 +356,7 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
                     ),
                   ],
                 );
-              }).toList(),
+              }),
               // Total Expense Row
               DataRow(
                 color: WidgetStateProperty.all(Colors.purple.shade50),
@@ -560,7 +561,7 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
     if (result == true) {
       final recordId = _parseIdFromDynamic(record['id']);
       await _saveExpenseData(
-        id: recordId != null ? recordId.toString() : null,
+        id: recordId?.toString(),
         itemDetails: itemDetailsController.text.trim(),
         amount: _parseDoubleValue(amountController.text),
         reason: reasonController.text.trim(),
@@ -680,14 +681,14 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
               ),
             )
           else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.business, size: 18),
-                  const SizedBox(width: 4),
-                  const Text(
+                  Icon(Icons.business, size: 18),
+                  SizedBox(width: 4),
+                  Text(
                     'All Sectors',
                     style: TextStyle(fontSize: 14),
                   ),
@@ -715,7 +716,10 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (context) => HomeScreen(
-                    username: widget.username,
+                    username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                    initialSector: widget.selectedSector,
+                    isAdmin: AuthService.isAdmin,
+                    isMainAdmin: AuthService.isMainAdmin,
                   ),
                 ),
               );

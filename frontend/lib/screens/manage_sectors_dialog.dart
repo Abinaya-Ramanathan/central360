@@ -3,7 +3,9 @@ import '../services/api_service.dart';
 import '../models/sector.dart';
 
 class ManageSectorsDialog extends StatefulWidget {
-  const ManageSectorsDialog({super.key});
+  final bool isMainAdmin;
+
+  const ManageSectorsDialog({super.key, required this.isMainAdmin});
 
   @override
   State<ManageSectorsDialog> createState() => _ManageSectorsDialogState();
@@ -170,11 +172,12 @@ class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
                                           tooltip: 'Edit',
                                           onPressed: () => _editSector(sector),
                                         ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                          tooltip: 'Delete',
-                                          onPressed: () => _deleteSector(sector),
-                                        ),
+                                        if (widget.isMainAdmin)
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                            tooltip: 'Delete',
+                                            onPressed: () => _deleteSector(sector),
+                                          ),
                                       ],
                                     ),
                                   ),

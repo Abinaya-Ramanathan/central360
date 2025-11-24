@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'login_screen.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class DailyReportDetailsScreen extends StatefulWidget {
   final String username;
@@ -178,7 +179,12 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> wit
             onPressed: () {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (context) => HomeScreen(username: widget.username),
+                  builder: (context) => HomeScreen(
+                    username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                    initialSector: widget.selectedSector,
+                    isAdmin: AuthService.isAdmin,
+                    isMainAdmin: AuthService.isMainAdmin,
+                  ),
                 ),
               );
             },

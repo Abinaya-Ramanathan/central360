@@ -312,3 +312,51 @@ CREATE INDEX IF NOT EXISTS idx_engine_oil_services_date ON engine_oil_services(s
 CREATE INDEX IF NOT EXISTS idx_engine_oil_services_next_date ON engine_oil_services(next_service_date);
 CREATE INDEX IF NOT EXISTS idx_engine_oil_services_vehicle ON engine_oil_services(vehicle_name);
 
+-- ============================================
+-- STOCK ITEMS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS stock_items (
+  id SERIAL PRIMARY KEY,
+  item_name VARCHAR(255) NOT NULL,
+  sector_code VARCHAR(50) NOT NULL REFERENCES sectors(code) ON DELETE CASCADE,
+  vehicle_type VARCHAR(255),
+  part_number VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(item_name, sector_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_items_sector ON stock_items(sector_code);
+
+-- ============================================
+-- DAILY STOCK TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS daily_stock (
+  id SERIAL PRIMARY KEY,
+  item_id INTEGER NOT NULL REFERENCES stock_items(id) ON DELETE CASCADE,
+  quantity_taken VARCHAR(255) DEFAULT '0',
+  reason TEXT,
+  stock_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_stock_item ON daily_stock(item_id);
+CREATE INDEX IF NOT EXISTS idx_daily_stock_date ON daily_stock(stock_date);
+
+-- ============================================
+-- OVERALL STOCK TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS overall_stock (
+  id SERIAL PRIMARY KEY,
+  item_id INTEGER NOT NULL REFERENCES stock_items(id) ON DELETE CASCADE,
+  remaining_stock DECIMAL(10, 2) DEFAULT 0,
+  new_stock DECIMAL(10, 2) DEFAULT 0,
+  new_stock_date DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_overall_stock_item ON overall_stock(item_id);
+

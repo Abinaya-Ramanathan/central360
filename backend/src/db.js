@@ -7,21 +7,8 @@ const { Pool } = pkg;
 // Create pool configuration - support both connection string and individual parameters
 let poolConfig;
 
-// Option 1: Use individual parameters (recommended if password has special characters)
-if (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME) {
-  poolConfig = {
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DB_NAME,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 30000,
-  };
-  console.log('Using individual database connection parameters');
-}
-// Option 2: Use connection string
-else if (process.env.DATABASE_URL) {
+// Priority 1: Use DATABASE_URL (Railway provides this automatically)
+if (process.env.DATABASE_URL) {
   const connectionString = process.env.DATABASE_URL;
   
   // Check if password might need URL encoding
@@ -37,6 +24,19 @@ else if (process.env.DATABASE_URL) {
     idleTimeoutMillis: 30000,
   };
   console.log('Using DATABASE_URL connection string');
+}
+// Option 2: Use individual parameters (fallback if DATABASE_URL not available)
+else if (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME) {
+  poolConfig = {
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+  };
+  console.log('Using individual database connection parameters');
 }
 else {
   console.error('ERROR: Database configuration is missing!');

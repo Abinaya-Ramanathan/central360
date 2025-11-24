@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../models/sector.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -39,20 +41,11 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
     _loadSectors();
     // Load products first, then production data after initialization
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      print('Daily Production: initState callback, sector: ${widget.selectedSector}');
-      print('Daily Production: Selected month: $_selectedMonth, date: $_selectedDate');
       if (widget.selectedSector != null) {
-        print('Daily Production: Sector is not null, calling _loadProducts()');
         await _loadProducts();
-        print('Daily Production: Products loaded in initState, count: ${_products.length}');
         if (_selectedDate != null) {
-          print('Daily Production: Calling _loadProductionData()');
           await _loadProductionData();
-        } else {
-          print('Daily Production: Date is null, skipping _loadProductionData()');
         }
-      } else {
-        print('Daily Production: No sector selected in initState');
       }
     });
   }
@@ -90,21 +83,13 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
       setState(() => _isLoading = true);
     }
     try {
-      print('Daily Production: Calling ApiService.getProducts(sector: ${widget.selectedSector})');
       final products = await ApiService.getProducts(sector: widget.selectedSector);
-      print('Daily Production: API returned ${products.length} products');
-      print('Daily Production: Products: $products');
       if (mounted) {
         setState(() {
           _products = products;
-          print('Daily Production: Updated _products list, count: ${_products.length}');
         });
-      } else {
-        print('Daily Production: Widget not mounted, cannot update state');
       }
-    } catch (e, stackTrace) {
-      print('Daily Production: Error loading products: $e');
-      print('Daily Production: Stack trace: $stackTrace');
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading products: $e')),
@@ -201,12 +186,9 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
     }
     
     if (_products.isEmpty) {
-      print('Daily Production: Products empty, loading products first for sector: ${widget.selectedSector}');
       await _loadProducts(showLoading: false);
-      print('Daily Production: Products loaded, count: ${_products.length}');
       
       if (_products.isEmpty) {
-        print('Daily Production: Still no products after loading. Check if products exist for sector ${widget.selectedSector}');
         if (mounted) {
           setState(() {
             _productionData = [];
@@ -236,10 +218,8 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
       // Build the final list: products from database (with saved data if exists, or empty entries)
       final List<Map<String, dynamic>> finalData = [];
       
-      print('Daily Production: Building final data from ${_products.length} products');
       for (var product in _products) {
         final productName = product['product_name']?.toString() ?? '';
-        print('Daily Production: Processing product: $productName');
         if (existingRecordsMap.containsKey(productName)) {
           // Use saved data
           finalData.add(existingRecordsMap[productName]!);
@@ -256,7 +236,6 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
         }
       }
       
-      print('Daily Production: Final data count: ${finalData.length}');
       if (mounted) {
         setState(() {
           _productionData = finalData;
@@ -526,14 +505,14 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
               ),
             )
           else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.business, size: 18),
-                  const SizedBox(width: 4),
-                  const Text(
+                  Icon(Icons.business, size: 18),
+                  SizedBox(width: 4),
+                  Text(
                     'All Sectors',
                     style: TextStyle(fontSize: 14),
                   ),
@@ -561,7 +540,10 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (context) => HomeScreen(
-                    username: widget.username,
+                    username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                    initialSector: widget.selectedSector,
+                    isAdmin: AuthService.isAdmin,
+                    isMainAdmin: AuthService.isMainAdmin,
                   ),
                 ),
               );

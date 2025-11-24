@@ -36,9 +36,14 @@ router.post('/', async (req, res) => {
     const nameTrimmed = name.trim();
 
     // Check if sector already exists
-    const existing = await db.query('SELECT * FROM sectors WHERE code = $1', [codeUpper]);
-    if (existing.rows.length > 0) {
-      return res.status(400).json({ message: 'Sector code already exists' });
+    try {
+      const existing = await db.query('SELECT * FROM sectors WHERE code = $1', [codeUpper]);
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ message: 'Sector code already exists' });
+      }
+    } catch (checkErr) {
+      console.error('Error checking existing sector:', checkErr);
+      // Continue to try insert - might be a connection issue
     }
 
     const { rows } = await db.query(
@@ -48,13 +53,27 @@ router.post('/', async (req, res) => {
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error('Error creating sector:', err);
+    console.error('Error code:', err.code);
+    console.error('Error message:', err.message);
+    
     // Handle database constraint violations
     if (err.code === '23505') { // Unique violation
       return res.status(400).json({ message: 'Sector code already exists' });
     }
+    
+    // Handle other database errors
+    if (err.code && err.code.startsWith('23')) { // Other constraint violations
+      return res.status(400).json({ 
+        message: 'Database constraint violation',
+        error: err.message 
+      });
+    }
+    
+    // Return more detailed error in production for debugging
     res.status(500).json({ 
       message: 'Error creating sector',
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      error: err.message || 'Unknown database error',
+      code: err.code || 'UNKNOWN'
     });
   }
 });

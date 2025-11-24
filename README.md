@@ -1,61 +1,130 @@
-# Central360
+# Company360
 
-This is the dedicated project root for Central360, separate from any employee-management-system scaffolding.
+Comprehensive Business Management Application for managing employees, expenses, bookings, credit details, vehicle licenses, and more.
 
-## Structure
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+ and npm
+- Flutter 3.0+
+- PostgreSQL database
+- Git
+
+### Installation
+
+#### Backend
+```bash
+cd backend
+npm install
+cp .env.example .env  # Edit .env with your database credentials
+npm start
+```
+
+#### Frontend
+```bash
+cd frontend
+flutter pub get
+flutter run -d windows
+```
+
+## 📦 Download Windows Installer
+
+**Latest Release:**
+[Download Company360 Installer](https://github.com/YOUR_USERNAME/company360/releases/latest/download/company360-setup.exe)
+
+**System Requirements:**
+- Windows 10 or later
+- 64-bit system
+- Internet connection
+
+## 🏗️ Project Structure
 
 ```
-central360/
-├── README.md
-├── assets/
-│   └── brand/
-│       └── c360-logo.png    # (legacy) general brand asset
-└── docs/
-    └── PROJECT_STRUCTURE.md # copied/derived from the planning document
-
-frontend/                     # Flutter app
-├── pubspec.yaml
-└── lib/
-    ├── main.dart
-    └── screens/
-        └── login_screen.dart
-└── assets/
+company360/
+├── backend/          # Node.js + Express + PostgreSQL
+│   ├── src/
+│   │   ├── routes/   # API routes
+│   │   ├── migrations/ # Database migrations
+│   │   └── index.js  # Server entry point
+│   └── package.json
+├── frontend/         # Flutter application
+│   ├── lib/
+│   │   ├── screens/  # UI screens
+│   │   ├── services/ # API services
+│   │   └── models/   # Data models
+│   └── pubspec.yaml
+└── assets/           # Brand assets
     └── brand/
-        └── c360-logo.png     # Flutter loads this path
-
-backend/                      # Node.js + Express + PostgreSQL
-├── package.json
-├── env.example
-└── src/
-    ├── index.js
-    ├── server.js
-    ├── db.js
-    └── routes/
-        └── auth.routes.js
+        └── c360-icon.ico
 ```
 
-## Branding
+## 🔧 Development
 
-- Logo expected at: `central360/assets/brand/c360-logo.png`
-- Preferred usage: splash, login, app icon, installer assets
-- Colors: gold/yellow sun accent with white “360” on dark background
+### Backend Development
+```bash
+cd backend
+npm run dev  # Development mode with auto-reload
+```
 
-## Next
+### Frontend Development
+```bash
+cd frontend
+flutter run -d windows  # Run on Windows
+```
 
-1. Copy your logo to `central360/frontend/assets/brand/c360-logo.png` (required by Flutter).
-2. Backend
-   - Create `.env` (copy from `backend/env.example`) and set `DATABASE_URL`, `JWT_SECRET`.
-   - From `central360/backend/`, run:
-     - `npm install`
-     - `npm run dev`
-3. Flutter
-   - From `central360/frontend/`, run:
-     - `flutter pub get`
-     - `flutter run -d windows` (or your target)
+## 🌐 Deployment
 
-Login screen fields:
-- Company name
-- User name
-- Password
+### Backend (Railway)
+1. Connect GitHub repository to Railway
+2. Set root directory to `backend/`
+3. Add PostgreSQL database
+4. Set environment variables
+5. Deploy automatically
 
+### Frontend (Build Installer)
+```bash
+# Build with production API URL
+cd frontend
+flutter build windows --release --dart-define=API_BASE_URL=https://your-api.railway.app
 
+# Create installer using Inno Setup
+# Open setup.iss in Inno Setup Compiler and compile
+```
+
+See [DEPLOYMENT_COMPLETE_GUIDE.md](./DEPLOYMENT_COMPLETE_GUIDE.md) for detailed instructions.
+
+## 📱 Features
+
+- **Employee Management** - Track employees, attendance, and salaries
+- **Stock Management** - Daily and overall stock tracking
+- **Production Tracking** - Daily production records
+- **Expense Management** - Track daily expenses and credit details
+- **Mahal Bookings** - Event booking and catering management
+- **Vehicle & Driver** - License and service tracking
+- **Maintenance Issues** - Track and resolve maintenance issues
+- **Reports & PDFs** - Generate reports and statements
+
+## 👥 User Roles
+
+- **Main Admin** (password: `abinaya`) - Full access including delete privileges
+- **Sub Admin** (password: `admin`) - Admin access without delete privileges
+- **Sector Users** - Access limited to their sector
+
+## 🔐 Security
+
+- JWT-based authentication
+- Role-based access control
+- Password-protected admin accounts
+- Secure API endpoints
+
+## 📄 License
+
+Private - All rights reserved
+
+## 🤝 Support
+
+For issues and questions, please open an issue on GitHub.
+
+---
+
+**Built with:** Flutter, Node.js, Express, PostgreSQL

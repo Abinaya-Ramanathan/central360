@@ -17,11 +17,13 @@
 
 ## 📋 **Step 2: Build Your App Files** (3 minutes)
 
-**Open Command Prompt:**
+**Open Command Prompt or PowerShell:**
 ```cmd
 cd F:\central360\frontend
-build-release.bat
+.\build-release.bat
 ```
+
+**Note:** In PowerShell, you need to use `.\build-release.bat` (with `.\` prefix). In Command Prompt, you can use just `build-release.bat`.
 
 **When asked for API URL**, enter your production backend URL:
 ```

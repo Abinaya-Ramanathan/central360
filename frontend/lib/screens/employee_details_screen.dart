@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'add_employee_dialog.dart';
 import 'edit_employee_dialog.dart';
 import 'home_screen.dart';
@@ -10,11 +11,13 @@ import 'login_screen.dart';
 class EmployeeDetailsScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  final bool isMainAdmin;
 
   const EmployeeDetailsScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.isMainAdmin = false,
   });
 
   @override
@@ -240,14 +243,14 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
               ),
             )
           else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.business, size: 18),
-                  const SizedBox(width: 4),
-                  const Text(
+                  Icon(Icons.business, size: 18),
+                  SizedBox(width: 4),
+                  Text(
                     'All Sectors',
                     style: TextStyle(fontSize: 14),
                   ),
@@ -277,7 +280,10 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(
                   builder: (context) => HomeScreen(
-                    username: widget.username,
+                    username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
+                    initialSector: widget.selectedSector,
+                    isAdmin: AuthService.isAdmin,
+                    isMainAdmin: AuthService.isMainAdmin,
                   ),
                 ),
                 (route) => false, // Remove all previous routes
@@ -484,17 +490,18 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
                                                 }
                                               },
                                             ),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete, color: Colors.red),
-                                              tooltip: 'Delete',
-                                              onPressed: () => _deleteEmployee(employee),
-                                            ),
+                                            if (widget.isMainAdmin)
+                                              IconButton(
+                                                icon: const Icon(Icons.delete, color: Colors.red),
+                                                tooltip: 'Delete',
+                                                onPressed: () => _deleteEmployee(employee),
+                                              ),
                                           ],
                                         ),
                                       ),
                                     ],
                                   );
-                                }).toList(),
+                                }),
                                 // Summary Row
                                 DataRow(
                                   color: WidgetStateProperty.all(Colors.blue.shade50),

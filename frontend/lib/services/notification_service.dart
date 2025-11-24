@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
@@ -82,7 +83,7 @@ class NotificationService {
   /// Handle notification tap
   void _onNotificationTapped(NotificationResponse response) {
     // Handle notification tap - you can navigate to specific screen here
-    print('Notification tapped: ${response.payload}');
+    debugPrint('Notification tapped: ${response.payload}');
   }
 
   /// Show a notification
@@ -249,7 +250,7 @@ class NotificationService {
     // Send notification if date expires in 0-2 days (today, tomorrow, or in 2 days)
     if (daysUntilExpiry >= 0 && daysUntilExpiry <= 2) {
       // Generate unique key to avoid duplicate notifications
-      final notificationKey = _generateNotificationKey('vehicle_${dateType}', vehicleName, expiryDate);
+      final notificationKey = _generateNotificationKey('vehicle_$dateType', vehicleName, expiryDate);
       
       // Only send notification if we haven't sent it already
       if (!_sentNotifications.contains(notificationKey)) {
@@ -265,7 +266,7 @@ class NotificationService {
           id: _generateNotificationId('vehicle_$dateType', licenseId),
           title: 'Vehicle $dateTypeLabel Expiry Alert',
           body: '$vehicleName ($registrationNumber) $dateType is expiring $daysText.',
-          payload: 'vehicle_${dateType}_${licenseId}',
+          payload: 'vehicle_${dateType}_$licenseId',
         );
         
         // Mark this notification as sent

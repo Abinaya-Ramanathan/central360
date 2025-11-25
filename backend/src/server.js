@@ -38,8 +38,13 @@ app.use(express.json());
 // Serve uploaded images
 app.use('/uploads', express.static(join(__dirname, '../uploads')));
 
+// Health check endpoints (for Railway and monitoring)
+app.get('/', (_req, res) => {
+  res.json({ status: 'ok', service: 'Company360 API' });
+});
+
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', service: 'Company360 API' });
 });
 
 app.use('/api/v1/auth', authRouter);

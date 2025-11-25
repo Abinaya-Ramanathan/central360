@@ -13,12 +13,16 @@ const __dirname = path.dirname(__filename);
 // Handle uncaught errors to prevent crashes
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
+  console.error('Stack:', error.stack);
   // Don't exit - let the app continue running
+  // Railway will restart if needed
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('Unhandled Rejection at:', promise);
+  console.error('Reason:', reason);
   // Don't exit - let the app continue running
+  // Railway will restart if needed
 });
 
 // Auto-run migrations on startup
@@ -51,14 +55,59 @@ const host = process.env.HOST || '0.0.0.0';
 
 // Start server after migrations
 runMigrations().then(() => {
-  app.listen(port, host, () => {
+  const server = app.listen(port, host, () => {
     console.log(`Central360 API listening on http://${host}:${port}`);
+    console.log(`Health check available at http://${host}:${port}/api/health`);
+  });
+  
+  // Keep the process alive
+  server.on('error', (error) => {
+    console.error('Server error:', error);
+  });
+  
+  // Handle graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  });
+  
+  process.on('SIGINT', () => {
+    console.log('SIGINT received, shutting down gracefully...');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
   });
 }).catch((error) => {
   console.error('Failed to start server:', error);
   // Still try to start the server even if migrations fail
-  app.listen(port, host, () => {
+  const server = app.listen(port, host, () => {
     console.log(`Central360 API listening on http://${host}:${port}`);
+    console.log(`Health check available at http://${host}:${port}/api/health`);
+  });
+  
+  server.on('error', (error) => {
+    console.error('Server error:', error);
+  });
+  
+  // Handle graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  });
+  
+  process.on('SIGINT', () => {
+    console.log('SIGINT received, shutting down gracefully...');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
   });
 });
 

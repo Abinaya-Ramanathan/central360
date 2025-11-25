@@ -14,10 +14,13 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-REM Get production API URL from user or use default
+REM Get production API URL from user or use default Railway URL
+set DEFAULT_RAILWAY_URL=https://central360-backend-production.up.railway.app
+
 if "%API_BASE_URL%"=="" (
-    set /p API_URL="Enter Production API Base URL (without /api/v1): "
-    if "!API_URL!"=="" set API_URL=http://localhost:4000
+    echo Default Railway URL: %DEFAULT_RAILWAY_URL%
+    set /p API_URL="Enter Production API Base URL (press Enter for default): "
+    if "!API_URL!"=="" set API_URL=%DEFAULT_RAILWAY_URL%
 ) else (
     set API_URL=%API_BASE_URL%
 )

@@ -31,9 +31,13 @@ if (-not $innoSetupPath) {
 Write-Host "Found Inno Setup at: $innoSetupPath" -ForegroundColor Green
 Write-Host ""
 
-# Build Flutter Windows app first
-Write-Host "Step 1: Building Flutter Windows app..." -ForegroundColor Cyan
-& flutter build windows --release
+# Default Railway URL for production builds
+$railwayUrl = "https://central360-backend-production.up.railway.app"
+
+# Build Flutter Windows app first with Railway URL
+Write-Host "Step 1: Building Flutter Windows app with Railway URL..." -ForegroundColor Cyan
+Write-Host "Using API URL: $railwayUrl" -ForegroundColor Gray
+& flutter build windows --release --dart-define=API_BASE_URL=$railwayUrl
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Flutter build failed!" -ForegroundColor Red
     Read-Host "Press Enter to exit"

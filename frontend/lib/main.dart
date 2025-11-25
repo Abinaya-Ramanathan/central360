@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'services/notification_service.dart';
 import 'services/expiry_notification_service.dart';
+import 'config/env_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize config first (loads API URL from config file or environment)
+  await EnvConfig.initialize();
   
   // Initialize notification service on app startup
   try {

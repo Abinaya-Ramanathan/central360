@@ -6,13 +6,17 @@ Write-Host "Company360 - Production Installer Builder"
 Write-Host "========================================"
 Write-Host ""
 
-# Get Railway URL
-$railwayUrl = Read-Host "Enter your Railway API URL (e.g., https://your-app.railway.app)"
+# Default Railway URL (can be overridden)
+$defaultRailwayUrl = "https://central360-backend-production.up.railway.app"
+
+# Get Railway URL (use default if user presses Enter)
+Write-Host "Railway API URL (press Enter to use default):" -ForegroundColor Yellow
+Write-Host "Default: $defaultRailwayUrl" -ForegroundColor Gray
+$railwayUrl = Read-Host "Enter URL"
 
 if ([string]::IsNullOrWhiteSpace($railwayUrl)) {
-    Write-Host "ERROR: Railway URL is required!" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
-    exit 1
+    $railwayUrl = $defaultRailwayUrl
+    Write-Host "Using default Railway URL: $railwayUrl" -ForegroundColor Green
 }
 
 Write-Host ""

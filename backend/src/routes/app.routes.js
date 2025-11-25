@@ -10,12 +10,12 @@ router.get('/version', (_req, res) => {
     // TODO: Update these values when releasing a new version
     // You can also read from a config file or environment variables
     const versionInfo = {
-      version: process.env.APP_VERSION || '1.0.0',
-      buildNumber: process.env.APP_BUILD_NUMBER || '1',
-      downloadUrl: process.env.APP_DOWNLOAD_URL || '', // GitHub release URL or direct download link
-      releaseNotes: process.env.APP_RELEASE_NOTES || 'Bug fixes and improvements',
-      isRequired: process.env.APP_UPDATE_REQUIRED === 'true' || false,
-      releaseDate: process.env.APP_RELEASE_DATE || new Date().toISOString(),
+      version: '1.0.1',  // Update this
+  buildNumber: '2',  // Update this
+  downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.1/Company360-Setup.exe',
+  releaseNotes: 'Auto update fix',
+  isRequired: false,  // Set to true for critical updates
+  releaseDate: '2025-11-25T00:00:00Z',
     };
     
     res.json(versionInfo);

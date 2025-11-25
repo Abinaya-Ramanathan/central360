@@ -24,6 +24,7 @@ import stockItemsRouter from './routes/stock_items.routes.js';
 import dailyStockRouter from './routes/daily_stock.routes.js';
 import overallStockRouter from './routes/overall_stock.routes.js';
 import stockStatementRouter from './routes/stock_statement.routes.js';
+import appRouter from './routes/app.routes.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -70,6 +71,7 @@ app.use('/api/v1/stock-items', stockItemsRouter);
 app.use('/api/v1/daily-stock', dailyStockRouter);
 app.use('/api/v1/overall-stock', overallStockRouter);
 app.use('/api/v1/stock-statement', stockStatementRouter);
+app.use('/api/v1/app', appRouter);
 
 export default app;
 

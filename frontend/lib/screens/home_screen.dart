@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'employee_details_screen.dart';
 import 'daily_report_details_screen.dart';
 import 'maintenance_issue_screen.dart';
@@ -17,6 +18,8 @@ import 'add_stock_item_dialog.dart';
 import 'manage_stock_items_dialog.dart';
 import 'stock_management_screen.dart';
 import 'login_screen.dart';
+import 'update_dialog.dart';
+import '../services/update_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -54,6 +57,34 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedSector = widget.initialSector;
     }
     _loadSectors();
+    // Check for updates after a short delay (to let UI load first)
+    Future.delayed(const Duration(seconds: 2), () {
+      _checkForUpdates();
+    });
+  }
+  
+  Future<void> _checkForUpdates() async {
+    try {
+      final updateInfo = await UpdateService.checkForUpdate();
+      if (updateInfo != null && mounted) {
+        // Show update dialog
+        final shouldUpdate = await showDialog<bool>(
+          context: context,
+          barrierDismissible: !updateInfo.isRequired,
+          builder: (context) => UpdateDialog(updateInfo: updateInfo),
+        );
+        
+        // If update is required and user dismissed, show again after delay
+        if (updateInfo.isRequired && shouldUpdate == false) {
+          Future.delayed(const Duration(seconds: 5), () {
+            if (mounted) _checkForUpdates();
+          });
+        }
+      }
+    } catch (e) {
+      // Silently fail - don't interrupt user experience
+      debugPrint('Error checking for updates: $e');
+    }
   }
 
   Future<void> _loadSectors() async {

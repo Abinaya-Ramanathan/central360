@@ -30,7 +30,7 @@ flutter run -d windows
 ## 📦 Download Windows Installer
 
 **Latest Release:**
-[Download Company360 Installer](https://github.com/YOUR_USERNAME/company360/releases/latest/download/company360-setup.exe)
+[Download Company360 Installer](https://github.com/Abinaya-Ramanathan/company360/releases/latest/download/company360-setup.exe)
 
 **System Requirements:**
 - Windows 10 or later
@@ -91,7 +91,7 @@ flutter build windows --release --dart-define=API_BASE_URL=https://your-api.rail
 # Open setup.iss in Inno Setup Compiler and compile
 ```
 
-See [DEPLOYMENT_COMPLETE_GUIDE.md](./DEPLOYMENT_COMPLETE_GUIDE.md) for detailed instructions.
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
 
 ## 📱 Features
 

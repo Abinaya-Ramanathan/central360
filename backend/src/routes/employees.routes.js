@@ -35,6 +35,7 @@ router.post('/', async (req, res) => {
     const {
       name,
       contact,
+      contact2,
       address,
       bank_details,
       sector,
@@ -87,10 +88,21 @@ router.post('/', async (req, res) => {
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error('Error creating employee:', err);
+    console.error('Error details:', {
+      code: err.code,
+      message: err.message,
+      detail: err.detail,
+      body: req.body
+    });
     // Handle database constraint violations
     if (err.code === '23503') { // Foreign key violation
       return res.status(400).json({ 
         message: `Sector does not exist. Please create the sector first.` 
+      });
+    }
+    if (err.code === '23505') { // Unique violation
+      return res.status(400).json({ 
+        message: `Employee with this information already exists.` 
       });
     }
     res.status(500).json({ 
@@ -107,6 +119,7 @@ router.put('/:id', async (req, res) => {
     const {
       name,
       contact,
+      contact2,
       address,
       bank_details,
       sector,

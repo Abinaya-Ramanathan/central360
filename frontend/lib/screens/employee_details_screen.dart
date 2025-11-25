@@ -28,10 +28,12 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   List<Employee> _employees = [];
   List<Sector> _sectors = [];
   bool _isLoading = false;
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
+    _isAdmin = AuthService.isAdmin;
     _loadSectors();
     _loadEmployees();
   }
@@ -556,35 +558,48 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-            onPressed: () async {
-              final result = await showDialog<Employee>(
-                context: context,
-                builder: (context) => const AddEmployeeDialog(),
-              );
-              if (result != null) {
-                try {
-                  final created = await ApiService.createEmployee(result);
-                  setState(() {
-                    _employees.add(created);
-                  });
-                } catch (e) {
-                  // Extract error message without "Exception: " prefix
-                  String errorMessage = e.toString().replaceFirst('Exception: ', '');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(errorMessage),
-                      backgroundColor: Colors.red,
-                      duration: const Duration(seconds: 4),
-                    ),
-                  );
+      floatingActionButton: _isAdmin || widget.isMainAdmin
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                final result = await showDialog<Employee>(
+                  context: context,
+                  builder: (context) => const AddEmployeeDialog(),
+                );
+                if (result != null) {
+                  try {
+                    final created = await ApiService.createEmployee(result);
+                    setState(() {
+                      _employees.add(created);
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Employee added successfully'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    // Extract error message without "Exception: " prefix
+                    String errorMessage = e.toString().replaceFirst('Exception: ', '');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(errorMessage),
+                          backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    }
+                  }
                 }
-              }
-            },
-            backgroundColor: Colors.blue.shade700,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Employee'),
-          ),
+              },
+              backgroundColor: Colors.blue.shade700,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Employee'),
+            )
+          : null,
     );
   }
 }

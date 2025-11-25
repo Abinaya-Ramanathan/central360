@@ -43,9 +43,14 @@ router.post('/', async (req, res) => {
       production_date,
     } = req.body;
 
+    // Validation
+    if (!product_name || !production_date) {
+      return res.status(400).json({ message: 'Product name and production date are required' });
+    }
+
     let rows;
     
-    // If ID is provided, update existing record
+    // If ID is provided, update existing record by ID
     if (id) {
       const result = await db.query(
         `UPDATE daily_production SET
@@ -67,27 +72,58 @@ router.post('/', async (req, res) => {
         return res.status(404).json({ message: 'Daily production record not found' });
       }
     } else {
-      // Create new record
-      const result = await db.query(
-        `INSERT INTO daily_production (
-          product_name, morning_production, afternoon_production,
-          evening_production, production_date
-        ) VALUES ($1, $2, $3, $4, $5)
-        RETURNING *`,
-        [
-          product_name,
-          morning_production || 0,
-          afternoon_production || 0,
-          evening_production || 0,
-          production_date,
-        ]
+      // Check if record exists for this product and date
+      const existingResult = await db.query(
+        'SELECT id FROM daily_production WHERE product_name = $1 AND production_date = $2',
+        [product_name, production_date]
       );
-      rows = result.rows;
+      
+      if (existingResult.rows.length > 0) {
+        // Update existing record
+        const existingId = existingResult.rows[0].id;
+        const result = await db.query(
+          `UPDATE daily_production SET
+            morning_production = $1, afternoon_production = $2,
+            evening_production = $3, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $4
+          RETURNING *`,
+          [
+            morning_production || 0,
+            afternoon_production || 0,
+            evening_production || 0,
+            existingId,
+          ]
+        );
+        rows = result.rows;
+      } else {
+        // Create new record
+        const result = await db.query(
+          `INSERT INTO daily_production (
+            product_name, morning_production, afternoon_production,
+            evening_production, production_date
+          ) VALUES ($1, $2, $3, $4, $5)
+          RETURNING *`,
+          [
+            product_name,
+            morning_production || 0,
+            afternoon_production || 0,
+            evening_production || 0,
+            production_date,
+          ]
+        );
+        rows = result.rows;
+      }
     }
 
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error('Error saving daily production:', err);
+    console.error('Error details:', {
+      code: err.code,
+      message: err.message,
+      detail: err.detail,
+      body: req.body
+    });
     res.status(500).json({ 
       message: 'Error saving daily production',
       error: process.env.NODE_ENV === 'development' ? err.message : undefined

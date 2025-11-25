@@ -100,6 +100,7 @@ class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: _nameController.text.trim(),
         contact: _contactController.text.trim(),
+        contact2: _contact2Controller.text.trim(),
         address: _addressController.text.trim(),
         bankDetails: _bankDetailsController.text.trim(),
         sector: _selectedSector!,

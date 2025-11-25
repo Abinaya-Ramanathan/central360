@@ -149,28 +149,52 @@ https://github.com/Abinaya-Ramanathan/company360/releases
 
 ## 🔄 Updating the App
 
-When you release a new version:
+### Backend Updates (Automatic) ✅
+When you push backend changes to GitHub:
+- Railway **automatically deploys** the backend
+- Changes are **available immediately**
+- Users don't need to do anything
+- The app connects to the updated backend automatically
 
-1. **Update code:**
-   ```powershell
-   git add .
-   git commit -m "Update: description of changes"
-   git push
-   ```
+**Example:**
+```powershell
+git add backend/
+git commit -m "Fix: Production save issue"
+git push
+# Railway auto-deploys - done!
+```
 
-2. **Rebuild installer:**
-   ```powershell
-   cd F:\central360\frontend
-   flutter build windows --release --dart-define=API_BASE_URL=https://your-app.railway.app
-   # Create installer in Inno Setup
-   ```
+### Frontend Updates (Manual) ❌
+When you make frontend changes:
+- You must **rebuild the installer**
+- You must **create a new GitHub Release**
+- Users must **download and install** the new version
+- **No auto-update** - Windows apps don't auto-update
 
-3. **Create new release:**
-   - Tag: `v1.0.1` (increment version)
-   - Upload new installer
-   - Publish
+**Example:**
+```powershell
+# 1. Push code
+git add frontend/
+git commit -m "Add new feature"
+git push
 
-4. **Users get latest automatically** via the `latest` download link!
+# 2. Rebuild installer
+cd F:\central360\frontend
+flutter build windows --release --dart-define=API_BASE_URL=https://your-app.railway.app
+# Create installer in Inno Setup
+
+# 3. Create new GitHub Release
+# - Tag: v1.0.1 (increment version)
+# - Upload new installer
+# - Publish
+
+# 4. Users download from releases page
+```
+
+**Important:** 
+- ✅ Backend changes = Automatic (Railway)
+- ❌ Frontend changes = Manual (new installer required)
+- ❌ App does NOT auto-update - users must install new version
 
 ---
 

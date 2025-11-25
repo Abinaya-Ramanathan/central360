@@ -429,7 +429,12 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
                     'production_date': dateStr,
                   };
 
-                  await ApiService.saveDailyProduction(productionRecord);
+                  try {
+                    await ApiService.saveDailyProduction(productionRecord);
+                  } catch (e) {
+                    debugPrint('Error saving production for $productName: $e');
+                    // Continue with other records even if one fails
+                  }
                 }
 
                 // Dispose controllers
@@ -445,9 +450,14 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
 
                 if (mounted) {
                   Navigator.pop(context, true);
+                  // Reload production data to show updated values
                   await _loadProductionData();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Production data saved successfully')),
+                    const SnackBar(
+                      content: Text('Production data saved successfully'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
                   );
                 }
               } catch (e) {
@@ -463,8 +473,13 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
                 }
                 
                 if (mounted) {
+                  String errorMessage = e.toString().replaceFirst('Exception: ', '');
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error saving production data: $e')),
+                    SnackBar(
+                      content: Text('Error saving production data: $errorMessage'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 4),
+                    ),
                   );
                 }
               } finally {

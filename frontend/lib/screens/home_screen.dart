@@ -421,11 +421,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => EmployeeDetailsScreen(
-                                            username: widget.username,
-                                            selectedSector: _selectedSector,
-                                            isMainAdmin: _isMainAdmin,
-                                          ),
+                                        builder: (context) => EmployeeDetailsScreen(
+                                          username: widget.username,
+                                          selectedSector: _selectedSector,
+                                          isMainAdmin: _isMainAdmin || _isAdmin, // Ensure abinaya has full access
+                                        ),
                                         ),
                                       );
                                     },

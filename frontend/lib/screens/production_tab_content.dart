@@ -24,18 +24,43 @@ class ProductionTabContent extends StatefulWidget {
 class _ProductionTabContentState extends State<ProductionTabContent> {
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _productionData = [];
+  List<Map<String, dynamic>> _filteredProductionData = [];
   bool _isLoading = false;
+  final TextEditingController _searchController = TextEditingController();
 
   List<Sector> _sectors = [];
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_filterProductionData);
     _loadSectors();
     if (widget.selectedMonth != null && widget.selectedDate != null) {
       if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
         _loadData();
       }
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterProductionData() {
+    final searchQuery = _searchController.text.toLowerCase().trim();
+    if (searchQuery.isEmpty) {
+      setState(() {
+        _filteredProductionData = _productionData;
+      });
+    } else {
+      setState(() {
+        _filteredProductionData = _productionData.where((record) {
+          final productName = record['product_name']?.toString().toLowerCase() ?? '';
+          return productName.contains(searchQuery);
+        }).toList();
+      });
     }
   }
 
@@ -188,6 +213,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
 
       setState(() {
         _productionData = finalData;
+        _filteredProductionData = finalData;
       });
     } catch (e) {
       if (mounted) {
@@ -230,7 +256,10 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
       return;
     }
 
-    if (_productionData.isEmpty) {
+    // Use filtered data if search is active, otherwise use all data
+    final dataToEdit = _searchController.text.isNotEmpty ? _filteredProductionData : _productionData;
+    
+    if (dataToEdit.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No products available for this sector')),
       );
@@ -241,7 +270,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
     final Map<String, TextEditingController> afternoonControllers = {};
     final Map<String, TextEditingController> eveningControllers = {};
 
-    for (var record in _productionData) {
+    for (var record in dataToEdit) {
       final productName = record['product_name']?.toString() ?? '';
       final sectorCode = record['sector_code']?.toString() ?? widget.selectedSector;
       // Create unique key for controllers when "All Sectors" is selected
@@ -269,7 +298,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: _productionData.map((record) {
+              children: dataToEdit.map((record) {
                 final productName = record['product_name']?.toString() ?? '';
                 final sectorCode = record['sector_code']?.toString() ?? widget.selectedSector;
                 final controllerKey = widget.selectedSector == null && widget.isAdmin
@@ -355,6 +384,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
               try {
                 final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
 
+                // Save all records (not just filtered ones)
                 for (var record in _productionData) {
                   final productName = record['product_name']?.toString() ?? '';
                   final sectorCode = record['sector_code']?.toString() ?? widget.selectedSector;
@@ -448,6 +478,31 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
 
     return Column(
       children: [
+        // Search Bar
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          color: Colors.grey.shade100,
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search by product name...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          ),
+        ),
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -458,20 +513,34 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SingleChildScrollView(
-                        child: DataTable(
-                          columnSpacing: 20,
-                          columns: [
-                            if (showSectorColumn)
-                              const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
-                            const DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                            const DataColumn(label: Text('Morning Production', style: TextStyle(fontWeight: FontWeight.bold))),
-                            const DataColumn(label: Text('Afternoon Production', style: TextStyle(fontWeight: FontWeight.bold))),
-                            const DataColumn(label: Text('Evening Production', style: TextStyle(fontWeight: FontWeight.bold))),
-                          ],
-                          rows: _productionData.map((record) {
+                  : _filteredProductionData.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.search_off, size: 48, color: Colors.grey),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No products found matching "${_searchController.text}"',
+                                style: const TextStyle(fontSize: 16, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SingleChildScrollView(
+                            child: DataTable(
+                              columnSpacing: 20,
+                              columns: [
+                                if (showSectorColumn)
+                                  const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Morning Production', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Afternoon Production', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Evening Production', style: TextStyle(fontWeight: FontWeight.bold))),
+                              ],
+                              rows: _filteredProductionData.map((record) {
                             return DataRow(
                               cells: [
                                 if (showSectorColumn)

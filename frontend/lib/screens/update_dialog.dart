@@ -150,22 +150,44 @@ class _UpdateDialogState extends State<UpdateDialog> {
       });
 
       // Launch installer/APK based on platform
-      if (Platform.isWindows || Platform.isAndroid) {
+      if (Platform.isWindows) {
         await UpdateService.installUpdate(installerPath!);
         
         if (mounted) {
           Navigator.of(context).pop(true);
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                Platform.isWindows
-                    ? 'Update installer launched. Please follow the installation prompts.'
-                    : 'APK file opened. Please follow the installation prompts.',
-              ),
+            const SnackBar(
+              content: Text('Update installer launched. Please follow the installation prompts.'),
               backgroundColor: Colors.green,
             ),
           );
+        }
+      } else if (Platform.isAndroid) {
+        // For Android, try to open the APK
+        try {
+          await UpdateService.installUpdate(installerPath!);
+          
+          if (mounted) {
+            Navigator.of(context).pop(true);
+            // Show success message with instructions
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('APK file opened. Please tap "Install" in the installer dialog to complete the update.'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
+        } catch (e) {
+          // If automatic opening fails, show manual instructions
+          if (mounted) {
+            setState(() {
+              _isDownloading = false;
+              _isInstalling = false;
+              _errorMessage = 'APK downloaded successfully. Please open your file manager, navigate to Downloads, and install the APK file manually.';
+            });
+          }
         }
       } else {
         // For other platforms, just open the file

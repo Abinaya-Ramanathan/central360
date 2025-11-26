@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 import '../config/env_config.dart';
 
@@ -124,8 +126,29 @@ class UpdateService {
       
       // Get file name from URL or use default
       final fileName = downloadUrl.split('/').last;
-      final tempDir = Directory.systemTemp;
-      final file = File('${tempDir.path}/$fileName');
+      
+      // For Android, use Downloads directory (more accessible)
+      // For Windows, use system temp directory
+      Directory downloadDir;
+      if (Platform.isAndroid) {
+        // Try to use Downloads directory
+        final externalDir = await getExternalStorageDirectory();
+        if (externalDir != null) {
+          // Navigate to Downloads folder
+          final downloadsDir = Directory('${externalDir.path.replaceAll('/Android/data/com.example.central360/files', '')}/Download');
+          if (!await downloadsDir.exists()) {
+            await downloadsDir.create(recursive: true);
+          }
+          downloadDir = downloadsDir;
+        } else {
+          // Fallback to app's external files directory
+          downloadDir = await getApplicationDocumentsDirectory();
+        }
+      } else {
+        downloadDir = Directory.systemTemp;
+      }
+      
+      final file = File('${downloadDir.path}/$fileName');
       
       final contentLength = response.contentLength ?? 0;
       final bytes = <int>[];
@@ -161,14 +184,36 @@ class UpdateService {
           runInShell: true,
         );
       } else if (Platform.isAndroid) {
-        // For Android, we need to use the platform channel or open the file
-        // The file will be opened by the system's package installer
-        // Using am start to open the APK file
-        await Process.run(
-          'am',
-          ['start', '-a', 'android.intent.action.VIEW', '-d', 'file://$installerPath', '-t', 'application/vnd.android.package-archive'],
-          runInShell: false,
-        );
+        // For Android, try to open the APK file
+        // The file should be in Downloads folder for easier access
+        try {
+          final file = File(installerPath);
+          if (!await file.exists()) {
+            throw Exception('APK file not found');
+          }
+          
+          // Try using file:// URI first (works if file is in accessible location)
+          final fileUri = Uri.file(installerPath);
+          if (await canLaunchUrl(fileUri)) {
+            await launchUrl(fileUri, mode: LaunchMode.externalApplication);
+          } else {
+            // Try content URI with FileProvider
+            final packageName = 'com.example.central360';
+            final fileName = installerPath.split('/').last;
+            final contentUri = Uri.parse('content://$packageName.fileprovider/external_files/$fileName');
+            if (await canLaunchUrl(contentUri)) {
+              await launchUrl(contentUri, mode: LaunchMode.externalApplication);
+            } else {
+              // If both fail, provide clear instructions
+              throw Exception('Please open Downloads folder and tap the APK file to install');
+            }
+          }
+        } catch (e) {
+          debugPrint('Error launching APK: $e');
+          // Provide helpful error message with file location
+          final fileName = installerPath.split('/').last;
+          throw Exception('APK downloaded as: $fileName\nPlease open your Downloads folder and tap the file to install.');
+        }
       } else {
         throw UnsupportedError('Auto-install not supported on ${Platform.operatingSystem}');
       }

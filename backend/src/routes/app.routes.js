@@ -10,12 +10,12 @@ router.get('/version', (_req, res) => {
     // TODO: Update these values when releasing a new version
     // You can also read from a config file or environment variables
     const versionInfo = {
-      version: '1.0.1',  // Update this
-  buildNumber: '2',  // Update this
-  downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.1/Company360-Setup.exe',
-  releaseNotes: 'Auto update fix',
-  isRequired: false,  // Set to true for critical updates
-  releaseDate: '2025-11-25T00:00:00Z',
+      version: '1.0.2',  // Update this when releasing new version
+      buildNumber: '3',  // Update this when releasing new version
+      downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.2/Company360-Setup.exe',
+      releaseNotes: 'Fixed scrolling on all pages - Stock Management, Credit Details, and Maintenance pages now support full vertical and horizontal scrolling',
+      isRequired: false,  // Set to true for critical security updates
+      releaseDate: '2025-11-25T00:00:00Z',
     };
     
     res.json(versionInfo);

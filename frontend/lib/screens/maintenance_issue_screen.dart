@@ -332,8 +332,9 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                           ),
                         )
                       : SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
+                          scrollDirection: Axis.vertical,
                           child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
                             child: DataTable(
                               columnSpacing: 20,
                               columns: [

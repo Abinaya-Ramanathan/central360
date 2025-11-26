@@ -49,12 +49,27 @@ class ApiService {
 
   // Employees
   static Future<List<Employee>> getEmployees() async {
-    final response = await http.get(Uri.parse('$baseUrl/employees'));
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      return data.map((json) => Employee.fromJson(json)).toList();
+    try {
+      final url = '$baseUrl/employees';
+      debugPrint('Fetching employees from: $url');
+      final response = await http.get(Uri.parse(url));
+      debugPrint('Response status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        debugPrint('Received ${data.length} employees from API');
+        final employees = data.map((json) => Employee.fromJson(json)).toList();
+        if (employees.isNotEmpty) {
+          debugPrint('First employee: ${employees.first.name}, Sector: ${employees.first.sector}');
+        }
+        return employees;
+      } else {
+        debugPrint('Error response body: ${response.body}');
+        throw Exception('Failed to load employees: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Exception in getEmployees: $e');
+      rethrow;
     }
-    throw Exception('Failed to load employees');
   }
 
   static Future<List<Employee>> getEmployeesBySector(String sectorCode) async {

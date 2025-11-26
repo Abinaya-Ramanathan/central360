@@ -38,9 +38,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   bool _isEditModeOverall = false;
   bool _isAdmin = false;
   String _searchQuery = '';
-  Map<String, TextEditingController> _dailyQuantityControllers = {};
-  Map<String, TextEditingController> _dailyReasonControllers = {};
-  Map<String, TextEditingController> _overallNewStockControllers = {};
+  final Map<String, TextEditingController> _dailyQuantityControllers = {};
+  final Map<String, TextEditingController> _dailyReasonControllers = {};
+  final Map<String, TextEditingController> _overallNewStockControllers = {};
 
   final List<String> _months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -64,9 +64,15 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   @override
   void dispose() {
     _tabController.dispose();
-    _dailyQuantityControllers.values.forEach((controller) => controller.dispose());
-    _dailyReasonControllers.values.forEach((controller) => controller.dispose());
-    _overallNewStockControllers.values.forEach((controller) => controller.dispose());
+    for (var controller in _dailyQuantityControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _dailyReasonControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallNewStockControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -123,8 +129,12 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         sector: widget.selectedSector,
       );
       if (mounted) {
-        _dailyQuantityControllers.values.forEach((controller) => controller.dispose());
-        _dailyReasonControllers.values.forEach((controller) => controller.dispose());
+        for (var controller in _dailyQuantityControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _dailyReasonControllers.values) {
+          controller.dispose();
+        }
         _dailyQuantityControllers.clear();
         _dailyReasonControllers.clear();
         
@@ -152,7 +162,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             final id = item['id'] as int;
             final itemId = item['item_id'] as int;
             // Use item_id as key to avoid conflicts with temporary -1 ids
-            final key = '${itemId}_${id}';
+            final key = '${itemId}_$id';
             _dailyQuantityControllers[key] = TextEditingController(
               text: item['quantity_taken']?.toString() ?? '',
             );
@@ -187,7 +197,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         sector: widget.selectedSector,
       );
       if (mounted) {
-        _overallNewStockControllers.values.forEach((controller) => controller.dispose());
+        for (var controller in _overallNewStockControllers.values) {
+          controller.dispose();
+        }
         _overallNewStockControllers.clear();
         
         final existingItemIds = stock.map((s) => s['item_id'] as int).toSet();
@@ -214,7 +226,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             final id = item['id'] as int;
             final itemId = item['item_id'] as int;
             // Use item_id as key to avoid conflicts with temporary -1 ids
-            final key = '${itemId}_${id}';
+            final key = '${itemId}_$id';
             _overallNewStockControllers[key] = TextEditingController(
               text: item['new_stock']?.toString() ?? '',
             );
@@ -337,7 +349,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       for (var item in _dailyStock) {
         final id = item['id'] as int;
         final itemId = item['item_id'] as int;
-        final key = '${itemId}_${id}';
+        final key = '${itemId}_$id';
         final quantityController = _dailyQuantityControllers[key];
         final reasonController = _dailyReasonControllers[key];
         
@@ -384,7 +396,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       for (var item in _overallStock) {
         final id = item['id'] as int;
         final itemId = item['item_id'] as int;
-        final key = '${itemId}_${id}';
+        final key = '${itemId}_$id';
         final newStockController = _overallNewStockControllers[key];
         
         if (newStockController != null) {
@@ -709,8 +721,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                     : filteredDailyStock.isEmpty
                         ? const Center(child: Text('No daily stock records found'))
                         : SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
+                            scrollDirection: Axis.vertical,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
                               columns: [
                                 if (widget.selectedSector == null)
                                   const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -725,7 +739,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                               rows: filteredDailyStock.map((record) {
                                 final id = record['id'] as int;
                                 final itemId = record['item_id'] as int;
-                                final key = '${itemId}_${id}';
+                                final key = '${itemId}_$id';
                                 final quantityController = _dailyQuantityControllers[key];
                                 final reasonController = _dailyReasonControllers[key];
                                 final itemSectorCode = record['sector_code']?.toString();
@@ -774,6 +788,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                               }).toList(),
                             ),
                           ),
+                        ),
               ),
               // Edit Button
               Container(
@@ -883,8 +898,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                     : filteredOverallStock.isEmpty
                         ? const Center(child: Text('No overall stock records found'))
                         : SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
+                            scrollDirection: Axis.vertical,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
                               columns: [
                                 if (widget.selectedSector == null)
                                   const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -899,7 +916,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                               rows: filteredOverallStock.map((record) {
                                 final id = record['id'] as int;
                                 final itemId = record['item_id'] as int;
-                                final key = '${itemId}_${id}';
+                                final key = '${itemId}_$id';
                                 final newStockController = _overallNewStockControllers[key];
                                 
                                 final itemSectorCode = record['sector_code']?.toString();
@@ -935,6 +952,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                               }).toList(),
                             ),
                           ),
+                        ),
               ),
               // Edit and Statement Buttons
               Container(

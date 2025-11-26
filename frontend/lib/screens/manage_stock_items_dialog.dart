@@ -150,51 +150,54 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
                           ),
                         )
                       : SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columnSpacing: 20,
-                            columns: [
-                              const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                              const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
-                              // Show vehicle type and part number columns
-                              const DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
-                              const DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
-                              const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
-                            ],
-                            rows: _stockItems.map((item) {
-                              final sectorCode = item['sector_code']?.toString();
-                              final showVehicleFields = sectorCode == 'SSEW';
-                              
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text(item['item_name']?.toString() ?? 'N/A')),
-                                  DataCell(Text(_getSectorName(sectorCode))),
-                                  DataCell(Text(showVehicleFields ? (item['vehicle_type']?.toString() ?? '') : '')),
-                                  DataCell(Text(showVehicleFields ? (item['part_number']?.toString() ?? '') : '')),
-                                  DataCell(
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                          tooltip: 'Edit',
-                                          onPressed: () => _editStockItem(item),
-                                        ),
-                                        if (widget.isMainAdmin)
+                          scrollDirection: Axis.vertical,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              columnSpacing: 20,
+                              columns: const [
+                                DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                                // Show vehicle type and part number columns
+                                DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                              ],
+                              rows: _stockItems.map((item) {
+                                final sectorCode = item['sector_code']?.toString();
+                                final showVehicleFields = sectorCode == 'SSEW';
+                                
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text(item['item_name']?.toString() ?? 'N/A')),
+                                    DataCell(Text(_getSectorName(sectorCode))),
+                                    DataCell(Text(showVehicleFields ? (item['vehicle_type']?.toString() ?? '') : '')),
+                                    DataCell(Text(showVehicleFields ? (item['part_number']?.toString() ?? '') : '')),
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
                                           IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                            tooltip: 'Delete',
-                                            onPressed: () => _deleteStockItem(
-                                              item['id'] as int,
-                                              item['item_name']?.toString() ?? 'Stock Item',
-                                            ),
+                                            icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                            tooltip: 'Edit',
+                                            onPressed: () => _editStockItem(item),
                                           ),
-                                      ],
+                                          if (widget.isMainAdmin)
+                                            IconButton(
+                                              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                              tooltip: 'Delete',
+                                              onPressed: () => _deleteStockItem(
+                                                item['id'] as int,
+                                                item['item_name']?.toString() ?? 'Stock Item',
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ),
             ),

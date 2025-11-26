@@ -1001,8 +1001,9 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                         ),
                       )
                     : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
+                        scrollDirection: Axis.vertical,
                         child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Card(

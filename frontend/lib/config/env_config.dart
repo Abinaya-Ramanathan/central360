@@ -151,6 +151,6 @@ class EnvConfig {
   }
 
   // Get API endpoint (synchronous)
-  static String get apiEndpoint => '${apiBaseUrl}/api/v1';
+  static String get apiEndpoint => '$apiBaseUrl/api/v1';
 }
 

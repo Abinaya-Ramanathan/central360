@@ -58,9 +58,14 @@ class UpdateService {
         debugPrint('Latest version: $latestVersion+$latestBuildNumber');
         debugPrint('Platform: ${Platform.operatingSystem}');
         debugPrint('Download URL: $downloadUrl');
+        debugPrint('Platforms data: ${data['platforms']}');
         
         // Compare versions
         if (_isNewerVersion(latestVersion, latestBuildNumber, currentVersion, currentBuildNumber)) {
+          if (downloadUrl == null || downloadUrl.isEmpty) {
+            debugPrint('WARNING: Download URL is empty! Backend may not be deployed with latest version.');
+            debugPrint('Platform-specific URL not found. Check backend deployment.');
+          }
           return UpdateInfo(
             currentVersion: currentVersion,
             currentBuildNumber: currentBuildNumber,

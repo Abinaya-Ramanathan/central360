@@ -118,7 +118,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
   Future<void> _downloadAndInstall() async {
     if (widget.updateInfo.downloadUrl.isEmpty) {
       setState(() {
-        _errorMessage = 'Download URL not available. Please download manually from the website.';
+        _errorMessage = 'Download URL not available. The backend may not be deployed with the latest version. Please contact support or download manually from the website.';
       });
       return;
     }

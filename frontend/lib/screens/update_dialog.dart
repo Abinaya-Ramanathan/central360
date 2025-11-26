@@ -199,16 +199,20 @@ class _UpdateDialogState extends State<UpdateDialog> {
         _isInstalling = true;
       });
 
-      // For Windows, launch the installer
-      if (Platform.isWindows) {
+      // Launch installer/APK based on platform
+      if (Platform.isWindows || Platform.isAndroid) {
         await UpdateService.installUpdate(installerPath!);
         
         if (mounted) {
           Navigator.of(context).pop(true);
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Update installer launched. Please follow the installation prompts.'),
+            SnackBar(
+              content: Text(
+                Platform.isWindows
+                    ? 'Update installer launched. Please follow the installation prompts.'
+                    : 'APK file opened. Please follow the installation prompts.',
+              ),
               backgroundColor: Colors.green,
             ),
           );

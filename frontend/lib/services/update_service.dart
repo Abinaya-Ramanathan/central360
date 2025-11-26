@@ -29,11 +29,33 @@ class UpdateService {
         final data = json.decode(response.body);
         final latestVersion = data['version'] as String;
         final latestBuildNumber = int.tryParse(data['buildNumber'] ?? '1') ?? 1;
-        final downloadUrl = data['downloadUrl'] as String?;
         final releaseNotes = data['releaseNotes'] as String?;
         final isRequired = data['isRequired'] as bool? ?? false;
         
+        // Get platform-specific download URL
+        String? downloadUrl;
+        bool platformIsRequired = isRequired;
+        
+        // Check for new platforms structure
+        if (data['platforms'] != null) {
+          final platforms = data['platforms'] as Map<String, dynamic>;
+          if (Platform.isWindows && platforms['windows'] != null) {
+            final windowsInfo = platforms['windows'] as Map<String, dynamic>;
+            downloadUrl = windowsInfo['downloadUrl'] as String?;
+            platformIsRequired = windowsInfo['isRequired'] as bool? ?? isRequired;
+          } else if (Platform.isAndroid && platforms['android'] != null) {
+            final androidInfo = platforms['android'] as Map<String, dynamic>;
+            downloadUrl = androidInfo['downloadUrl'] as String?;
+            platformIsRequired = androidInfo['isRequired'] as bool? ?? isRequired;
+          }
+        } else {
+          // Fallback to old structure for backward compatibility
+          downloadUrl = data['downloadUrl'] as String?;
+        }
+        
         debugPrint('Latest version: $latestVersion+$latestBuildNumber');
+        debugPrint('Platform: ${Platform.operatingSystem}');
+        debugPrint('Download URL: $downloadUrl');
         
         // Compare versions
         if (_isNewerVersion(latestVersion, latestBuildNumber, currentVersion, currentBuildNumber)) {
@@ -44,7 +66,7 @@ class UpdateService {
             latestBuildNumber: latestBuildNumber,
             downloadUrl: downloadUrl ?? '',
             releaseNotes: releaseNotes ?? 'Bug fixes and improvements',
-            isRequired: isRequired,
+            isRequired: platformIsRequired,
           );
         }
       } else {
@@ -125,27 +147,42 @@ class UpdateService {
     }
   }
   
-  /// Launch the installer (Windows only)
+  /// Launch the installer/APK
+  /// Windows: Launches the installer executable
+  /// Android: Opens the APK file for installation
   static Future<void> installUpdate(String installerPath) async {
-    if (!Platform.isWindows) {
-      throw UnsupportedError('Auto-install only supported on Windows');
-    }
-    
     try {
-      // Launch installer - Windows will prompt for admin permission if needed
-      // Using start command to open in a new window
-      await Process.run(
-        'cmd',
-        ['/c', 'start', '', installerPath],
-        runInShell: true,
-      );
+      if (Platform.isWindows) {
+        // Launch installer - Windows will prompt for admin permission if needed
+        // Using start command to open in a new window
+        await Process.run(
+          'cmd',
+          ['/c', 'start', '', installerPath],
+          runInShell: true,
+        );
+      } else if (Platform.isAndroid) {
+        // For Android, we need to use the platform channel or open the file
+        // The file will be opened by the system's package installer
+        // Using am start to open the APK file
+        await Process.run(
+          'am',
+          ['start', '-a', 'android.intent.action.VIEW', '-d', 'file://$installerPath', '-t', 'application/vnd.android.package-archive'],
+          runInShell: false,
+        );
+      } else {
+        throw UnsupportedError('Auto-install not supported on ${Platform.operatingSystem}');
+      }
     } catch (e) {
       debugPrint('Error launching installer: $e');
-      // Try alternative method
-      try {
-        await Process.start(installerPath, [], mode: ProcessStartMode.detached);
-      } catch (e2) {
-        debugPrint('Alternative launch method also failed: $e2');
+      // Try alternative method for Windows
+      if (Platform.isWindows) {
+        try {
+          await Process.start(installerPath, [], mode: ProcessStartMode.detached);
+        } catch (e2) {
+          debugPrint('Alternative launch method also failed: $e2');
+          rethrow;
+        }
+      } else {
         rethrow;
       }
     }

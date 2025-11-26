@@ -5,8 +5,13 @@ import 'edit_stock_item_dialog.dart';
 
 class ManageStockItemsDialog extends StatefulWidget {
   final bool isMainAdmin;
+  final String? selectedSector;
 
-  const ManageStockItemsDialog({super.key, required this.isMainAdmin});
+  const ManageStockItemsDialog({
+    super.key,
+    required this.isMainAdmin,
+    this.selectedSector,
+  });
 
   @override
   State<ManageStockItemsDialog> createState() => _ManageStockItemsDialogState();
@@ -29,8 +34,17 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
       final stockItems = await ApiService.getStockItems();
       final sectors = await ApiService.getSectors();
       if (mounted) {
+        // Filter stock items by selected sector
+        List<Map<String, dynamic>> filteredStockItems = stockItems;
+        if (widget.selectedSector != null) {
+          filteredStockItems = stockItems.where((item) {
+            final itemSector = item['sector_code']?.toString();
+            return itemSector == widget.selectedSector;
+          }).toList();
+        }
+        
         setState(() {
-          _stockItems = stockItems;
+          _stockItems = filteredStockItems;
           _sectors = sectors;
         });
       }
@@ -128,9 +142,26 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Manage Stock Items',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Manage Stock Items',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      if (widget.selectedSector != null)
+                        Text(
+                          'Sector: ${_getSectorName(widget.selectedSector)}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        )
+                      else
+                        const Text(
+                          'All Sectors',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                    ],
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),

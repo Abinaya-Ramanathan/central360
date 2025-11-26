@@ -280,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   }
                                 },
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6), // Reduced spacing
                               _buildAdminButton(
                                 icon: Icons.business,
                                 label: 'Manage Sectors',
@@ -292,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ).then((_) => _loadSectors());
                                 },
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6), // Reduced spacing
                               _buildAdminButton(
                                 icon: Icons.add_shopping_cart,
                                 label: 'Add Production Item',
@@ -307,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   }
                                 },
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6), // Reduced spacing
                               _buildAdminButton(
                                 icon: Icons.inventory_2,
                                 label: 'Manage Production Item',
@@ -315,11 +315,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onPressed: () {
                                   showDialog(
                                     context: context,
-                                    builder: (context) => ManageProductsDialog(isMainAdmin: _isMainAdmin),
+                                    builder: (context) => ManageProductsDialog(
+                                      isMainAdmin: _isMainAdmin,
+                                      selectedSector: _selectedSector,
+                                    ),
                                   );
                                 },
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6), // Reduced spacing
                               _buildAdminButton(
                                 icon: Icons.add_box,
                                 label: 'Add Stock Item',
@@ -334,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   }
                                 },
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6), // Reduced spacing
                               _buildAdminButton(
                                 icon: Icons.inventory,
                                 label: 'Manage Stock Item',
@@ -342,7 +345,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onPressed: () {
                                   showDialog(
                                     context: context,
-                                    builder: (context) => ManageStockItemsDialog(isMainAdmin: _isMainAdmin),
+                                    builder: (context) => ManageStockItemsDialog(
+                                      isMainAdmin: _isMainAdmin,
+                                      selectedSector: _selectedSector,
+                                    ),
                                   );
                                 },
                               ),
@@ -351,8 +357,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         } else {
                           // On larger screens, use Wrap for horizontal layout
                           return Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
+                            spacing: 6, // Reduced spacing
+                            runSpacing: 6, // Reduced spacing
                             children: [
                               _buildAdminButton(
                                 icon: Icons.add_business,
@@ -400,7 +406,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onPressed: () {
                                   showDialog(
                                     context: context,
-                                    builder: (context) => ManageProductsDialog(isMainAdmin: _isMainAdmin),
+                                    builder: (context) => ManageProductsDialog(
+                                      isMainAdmin: _isMainAdmin,
+                                      selectedSector: _selectedSector,
+                                    ),
                                   );
                                 },
                               ),
@@ -425,7 +434,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onPressed: () {
                                   showDialog(
                                     context: context,
-                                    builder: (context) => ManageStockItemsDialog(isMainAdmin: _isMainAdmin),
+                                    builder: (context) => ManageStockItemsDialog(
+                                      isMainAdmin: _isMainAdmin,
+                                      selectedSector: _selectedSector,
+                                    ),
                                   );
                                 },
                               ),
@@ -707,22 +719,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     return SizedBox(
       width: double.infinity,
+      height: 40, // Fixed height to make buttons smaller
       child: ElevatedButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon, size: 20),
+        icon: Icon(icon, size: 18), // Reduced icon size
         label: Text(
           label,
-          style: const TextStyle(fontSize: 14),
+          style: const TextStyle(fontSize: 13), // Reduced font size
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
+            horizontal: 12,
+            vertical: 8, // Reduced vertical padding
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10), // Slightly smaller radius
           ),
         ),
       ),

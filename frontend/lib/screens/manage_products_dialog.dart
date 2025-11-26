@@ -6,8 +6,13 @@ import 'edit_product_dialog.dart';
 
 class ManageProductsDialog extends StatefulWidget {
   final bool isMainAdmin;
+  final String? selectedSector;
 
-  const ManageProductsDialog({super.key, required this.isMainAdmin});
+  const ManageProductsDialog({
+    super.key,
+    required this.isMainAdmin,
+    this.selectedSector,
+  });
 
   @override
   State<ManageProductsDialog> createState() => _ManageProductsDialogState();
@@ -30,8 +35,17 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
       final products = await ApiService.getProducts();
       final sectors = await ApiService.getSectors();
       if (mounted) {
+        // Filter products by selected sector
+        List<Map<String, dynamic>> filteredProducts = products;
+        if (widget.selectedSector != null) {
+          filteredProducts = products.where((product) {
+            final productSector = product['sector_code']?.toString();
+            return productSector == widget.selectedSector;
+          }).toList();
+        }
+        
         setState(() {
-          _products = products;
+          _products = filteredProducts;
           _sectors = sectors;
         });
       }
@@ -129,9 +143,26 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Manage Products',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Manage Products',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      if (widget.selectedSector != null)
+                        Text(
+                          'Sector: ${_getSectorName(widget.selectedSector)}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        )
+                      else
+                        const Text(
+                          'All Sectors',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                    ],
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),

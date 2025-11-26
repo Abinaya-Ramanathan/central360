@@ -1,7 +1,7 @@
 name: company360
 description: Company360 - Comprehensive Business Management App for managing employees, expenses, bookings, credit details, vehicle licenses, and more.
 publish_to: "none"  # Will be removed when ready to publish
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -26,10 +26,19 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/brand/c360-background.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "../assets/brand/c360-icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "../assets/brand/c360-icon.png"
 
 

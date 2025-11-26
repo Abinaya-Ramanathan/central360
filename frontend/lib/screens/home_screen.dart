@@ -110,58 +110,33 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
         actions: [
-          // Sector Selection in AppBar
-          if (_selectedSector != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.business, size: 18),
-                  const SizedBox(width: 4),
-                  Text(
-                    _sectors.firstWhere((s) => s.code == _selectedSector, orElse: () => Sector(code: _selectedSector!, name: _selectedSector!)).name,
-                    style: const TextStyle(fontSize: 14),
+          // User icon with username - Hide text on small screens
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 400) {
+                // On very small screens, show only icon
+                return IconButton(
+                  icon: const Icon(Icons.person),
+                  tooltip: widget.username,
+                  onPressed: null,
+                );
+              } else {
+                // On larger screens, show icon and username
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.person, size: 20),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.username,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            )
-          else
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.business, size: 18),
-                  SizedBox(width: 4),
-                  Text(
-                    'All Sectors',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-          // User icon with username
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.person, size: 20),
-                const SizedBox(width: 4),
-                Text(
-                  widget.username,
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-          ),
-          // Home icon
-          IconButton(
-            icon: const Icon(Icons.home),
-            tooltip: 'Home',
-            onPressed: () {
-              // Already on home page, do nothing or refresh
+                );
+              }
             },
           ),
           // Logout icon
@@ -211,11 +186,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Column(
           children: [
-            // Sector Selection
+            // Sector Selection - Responsive layout for mobile
             Container(
               padding: const EdgeInsets.all(16.0),
               color: Colors.white,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Row(
                     children: [
@@ -231,195 +207,226 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _selectedSector,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            prefixIcon: const Icon(Icons.filter_list),
-                          ),
-                          isExpanded: true,
-                          hint: const Text('Select Sector'),
-                          items: [
-                            // For admin users, show "All Sectors" and all sectors
-                            if (_isAdmin) ...[
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('All Sectors'),
-                              ),
-                              ..._sectors.map((sector) {
-                                return DropdownMenuItem<String>(
-                                  value: sector.code,
-                                  child: Text('${sector.code} - ${sector.name}'),
-                                );
-                              }),
-                            ]
-                            // For non-admin users with initialSector, only show their sector
-                            else if (!_isAdmin && widget.initialSector != null && _sectors.isNotEmpty)
-                              DropdownMenuItem<String>(
-                                value: widget.initialSector,
-                                child: Text(_sectors.firstWhere(
-                                  (s) => s.code == widget.initialSector,
-                                  orElse: () => Sector(code: widget.initialSector!, name: widget.initialSector!),
-                                ).name),
-                              ),
-                          ],
-                          onChanged: _isAdmin ? (value) {
-                            setState(() {
-                              _selectedSector = value;
-                            });
-                          } : null,
-                        ),
+                  // Sector Dropdown - Full width on mobile
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedSector,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      prefixIcon: const Icon(Icons.filter_list),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    isExpanded: true,
+                    hint: const Text('Select Sector'),
+                    items: [
+                      // For admin users, show "All Sectors" and all sectors
                       if (_isAdmin) ...[
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            final result = await showDialog<Sector>(
-                              context: context,
-                              builder: (context) => const AddSectorDialog(),
-                            );
-                            if (result != null) {
-                              await _loadSectors();
-                            }
-                          },
-                          icon: const Icon(Icons.add_business),
-                          label: const Text('Add Sector'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('All Sectors'),
                         ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => ManageSectorsDialog(isMainAdmin: _isMainAdmin),
-                            ).then((_) => _loadSectors());
-                          },
-                          icon: const Icon(Icons.business),
-                          label: const Text('Manage Sectors'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                        ..._sectors.map((sector) {
+                          return DropdownMenuItem<String>(
+                            value: sector.code,
+                            child: Text('${sector.code} - ${sector.name}'),
+                          );
+                        }),
+                      ]
+                      // For non-admin users with initialSector, only show their sector
+                      else if (!_isAdmin && widget.initialSector != null && _sectors.isNotEmpty)
+                        DropdownMenuItem<String>(
+                          value: widget.initialSector,
+                          child: Text(_sectors.firstWhere(
+                            (s) => s.code == widget.initialSector,
+                            orElse: () => Sector(code: widget.initialSector!, name: widget.initialSector!),
+                          ).name),
                         ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            final result = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => const AddProductDialog(),
-                            );
-                            if (result == true) {
-                              // Product created successfully
-                            }
-                          },
-                          icon: const Icon(Icons.add_shopping_cart),
-                          label: const Text('Add Production Item'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => ManageProductsDialog(isMainAdmin: _isMainAdmin),
-                            );
-                          },
-                          icon: const Icon(Icons.inventory_2),
-                          label: const Text('Manage Production Item'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            final result = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => const AddStockItemDialog(),
-                            );
-                            if (result == true) {
-                              // Stock item created successfully
-                            }
-                          },
-                          icon: const Icon(Icons.add_box),
-                          label: const Text('Add Stock Item'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.brown.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => ManageStockItemsDialog(isMainAdmin: _isMainAdmin),
-                            );
-                          },
-                          icon: const Icon(Icons.inventory),
-                          label: const Text('Manage Stock Item'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
+                    onChanged: _isAdmin ? (value) {
+                      setState(() {
+                        _selectedSector = value;
+                      });
+                    } : null,
                   ),
+                  // Admin buttons - Use Wrap for responsive layout
+                  if (_isAdmin) ...[
+                    const SizedBox(height: 12),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        // On mobile (width < 600), use vertical layout
+                        if (constraints.maxWidth < 600) {
+                          return Column(
+                            children: [
+                              _buildAdminButton(
+                                icon: Icons.add_business,
+                                label: 'Add Sector',
+                                color: Colors.green.shade700,
+                                onPressed: () async {
+                                  final result = await showDialog<Sector>(
+                                    context: context,
+                                    builder: (context) => const AddSectorDialog(),
+                                  );
+                                  if (result != null) {
+                                    await _loadSectors();
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _buildAdminButton(
+                                icon: Icons.business,
+                                label: 'Manage Sectors',
+                                color: Colors.indigo.shade700,
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => ManageSectorsDialog(isMainAdmin: _isMainAdmin),
+                                  ).then((_) => _loadSectors());
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _buildAdminButton(
+                                icon: Icons.add_shopping_cart,
+                                label: 'Add Production Item',
+                                color: Colors.orange.shade700,
+                                onPressed: () async {
+                                  final result = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => const AddProductDialog(),
+                                  );
+                                  if (result == true) {
+                                    // Product created successfully
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _buildAdminButton(
+                                icon: Icons.inventory_2,
+                                label: 'Manage Production Item',
+                                color: Colors.purple.shade700,
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => ManageProductsDialog(isMainAdmin: _isMainAdmin),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _buildAdminButton(
+                                icon: Icons.add_box,
+                                label: 'Add Stock Item',
+                                color: Colors.brown.shade700,
+                                onPressed: () async {
+                                  final result = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => const AddStockItemDialog(),
+                                  );
+                                  if (result == true) {
+                                    // Stock item created successfully
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _buildAdminButton(
+                                icon: Icons.inventory,
+                                label: 'Manage Stock Item',
+                                color: Colors.grey.shade700,
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => ManageStockItemsDialog(isMainAdmin: _isMainAdmin),
+                                  );
+                                },
+                              ),
+                            ],
+                          );
+                        } else {
+                          // On larger screens, use Wrap for horizontal layout
+                          return Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildAdminButton(
+                                icon: Icons.add_business,
+                                label: 'Add Sector',
+                                color: Colors.green.shade700,
+                                onPressed: () async {
+                                  final result = await showDialog<Sector>(
+                                    context: context,
+                                    builder: (context) => const AddSectorDialog(),
+                                  );
+                                  if (result != null) {
+                                    await _loadSectors();
+                                  }
+                                },
+                              ),
+                              _buildAdminButton(
+                                icon: Icons.business,
+                                label: 'Manage Sectors',
+                                color: Colors.indigo.shade700,
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => ManageSectorsDialog(isMainAdmin: _isMainAdmin),
+                                  ).then((_) => _loadSectors());
+                                },
+                              ),
+                              _buildAdminButton(
+                                icon: Icons.add_shopping_cart,
+                                label: 'Add Production Item',
+                                color: Colors.orange.shade700,
+                                onPressed: () async {
+                                  final result = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => const AddProductDialog(),
+                                  );
+                                  if (result == true) {
+                                    // Product created successfully
+                                  }
+                                },
+                              ),
+                              _buildAdminButton(
+                                icon: Icons.inventory_2,
+                                label: 'Manage Production Item',
+                                color: Colors.purple.shade700,
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => ManageProductsDialog(isMainAdmin: _isMainAdmin),
+                                  );
+                                },
+                              ),
+                              _buildAdminButton(
+                                icon: Icons.add_box,
+                                label: 'Add Stock Item',
+                                color: Colors.brown.shade700,
+                                onPressed: () async {
+                                  final result = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => const AddStockItemDialog(),
+                                  );
+                                  if (result == true) {
+                                    // Stock item created successfully
+                                  }
+                                },
+                              ),
+                              _buildAdminButton(
+                                icon: Icons.inventory,
+                                label: 'Manage Stock Item',
+                                color: Colors.grey.shade700,
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => ManageStockItemsDialog(isMainAdmin: _isMainAdmin),
+                                  );
+                                },
+                              ),
+                            ],
+                          );
+                        }
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -679,6 +686,36 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 14),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );

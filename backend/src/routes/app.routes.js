@@ -10,21 +10,21 @@ router.get('/version', (_req, res) => {
     // TODO: Update these values when releasing a new version
     // You can also read from a config file or environment variables
     const versionInfo = {
-      version: '1.0.2',  // Update this when releasing new version
-      buildNumber: '3',  // Update this when releasing new version
+      version: '1.0.3',  // Update this when releasing new version
+      buildNumber: '4',  // Update this when releasing new version
       platforms: {
         windows: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.2/Company360-Setup.exe',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.3/Company360-Setup.exe',
           isRequired: false,
         },
         android: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.2/central360-v1.0.2.apk',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.3/central360-v1.0.3.apk',
           isRequired: false,
         }
       },
-      releaseNotes: 'Fixed scrolling on all pages - Stock Management, Credit Details, and Maintenance pages now support full vertical and horizontal scrolling',
+      releaseNotes: 'Improved Android UI layout, simplified update dialog, fixed app name and icon',
       isRequired: false,  // Set to true for critical security updates
-      releaseDate: '2025-11-25T00:00:00Z',
+      releaseDate: '2025-11-26T00:00:00Z',
     };
     
     res.json(versionInfo);

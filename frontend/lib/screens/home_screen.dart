@@ -73,6 +73,14 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context) => UpdateDialog(updateInfo: updateInfo),
         );
         
+        // If user clicked "Later", mark this version as dismissed
+        if (shouldUpdate == false && !updateInfo.isRequired) {
+          await UpdateService.dismissVersion(
+            updateInfo.latestVersion,
+            updateInfo.latestBuildNumber,
+          );
+        }
+        
         // If update is required and user dismissed, show again after delay
         if (updateInfo.isRequired && shouldUpdate == false) {
           Future.delayed(const Duration(seconds: 5), () {

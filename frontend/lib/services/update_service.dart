@@ -4,11 +4,13 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../config/env_config.dart';
 
 class UpdateService {
   static const String _versionEndpoint = '/api/v1/app/version';
+  static const String _dismissedVersionKey = 'dismissed_update_version';
   
   /// Check if a new version is available
   /// Returns [UpdateInfo] if update is available, null otherwise
@@ -62,6 +64,16 @@ class UpdateService {
         
         // Compare versions
         if (_isNewerVersion(latestVersion, latestBuildNumber, currentVersion, currentBuildNumber)) {
+          // Check if user has already dismissed this version
+          final dismissedVersion = await _getDismissedVersion();
+          final latestVersionString = '$latestVersion+$latestBuildNumber';
+          
+          // If this version was already dismissed, don't show it again
+          if (dismissedVersion == latestVersionString) {
+            debugPrint('Update $latestVersionString was already dismissed by user');
+            return null;
+          }
+          
           if (downloadUrl == null || downloadUrl.isEmpty) {
             debugPrint('WARNING: Download URL is empty! Backend may not be deployed with latest version.');
             debugPrint('Platform-specific URL not found. Check backend deployment.');
@@ -85,6 +97,39 @@ class UpdateService {
     }
     
     return null;
+  }
+  
+  /// Mark a version as dismissed (user clicked "Later")
+  static Future<void> dismissVersion(String version, int buildNumber) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_dismissedVersionKey, '$version+$buildNumber');
+      debugPrint('Marked version $version+$buildNumber as dismissed');
+    } catch (e) {
+      debugPrint('Error saving dismissed version: $e');
+    }
+  }
+  
+  /// Get the last dismissed version
+  static Future<String?> _getDismissedVersion() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_dismissedVersionKey);
+    } catch (e) {
+      debugPrint('Error reading dismissed version: $e');
+      return null;
+    }
+  }
+  
+  /// Clear dismissed version (useful for testing or when a new version is released)
+  static Future<void> clearDismissedVersion() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_dismissedVersionKey);
+      debugPrint('Cleared dismissed version');
+    } catch (e) {
+      debugPrint('Error clearing dismissed version: $e');
+    }
   }
   
   /// Compare version strings and build numbers

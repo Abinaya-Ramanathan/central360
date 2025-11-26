@@ -10,19 +10,19 @@ router.get('/version', (_req, res) => {
     // TODO: Update these values when releasing a new version
     // You can also read from a config file or environment variables
     const versionInfo = {
-      version: '1.0.4',  // Update this when releasing new version
-      buildNumber: '5',  // Update this when releasing new version
+      version: '1.0.5',  // Update this when releasing new version
+      buildNumber: '6',  // Update this when releasing new version
       platforms: {
         windows: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.4/Company360-Setup.exe',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.5/Company360-Setup.exe',
           isRequired: false,
         },
         android: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.4/company360-v1.0.4.apk',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.5/company360-v1.0.5.apk',
           isRequired: false,
         }
       },
-      releaseNotes: 'Added search functionality in Production tab, improved Android update installation',
+      releaseNotes: 'Fixed update dialog showing on every login - now shows only once per version',
       isRequired: false,  // Set to true for critical security updates
       releaseDate: '2025-11-26T00:00:00Z',
     };

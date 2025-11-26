@@ -136,7 +136,7 @@ if (Test-Path $apkPath) {
     Write-Host ""
     
     # Suggest rename
-    $suggestedName = "central360-v$version.apk"
+    $suggestedName = "company360-v$version.apk"
     Write-Host "Suggested filename for release: $suggestedName" -ForegroundColor Cyan
     Write-Host ""
     

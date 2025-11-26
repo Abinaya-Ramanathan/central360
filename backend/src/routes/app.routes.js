@@ -18,7 +18,7 @@ router.get('/version', (_req, res) => {
           isRequired: false,
         },
         android: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.3/central360-v1.0.3.apk',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.3/company360-v1.0.3.apk',
           isRequired: false,
         }
       },

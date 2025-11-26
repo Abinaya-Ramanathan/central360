@@ -109,7 +109,7 @@ if [ $? -eq 0 ]; then
         echo ""
         
         # Suggest rename
-        SUGGESTED_NAME="central360-v$VERSION.apk"
+        SUGGESTED_NAME="company360-v$VERSION.apk"
         echo "Suggested filename for release: $SUGGESTED_NAME"
         echo ""
         

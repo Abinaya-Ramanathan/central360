@@ -33,6 +33,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
   bool _isAdmin = false;
   final TextEditingController _searchController = TextEditingController();
   bool _creditDateSortAscending = true; // true = ascending (oldest first), false = descending (newest first)
+  bool _sectorSortAscending = true; // Sort direction for Sector column
 
   @override
   void initState() {
@@ -1013,9 +1014,25 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                               ),
                               child: DataTable(
                                 columnSpacing: 20,
+                                sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
+                                sortAscending: _sectorSortAscending,
                                 columns: [
                                   if (widget.selectedSector == null && _isAdmin)
-                                    const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    DataColumn(
+                                      label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      onSort: (columnIndex, ascending) {
+                                        setState(() {
+                                          _sectorSortAscending = ascending;
+                                          _filteredCreditData.sort((a, b) {
+                                            final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                                            final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                                            return ascending
+                                                ? aName.compareTo(bName)
+                                                : bName.compareTo(aName);
+                                          });
+                                        });
+                                      },
+                                    ),
                                   const DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                   const DataColumn(label: Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold))),
                                   const DataColumn(label: Text('Address', style: TextStyle(fontWeight: FontWeight.bold))),

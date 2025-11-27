@@ -27,6 +27,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
   Map<String, double> _sectorExpenseSummary = {};
   List<Sector> _sectors = [];
   bool _isLoading = false;
+  bool _sortAscending = true; // Sort direction for Sector column
 
   @override
   void initState() {
@@ -222,9 +223,25 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
     
     return DataTable(
       columnSpacing: 20,
+      sortColumnIndex: showSectorColumn ? 0 : null,
+      sortAscending: _sortAscending,
       columns: [
         if (showSectorColumn)
-          const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+          DataColumn(
+            label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+            onSort: (columnIndex, ascending) {
+              setState(() {
+                _sortAscending = ascending;
+                _expenseData.sort((a, b) {
+                  final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                  final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                  return ascending
+                      ? aName.compareTo(bName)
+                      : bName.compareTo(aName);
+                });
+              });
+            },
+          ),
         const DataColumn(label: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold))),
         const DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
         const DataColumn(label: Text('Reason for Purchase', style: TextStyle(fontWeight: FontWeight.bold))),

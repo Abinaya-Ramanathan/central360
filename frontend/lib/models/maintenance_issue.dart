@@ -1,3 +1,25 @@
+class MaintenanceIssuePhoto {
+  final int id;
+  final String imageUrl;
+  final DateTime? createdAt;
+
+  MaintenanceIssuePhoto({
+    required this.id,
+    required this.imageUrl,
+    this.createdAt,
+  });
+
+  factory MaintenanceIssuePhoto.fromJson(Map<String, dynamic> json) {
+    return MaintenanceIssuePhoto(
+      id: json['id'] as int,
+      imageUrl: json['image_url'] as String,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : null,
+    );
+  }
+}
+
 class MaintenanceIssue {
   final int? id;
   final String? issueDescription;
@@ -7,6 +29,7 @@ class MaintenanceIssue {
   final DateTime? dateResolved;
   final String sectorCode;
   final String? sectorName;
+  final List<MaintenanceIssuePhoto>? photos;
 
   MaintenanceIssue({
     this.id,
@@ -17,6 +40,7 @@ class MaintenanceIssue {
     this.dateResolved,
     required this.sectorCode,
     this.sectorName,
+    this.photos,
   });
 
   Map<String, dynamic> toJson() {
@@ -32,6 +56,13 @@ class MaintenanceIssue {
   }
 
   factory MaintenanceIssue.fromJson(Map<String, dynamic> json) {
+    List<MaintenanceIssuePhoto>? photos;
+    if (json['photos'] != null && json['photos'] is List) {
+      photos = (json['photos'] as List)
+          .map((photo) => MaintenanceIssuePhoto.fromJson(photo as Map<String, dynamic>))
+          .toList();
+    }
+    
     return MaintenanceIssue(
       id: json['id'] as int?,
       issueDescription: json['issue_description'] as String?,
@@ -45,6 +76,7 @@ class MaintenanceIssue {
           : null,
       sectorCode: json['sector_code'] as String,
       sectorName: json['sector_name'] as String?,
+      photos: photos,
     );
   }
 

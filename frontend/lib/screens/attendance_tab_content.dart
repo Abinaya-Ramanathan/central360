@@ -27,6 +27,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
   List<Sector> _sectors = [];
   bool _isEditMode = false;
   bool _isLoading = false;
+  bool _sortAscending = true; // Sort direction for Sector column
   final Map<String, Map<String, dynamic>> _attendanceData = {};
 
   @override
@@ -109,12 +110,27 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         }
       });
 
-      final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
+      // Get previous outstanding from the day BEFORE the selected date
+      // This ensures we get the outstanding from the previous day, not from the current date's record
+      final previousDate = widget.selectedDate!.subtract(const Duration(days: 1));
+      final previousDateStr = previousDate.toIso8601String().split('T')[0];
+      
+      // First, reset advance_taken and advance_paid to 0 for all employees
+      // Only outstanding_advance should carry forward, not advance_taken/advance_paid
+      for (var emp in _employees) {
+        if (_attendanceData.containsKey(emp.id)) {
+          _attendanceData[emp.id]!['advance_taken'] = 0.0;
+          _attendanceData[emp.id]!['advance_paid'] = 0.0;
+        }
+      }
+      
       for (var emp in _employees) {
         try {
-          final previousOutstanding = await ApiService.getOutstandingAdvance(emp.id, dateStr);
+          // Get outstanding from the day before the selected date
+          final previousOutstanding = await ApiService.getOutstandingAdvance(emp.id, previousDateStr);
           if (_attendanceData.containsKey(emp.id)) {
             _attendanceData[emp.id]!['previous_outstanding'] = previousOutstanding;
+            // Outstanding advance carries forward from previous date
             _attendanceData[emp.id]!['outstanding_advance'] = previousOutstanding;
           }
         } catch (e) {
@@ -125,12 +141,14 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         }
       }
 
-      final dateStr2 = widget.selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
       final attendanceRecords = await ApiService.getAttendance(
         sector: widget.selectedSector, // null for all sectors
-        date: dateStr2,
+        date: dateStr,
       );
 
+      // If there's an existing record for this date, load its advance_taken and advance_paid
+      // Otherwise, they remain 0 (only outstanding_advance carries forward)
       for (var record in attendanceRecords) {
         final empIdStr = record['employee_id'].toString();
         final emp = _employees.firstWhere((e) => e.id == empIdStr, orElse: () => _employees.first);
@@ -139,6 +157,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
           final previous = _parseDecimal(data['previous_outstanding']);
           final taken = _parseDecimal(record['advance_taken']);
           final paid = _parseDecimal(record['advance_paid']);
+          // Calculate: previous outstanding + advance taken - advance paid
           final newOutstanding = previous + taken - paid;
           final status = record['status'] as String?;
 
@@ -146,8 +165,8 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
             'status': status,
             'previous_outstanding': previous,
             'outstanding_advance': newOutstanding,
-            'advance_taken': taken,
-            'advance_paid': paid,
+            'advance_taken': taken,  // Only load if record exists for this date
+            'advance_paid': paid,     // Only load if record exists for this date
           };
         }
       }
@@ -204,6 +223,9 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
 
     setState(() => _isLoading = true);
     try {
+      // Recalculate outstanding advance before saving to ensure it's up to date
+      _recalculateOutstanding();
+      
       final attendanceRecords = _employees.map((emp) {
         final data = _attendanceData[emp.id] ?? {};
         return {
@@ -212,6 +234,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
           'sector': widget.selectedSector ?? emp.sector,
           'date': dateStr,
           'status': data['status'] ?? 'present',
+          'outstanding_advance': _parseDecimal(data['outstanding_advance']),
           'advance_taken': _parseDecimal(data['advance_taken']),
           'advance_paid': _parseDecimal(data['advance_paid']),
         };
@@ -284,9 +307,25 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                             ),
                             child: DataTable(
                               headingRowColor: WidgetStateProperty.all(Colors.blue.shade100),
+                              sortColumnIndex: showSectorColumn ? 0 : null,
+                              sortAscending: _sortAscending,
                               columns: [
                                 if (showSectorColumn)
-                                  const DataColumn(label: Text('Sector')),
+                                  DataColumn(
+                                    label: const Text('Sector'),
+                                    onSort: (columnIndex, ascending) {
+                                      setState(() {
+                                        _sortAscending = ascending;
+                                        _employees.sort((a, b) {
+                                          final aName = _getSectorName(a.sector).toLowerCase();
+                                          final bName = _getSectorName(b.sector).toLowerCase();
+                                          return ascending
+                                              ? aName.compareTo(bName)
+                                              : bName.compareTo(aName);
+                                        });
+                                      });
+                                    },
+                                  ),
                                 const DataColumn(label: Text('Name')),
                                 const DataColumn(label: Text('Status')),
                                 const DataColumn(label: Text('Outstanding Advance')),

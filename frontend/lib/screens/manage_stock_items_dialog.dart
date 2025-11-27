@@ -21,6 +21,7 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
   List<Map<String, dynamic>> _stockItems = [];
   List<Sector> _sectors = [];
   bool _isLoading = false;
+  bool _sortAscending = true; // Sort direction for Sector column
 
   @override
   void initState() {
@@ -186,13 +187,29 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
                               columnSpacing: 20,
-                              columns: const [
-                                DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                              sortColumnIndex: 1,
+                              sortAscending: _sortAscending,
+                              columns: [
+                                const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                  label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  onSort: (columnIndex, ascending) {
+                                    setState(() {
+                                      _sortAscending = ascending;
+                                      _stockItems.sort((a, b) {
+                                        final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                                        final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                                        return ascending
+                                            ? aName.compareTo(bName)
+                                            : bName.compareTo(aName);
+                                      });
+                                    });
+                                  },
+                                ),
                                 // Show vehicle type and part number columns
-                                DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
                               rows: _stockItems.map((item) {
                                 final sectorCode = item['sector_code']?.toString();

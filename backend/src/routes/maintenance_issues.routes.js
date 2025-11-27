@@ -38,6 +38,9 @@ const upload = multer({
   }
 });
 
+// For multiple file uploads
+const uploadMultiple = upload.array('photos', 10); // Allow up to 10 photos
+
 // Get maintenance issues
 router.get('/', async (req, res) => {
   try {
@@ -58,6 +61,16 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY mi.date_created DESC, mi.created_at DESC';
     const { rows } = await db.query(query, params);
+    
+    // Get photos for each issue
+    for (const row of rows) {
+      const photosResult = await db.query(
+        'SELECT id, image_url, created_at FROM maintenance_issue_photos WHERE issue_id = $1 ORDER BY created_at ASC',
+        [row.id]
+      );
+      row.photos = photosResult.rows;
+    }
+    
     res.json(rows);
   } catch (err) {
     console.error('Error fetching maintenance issues:', err);
@@ -197,6 +210,19 @@ router.delete('/:id', async (req, res) => {
       }
     }
 
+    // Delete associated photos first
+    const photosResult = await db.query('SELECT image_url FROM maintenance_issue_photos WHERE issue_id = $1', [id]);
+    for (const photo of photosResult.rows) {
+      if (photo.image_url) {
+        const photoPath = path.join(__dirname, '../../', photo.image_url);
+        if (fs.existsSync(photoPath)) {
+          fs.unlinkSync(photoPath);
+        }
+      }
+    }
+    await db.query('DELETE FROM maintenance_issue_photos WHERE issue_id = $1', [id]);
+
+    // Delete the maintenance issue
     const result = await db.query('DELETE FROM maintenance_issues WHERE id = $1 RETURNING *', [id]);
 
     res.status(200).json({ message: 'Maintenance issue deleted successfully' });
@@ -204,6 +230,86 @@ router.delete('/:id', async (req, res) => {
     console.error('Error deleting maintenance issue:', err);
     res.status(500).json({
       message: 'Error deleting maintenance issue',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// Upload multiple photos for a maintenance issue
+router.post('/:id/photos', uploadMultiple, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if issue exists
+    const issueCheck = await db.query('SELECT id FROM maintenance_issues WHERE id = $1', [id]);
+    if (issueCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Maintenance issue not found' });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: 'No photos provided' });
+    }
+
+    const photos = [];
+    for (const file of req.files) {
+      const imageUrl = `/uploads/maintenance/${file.filename}`;
+      const result = await db.query(
+        'INSERT INTO maintenance_issue_photos (issue_id, image_url) VALUES ($1, $2) RETURNING *',
+        [id, imageUrl]
+      );
+      photos.push(result.rows[0]);
+    }
+
+    res.status(201).json({ photos });
+  } catch (err) {
+    console.error('Error uploading photos:', err);
+    res.status(500).json({
+      message: 'Error uploading photos',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// Get photos for a maintenance issue
+router.get('/:id/photos', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query(
+      'SELECT id, image_url, created_at FROM maintenance_issue_photos WHERE issue_id = $1 ORDER BY created_at ASC',
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching photos:', err);
+    res.status(500).json({ message: 'Error fetching photos' });
+  }
+});
+
+// Delete a photo
+router.delete('/photos/:photoId', async (req, res) => {
+  try {
+    const { photoId } = req.params;
+    
+    // Get photo info before deleting
+    const photoResult = await db.query('SELECT image_url FROM maintenance_issue_photos WHERE id = $1', [photoId]);
+    if (photoResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Photo not found' });
+    }
+
+    // Delete file
+    if (photoResult.rows[0].image_url) {
+      const photoPath = path.join(__dirname, '../../', photoResult.rows[0].image_url);
+      if (fs.existsSync(photoPath)) {
+        fs.unlinkSync(photoPath);
+      }
+    }
+
+    await db.query('DELETE FROM maintenance_issue_photos WHERE id = $1', [photoId]);
+    res.status(200).json({ message: 'Photo deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting photo:', err);
+    res.status(500).json({
+      message: 'Error deleting photo',
       error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }

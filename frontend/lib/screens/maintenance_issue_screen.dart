@@ -3,9 +3,11 @@ import '../models/maintenance_issue.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../config/env_config.dart';
 import 'add_issue_dialog.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
+import 'upload_photos_dialog.dart';
 
 class MaintenanceIssueScreen extends StatefulWidget {
   final String username;
@@ -30,6 +32,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
   final Map<int, String> _editStatus = {}; // Track edited status
   final Map<int, DateTime?> _editDateResolved = {}; // Track edited date resolved
   bool _isLoading = false;
+  bool _sortAscending = true; // Sort direction for Sector column
 
   @override
   void initState() {
@@ -210,6 +213,110 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
     }
   }
 
+  String _getImageUrl(String imageUrl) {
+    if (imageUrl.startsWith('http')) {
+      return imageUrl;
+    }
+    // Images are served from the base URL, not the API endpoint
+    return '${EnvConfig.apiBaseUrl}$imageUrl';
+  }
+
+  Widget _buildPhotosCell(MaintenanceIssue issue) {
+    // Get photos from the issue, or fallback to imageUrl for backward compatibility
+    final photos = issue.photos ?? [];
+    final hasLegacyImage = issue.imageUrl != null && issue.imageUrl!.isNotEmpty;
+    
+    if (photos.isEmpty && !hasLegacyImage) {
+      return const Center(
+        child: Text(
+          'No photos',
+          style: TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+      );
+    }
+
+    // Combine photos and legacy image
+    final allImages = <String>[];
+    if (hasLegacyImage) {
+      allImages.add(issue.imageUrl!);
+    }
+    for (var photo in photos) {
+      allImages.add(photo.imageUrl);
+    }
+
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      itemCount: allImages.length,
+      itemBuilder: (context, index) {
+        final imageUrl = allImages[index];
+        return Padding(
+          padding: const EdgeInsets.only(right: 4.0),
+          child: GestureDetector(
+            onTap: () {
+              // Show full image in a dialog
+              showDialog(
+                context: context,
+                builder: (context) => Dialog(
+                  child: Stack(
+                    children: [
+                      Image.network(
+                        _getImageUrl(imageUrl),
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Icon(Icons.broken_image, size: 50),
+                          );
+                        },
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.network(
+                  _getImageUrl(imageUrl),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Icon(Icons.broken_image, size: 20, color: Colors.grey),
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -337,13 +444,30 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
                               columnSpacing: 20,
+                              sortColumnIndex: widget.selectedSector == null ? 0 : null,
+                              sortAscending: _sortAscending,
                               columns: [
                                 if (widget.selectedSector == null)
-                                  const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(
+                                    label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    onSort: (columnIndex, ascending) {
+                                      setState(() {
+                                        _sortAscending = ascending;
+                                        _issues.sort((a, b) {
+                                          final aName = _getSectorName(a.sectorCode).toLowerCase();
+                                          final bName = _getSectorName(b.sectorCode).toLowerCase();
+                                          return ascending
+                                              ? aName.compareTo(bName)
+                                              : bName.compareTo(aName);
+                                        });
+                                      });
+                                    },
+                                  ),
                                 const DataColumn(label: Text('Issue Description', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Date Created', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Date Resolved', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Photos', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
                               rows: _issues.where((issue) => issue.id != null).map((issue) {
@@ -420,6 +544,13 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                                             ),
                                     ),
                                     DataCell(
+                                      SizedBox(
+                                        width: 150,
+                                        height: 60,
+                                        child: _buildPhotosCell(issue),
+                                      ),
+                                    ),
+                                    DataCell(
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
@@ -433,6 +564,21 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                                               icon: const Icon(Icons.edit, color: Colors.blue),
                                               onPressed: () => _toggleEditMode(issueId),
                                             ),
+                                          IconButton(
+                                            icon: const Icon(Icons.upload, color: Colors.orange),
+                                            tooltip: 'Upload Photos',
+                                            onPressed: () async {
+                                              final result = await showDialog<bool>(
+                                                context: context,
+                                                builder: (context) => UploadPhotosDialog(
+                                                  issueId: issueId,
+                                                ),
+                                              );
+                                              if (result == true) {
+                                                await _loadIssues();
+                                              }
+                                            },
+                                          ),
                                           if (widget.isMainAdmin)
                                             IconButton(
                                               icon: const Icon(Icons.delete, color: Colors.red),

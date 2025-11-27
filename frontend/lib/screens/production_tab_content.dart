@@ -27,6 +27,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   List<Map<String, dynamic>> _filteredProductionData = [];
   bool _isLoading = false;
   final TextEditingController _searchController = TextEditingController();
+  bool _sortAscending = true; // Sort direction for Sector column
 
   List<Sector> _sectors = [];
 
@@ -532,23 +533,50 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                           child: SingleChildScrollView(
                             child: DataTable(
                               columnSpacing: 20,
+                              sortColumnIndex: showSectorColumn ? 0 : null,
+                              sortAscending: _sortAscending,
                               columns: [
                                 if (showSectorColumn)
-                                  const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(
+                                    label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    onSort: (columnIndex, ascending) {
+                                      setState(() {
+                                        _sortAscending = ascending;
+                                        _filteredProductionData.sort((a, b) {
+                                          final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                                          final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                                          return ascending
+                                              ? aName.compareTo(bName)
+                                              : bName.compareTo(aName);
+                                        });
+                                      });
+                                    },
+                                  ),
                                 const DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Morning Production', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Afternoon Production', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Evening Production', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Overall Production', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
                               rows: _filteredProductionData.map((record) {
+                            final morning = _parseIntFromDynamic(record['morning_production']);
+                            final afternoon = _parseIntFromDynamic(record['afternoon_production']);
+                            final evening = _parseIntFromDynamic(record['evening_production']);
+                            final overall = morning + afternoon + evening;
                             return DataRow(
                               cells: [
                                 if (showSectorColumn)
                                   DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
                                 DataCell(Text(record['product_name']?.toString() ?? '')),
-                                DataCell(Text('${_parseIntFromDynamic(record['morning_production'])}')),
-                                DataCell(Text('${_parseIntFromDynamic(record['afternoon_production'])}')),
-                                DataCell(Text('${_parseIntFromDynamic(record['evening_production'])}')),
+                                DataCell(Text('$morning')),
+                                DataCell(Text('$afternoon')),
+                                DataCell(Text('$evening')),
+                                DataCell(
+                                  Text(
+                                    '$overall',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                               ],
                             );
                           }).toList(),

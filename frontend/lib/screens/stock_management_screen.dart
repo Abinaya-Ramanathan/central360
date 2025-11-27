@@ -38,6 +38,8 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   bool _isEditModeOverall = false;
   bool _isAdmin = false;
   String _searchQuery = '';
+  bool _sortAscendingDaily = true; // Sort direction for Sector column in Daily Stock
+  bool _sortAscendingOverall = true; // Sort direction for Sector column in Overall Stock
   final Map<String, TextEditingController> _dailyQuantityControllers = {};
   final Map<String, TextEditingController> _dailyReasonControllers = {};
   final Map<String, TextEditingController> _overallNewStockControllers = {};
@@ -725,9 +727,25 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: DataTable(
+                              sortColumnIndex: widget.selectedSector == null ? 0 : null,
+                              sortAscending: _sortAscendingDaily,
                               columns: [
                                 if (widget.selectedSector == null)
-                                  const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(
+                                    label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    onSort: (columnIndex, ascending) {
+                                      setState(() {
+                                        _sortAscendingDaily = ascending;
+                                        filteredDailyStock.sort((a, b) {
+                                          final aName = (a['sector_name']?.toString() ?? a['sector_code']?.toString() ?? '').toLowerCase();
+                                          final bName = (b['sector_name']?.toString() ?? b['sector_code']?.toString() ?? '').toLowerCase();
+                                          return ascending
+                                              ? aName.compareTo(bName)
+                                              : bName.compareTo(aName);
+                                        });
+                                      });
+                                    },
+                                  ),
                                 const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 if (showVehicleColumns) ...[
                                   const DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -902,9 +920,25 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: DataTable(
+                              sortColumnIndex: widget.selectedSector == null ? 0 : null,
+                              sortAscending: _sortAscendingOverall,
                               columns: [
                                 if (widget.selectedSector == null)
-                                  const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(
+                                    label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    onSort: (columnIndex, ascending) {
+                                      setState(() {
+                                        _sortAscendingOverall = ascending;
+                                        filteredOverallStock.sort((a, b) {
+                                          final aName = (a['sector_name']?.toString() ?? a['sector_code']?.toString() ?? '').toLowerCase();
+                                          final bName = (b['sector_name']?.toString() ?? b['sector_code']?.toString() ?? '').toLowerCase();
+                                          return ascending
+                                              ? aName.compareTo(bName)
+                                              : bName.compareTo(aName);
+                                        });
+                                      });
+                                    },
+                                  ),
                                 const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 if (showVehicleColumns) ...[
                                   const DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),

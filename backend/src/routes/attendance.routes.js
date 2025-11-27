@@ -99,21 +99,31 @@ router.post('/', async (req, res) => {
 router.get('/outstanding/:employeeId/:date', async (req, res) => {
   try {
     const { employeeId, date } = req.params;
+    console.log(`[Outstanding Advance] Request for employeeId: ${employeeId}, date: ${date}`);
+    
     // Get the outstanding_advance from the most recent record up to and including the given date
     // This includes any transactions on the date itself
     const { rows } = await db.query(
-      `SELECT outstanding_advance 
+      `SELECT outstanding_advance, date
        FROM attendance 
        WHERE employee_id = $1 AND date <= $2::date
        ORDER BY date DESC 
        LIMIT 1`,
       [employeeId, date]
     );
+    
+    console.log(`[Outstanding Advance] Found ${rows.length} record(s) for employeeId: ${employeeId}, date: ${date}`);
+    if (rows.length > 0) {
+      console.log(`[Outstanding Advance] Record date: ${rows[0].date}, outstanding_advance: ${rows[0].outstanding_advance}`);
+    }
+    
     // Return the outstanding_advance from the most recent record up to and including the given date
     // This represents the cumulative outstanding as of the given date (including that date's transactions)
     const outstanding = rows.length > 0 
       ? parseFloat(rows[0].outstanding_advance) || 0 
       : 0;
+    
+    console.log(`[Outstanding Advance] Returning outstanding_advance: ${outstanding} for employeeId: ${employeeId}, date: ${date}`);
     res.json({ outstanding_advance: outstanding });
   } catch (err) {
     console.error('Error fetching outstanding advance:', err);

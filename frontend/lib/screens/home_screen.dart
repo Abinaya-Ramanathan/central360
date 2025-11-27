@@ -3,22 +3,18 @@ import 'employee_details_screen.dart';
 import 'daily_report_details_screen.dart';
 import 'maintenance_issue_screen.dart';
 import 'mahal_booking_screen.dart';
-import 'credit_details_screen.dart';
+import 'sales_credit_details_screen.dart';
 import 'vehicle_driver_license_screen.dart';
+import 'attendance_advance_screen.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
-import 'add_sector_dialog.dart';
-import 'add_product_dialog.dart';
-import 'manage_products_dialog.dart';
-import 'manage_sectors_dialog.dart';
-import 'add_stock_item_dialog.dart';
-import 'manage_stock_items_dialog.dart';
 import 'stock_management_screen.dart';
 import 'login_screen.dart';
 import 'update_dialog.dart';
 import '../services/update_service.dart';
+import 'new_entry_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -194,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Column(
           children: [
-            // Sector Selection - Responsive layout for mobile
+            // Sector Selection and New Entry Button - Same line
             Container(
               padding: const EdgeInsets.all(16.0),
               color: Colors.white,
@@ -215,238 +211,81 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Sector Dropdown - Full width on mobile
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedSector,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  // Sector Dropdown and New Entry Button - Same line
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _selectedSector,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            prefixIcon: const Icon(Icons.filter_list),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          isExpanded: true,
+                          hint: const Text('Select Sector'),
+                          items: [
+                            // For admin users, show "All Sectors" and all sectors
+                            if (_isAdmin) ...[
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('All Sectors'),
+                              ),
+                              ..._sectors.map((sector) {
+                                return DropdownMenuItem<String>(
+                                  value: sector.code,
+                                  child: Text('${sector.code} - ${sector.name}'),
+                                );
+                              }),
+                            ]
+                            // For non-admin users with initialSector, only show their sector
+                            else if (!_isAdmin && widget.initialSector != null && _sectors.isNotEmpty)
+                              DropdownMenuItem<String>(
+                                value: widget.initialSector,
+                                child: Text(_sectors.firstWhere(
+                                  (s) => s.code == widget.initialSector,
+                                  orElse: () => Sector(code: widget.initialSector!, name: widget.initialSector!),
+                                ).name),
+                              ),
+                          ],
+                          onChanged: _isAdmin ? (value) {
+                            setState(() {
+                              _selectedSector = value;
+                            });
+                          } : null,
+                        ),
                       ),
-                      prefixIcon: const Icon(Icons.filter_list),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    isExpanded: true,
-                    hint: const Text('Select Sector'),
-                    items: [
-                      // For admin users, show "All Sectors" and all sectors
                       if (_isAdmin) ...[
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('All Sectors'),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => NewEntryScreen(
+                                  username: widget.username,
+                                  selectedSector: _selectedSector,
+                                  isMainAdmin: _isMainAdmin,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('New Entry'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
-                        ..._sectors.map((sector) {
-                          return DropdownMenuItem<String>(
-                            value: sector.code,
-                            child: Text('${sector.code} - ${sector.name}'),
-                          );
-                        }),
-                      ]
-                      // For non-admin users with initialSector, only show their sector
-                      else if (!_isAdmin && widget.initialSector != null && _sectors.isNotEmpty)
-                        DropdownMenuItem<String>(
-                          value: widget.initialSector,
-                          child: Text(_sectors.firstWhere(
-                            (s) => s.code == widget.initialSector,
-                            orElse: () => Sector(code: widget.initialSector!, name: widget.initialSector!),
-                          ).name),
-                        ),
+                      ],
                     ],
-                    onChanged: _isAdmin ? (value) {
-                      setState(() {
-                        _selectedSector = value;
-                      });
-                    } : null,
                   ),
-                  // Admin buttons - Use Wrap for responsive layout
-                  if (_isAdmin) ...[
-                    const SizedBox(height: 12),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        // On mobile (width < 600), use vertical layout
-                        if (constraints.maxWidth < 600) {
-                          return Column(
-                            children: [
-                              _buildAdminButton(
-                                icon: Icons.add_business,
-                                label: 'Add Sector',
-                                color: Colors.green.shade700,
-                                onPressed: () async {
-                                  final result = await showDialog<Sector>(
-                                    context: context,
-                                    builder: (context) => const AddSectorDialog(),
-                                  );
-                                  if (result != null) {
-                                    await _loadSectors();
-                                  }
-                                },
-                              ),
-                              const SizedBox(height: 6), // Reduced spacing
-                              _buildAdminButton(
-                                icon: Icons.business,
-                                label: 'Manage Sectors',
-                                color: Colors.indigo.shade700,
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => ManageSectorsDialog(isMainAdmin: _isMainAdmin),
-                                  ).then((_) => _loadSectors());
-                                },
-                              ),
-                              const SizedBox(height: 6), // Reduced spacing
-                              _buildAdminButton(
-                                icon: Icons.add_shopping_cart,
-                                label: 'Add Production Item',
-                                color: Colors.orange.shade700,
-                                onPressed: () async {
-                                  final result = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => const AddProductDialog(),
-                                  );
-                                  if (result == true) {
-                                    // Product created successfully
-                                  }
-                                },
-                              ),
-                              const SizedBox(height: 6), // Reduced spacing
-                              _buildAdminButton(
-                                icon: Icons.inventory_2,
-                                label: 'Manage Production Item',
-                                color: Colors.purple.shade700,
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => ManageProductsDialog(
-                                      isMainAdmin: _isMainAdmin,
-                                      selectedSector: _selectedSector,
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 6), // Reduced spacing
-                              _buildAdminButton(
-                                icon: Icons.add_box,
-                                label: 'Add Stock Item',
-                                color: Colors.brown.shade700,
-                                onPressed: () async {
-                                  final result = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => const AddStockItemDialog(),
-                                  );
-                                  if (result == true) {
-                                    // Stock item created successfully
-                                  }
-                                },
-                              ),
-                              const SizedBox(height: 6), // Reduced spacing
-                              _buildAdminButton(
-                                icon: Icons.inventory,
-                                label: 'Manage Stock Item',
-                                color: Colors.grey.shade700,
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => ManageStockItemsDialog(
-                                      isMainAdmin: _isMainAdmin,
-                                      selectedSector: _selectedSector,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          );
-                        } else {
-                          // On larger screens, use Wrap for horizontal layout
-                          return Wrap(
-                            spacing: 6, // Reduced spacing
-                            runSpacing: 6, // Reduced spacing
-                            children: [
-                              _buildAdminButton(
-                                icon: Icons.add_business,
-                                label: 'Add Sector',
-                                color: Colors.green.shade700,
-                                onPressed: () async {
-                                  final result = await showDialog<Sector>(
-                                    context: context,
-                                    builder: (context) => const AddSectorDialog(),
-                                  );
-                                  if (result != null) {
-                                    await _loadSectors();
-                                  }
-                                },
-                              ),
-                              _buildAdminButton(
-                                icon: Icons.business,
-                                label: 'Manage Sectors',
-                                color: Colors.indigo.shade700,
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => ManageSectorsDialog(isMainAdmin: _isMainAdmin),
-                                  ).then((_) => _loadSectors());
-                                },
-                              ),
-                              _buildAdminButton(
-                                icon: Icons.add_shopping_cart,
-                                label: 'Add Production Item',
-                                color: Colors.orange.shade700,
-                                onPressed: () async {
-                                  final result = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => const AddProductDialog(),
-                                  );
-                                  if (result == true) {
-                                    // Product created successfully
-                                  }
-                                },
-                              ),
-                              _buildAdminButton(
-                                icon: Icons.inventory_2,
-                                label: 'Manage Production Item',
-                                color: Colors.purple.shade700,
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => ManageProductsDialog(
-                                      isMainAdmin: _isMainAdmin,
-                                      selectedSector: _selectedSector,
-                                    ),
-                                  );
-                                },
-                              ),
-                              _buildAdminButton(
-                                icon: Icons.add_box,
-                                label: 'Add Stock Item',
-                                color: Colors.brown.shade700,
-                                onPressed: () async {
-                                  final result = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => const AddStockItemDialog(),
-                                  );
-                                  if (result == true) {
-                                    // Stock item created successfully
-                                  }
-                                },
-                              ),
-                              _buildAdminButton(
-                                icon: Icons.inventory,
-                                label: 'Manage Stock Item',
-                                color: Colors.grey.shade700,
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => ManageStockItemsDialog(
-                                      isMainAdmin: _isMainAdmin,
-                                      selectedSector: _selectedSector,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          );
-                        }
-                      },
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -502,7 +341,39 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               // Show Employee Details only for Admin
                               if (_isAdmin) const SizedBox(height: 16),
+                              // Attendance and Advance Details - available for all users
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => AttendanceAdvanceScreen(
+                                          username: widget.username,
+                                          selectedSector: _selectedSector,
+                                          isAdmin: _isAdmin,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.event_available),
+                                  label: const Text(
+                                    'Attendance and Advance Details',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green.shade700,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
                               // Daily Report Details - available for all users
+                              const SizedBox(height: 16),
                               SizedBox(
                                 width: double.infinity,
                                 height: 50,
@@ -520,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   },
                                   icon: const Icon(Icons.report),
                                   label: const Text(
-                                    'Daily Report Details',
+                                    'Production and Expense Details',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                   style: ElevatedButton.styleFrom(
@@ -564,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                               ),
-                              // Credit Details - available for all users
+                              // Sales and Credit Details - available for all users
                               const SizedBox(height: 16),
                               SizedBox(
                                 width: double.infinity,
@@ -574,7 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => CreditDetailsScreen(
+                                        builder: (context) => SalesCreditDetailsScreen(
                                           username: widget.username,
                                           selectedSector: _selectedSector,
                                           isMainAdmin: _isMainAdmin,
@@ -584,7 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   },
                                   icon: const Icon(Icons.credit_card),
                                   label: const Text(
-                                    'Credit Details',
+                                    'Sales and Credit Details',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                   style: ElevatedButton.styleFrom(
@@ -711,34 +582,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildAdminButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 40, // Fixed height to make buttons smaller
-      child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18), // Reduced icon size
-        label: Text(
-          label,
-          style: const TextStyle(fontSize: 13), // Reduced font size
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 8, // Reduced vertical padding
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10), // Slightly smaller radius
-          ),
-        ),
-      ),
-    );
-  }
 }

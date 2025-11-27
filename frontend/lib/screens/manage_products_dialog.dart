@@ -22,6 +22,7 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
   List<Map<String, dynamic>> _products = [];
   List<Sector> _sectors = [];
   bool _isLoading = false;
+  bool _sortAscending = true; // Sort direction for Sector column
 
   @override
   void initState() {
@@ -184,10 +185,26 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
                       : SingleChildScrollView(
                           child: DataTable(
                             columnSpacing: 20,
-                            columns: const [
-                              DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                            sortColumnIndex: 1,
+                            sortAscending: _sortAscending,
+                            columns: [
+                              const DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                onSort: (columnIndex, ascending) {
+                                  setState(() {
+                                    _sortAscending = ascending;
+                                    _products.sort((a, b) {
+                                      final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                                      final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                                      return ascending
+                                          ? aName.compareTo(bName)
+                                          : bName.compareTo(aName);
+                                    });
+                                  });
+                                },
+                              ),
+                              const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                             ],
                             rows: _products.map((product) {
                               return DataRow(

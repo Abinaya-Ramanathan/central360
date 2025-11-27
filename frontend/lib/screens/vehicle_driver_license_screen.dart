@@ -47,6 +47,11 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
   // Sorting state for Vehicle Services tab
   String? _serviceSortColumn;
   bool _serviceSortAscending = true;
+  
+  // Sorting state for Sector column
+  bool _sectorSortAscendingVehicle = true;
+  bool _sectorSortAscendingDriver = true;
+  bool _sectorSortAscendingService = true;
 
   @override
   void initState() {
@@ -295,9 +300,25 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                     child: DataTable(
                       headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                       dataTextStyle: const TextStyle(color: Colors.black87),
+                      sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
+                      sortAscending: _sectorSortAscendingVehicle,
                       columns: [
                         if (widget.selectedSector == null && _isAdmin)
-                          const DataColumn(label: Text('Sector')),
+                          DataColumn(
+                            label: const Text('Sector'),
+                            onSort: (columnIndex, ascending) {
+                              setState(() {
+                                _sectorSortAscendingVehicle = ascending;
+                                sortedLicenses.sort((a, b) {
+                                  final aName = _getSectorName(a.sectorCode).toLowerCase();
+                                  final bName = _getSectorName(b.sectorCode).toLowerCase();
+                                  return ascending
+                                      ? aName.compareTo(bName)
+                                      : bName.compareTo(aName);
+                                });
+                              });
+                            },
+                          ),
                         const DataColumn(label: Text('Name')),
                         const DataColumn(label: Text('Model')),
                         const DataColumn(label: Text('Registration Number')),
@@ -515,9 +536,25 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                     child: DataTable(
                       headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                       dataTextStyle: const TextStyle(color: Colors.black87),
+                      sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
+                      sortAscending: _sectorSortAscendingDriver,
                       columns: [
                         if (widget.selectedSector == null && _isAdmin)
-                          const DataColumn(label: Text('Sector')),
+                          DataColumn(
+                            label: const Text('Sector'),
+                            onSort: (columnIndex, ascending) {
+                              setState(() {
+                                _sectorSortAscendingDriver = ascending;
+                                sortedLicenses.sort((a, b) {
+                                  final aName = _getSectorName(a.sectorCode).toLowerCase();
+                                  final bName = _getSectorName(b.sectorCode).toLowerCase();
+                                  return ascending
+                                      ? aName.compareTo(bName)
+                                      : bName.compareTo(aName);
+                                });
+                              });
+                            },
+                          ),
                         const DataColumn(label: Text('Driver Name')),
                         const DataColumn(label: Text('License Number')),
                         DataColumn(
@@ -636,9 +673,25 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                     child: DataTable(
                       headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                       dataTextStyle: const TextStyle(color: Colors.black87),
+                      sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
+                      sortAscending: _sectorSortAscendingService,
                       columns: [
                         if (widget.selectedSector == null && _isAdmin)
-                          const DataColumn(label: Text('Sector')),
+                          DataColumn(
+                            label: const Text('Sector'),
+                            onSort: (columnIndex, ascending) {
+                              setState(() {
+                                _sectorSortAscendingService = ascending;
+                                sortedServices.sort((a, b) {
+                                  final aName = _getSectorName(a.sectorCode).toLowerCase();
+                                  final bName = _getSectorName(b.sectorCode).toLowerCase();
+                                  return ascending
+                                      ? aName.compareTo(bName)
+                                      : bName.compareTo(aName);
+                                });
+                              });
+                            },
+                          ),
                         const DataColumn(label: Text('Vehicle Name')),
                         const DataColumn(label: Text('Model')),
                         const DataColumn(label: Text('Service Part Name')),

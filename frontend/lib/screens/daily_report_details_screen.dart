@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'attendance_tab_content.dart';
 import 'production_tab_content.dart';
 import 'expense_tab_content.dart';
 import 'home_screen.dart';
@@ -69,7 +68,7 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> wit
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _selectedMonth = DateTime.now().month;
     _selectedDate = DateTime.now();
     _isAdmin = widget.username.toLowerCase() == 'admin' || widget.username.toLowerCase() == 'srisurya';
@@ -131,7 +130,7 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> wit
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daily Report Details'),
+        title: const Text('Production and Expense Details'),
         backgroundColor: Colors.teal.shade700,
         foregroundColor: Colors.white,
         bottom: TabBar(
@@ -140,7 +139,6 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> wit
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.orange,
           tabs: const [
-            Tab(text: 'Attendance'),
             Tab(text: 'Production'),
             Tab(text: 'Expense'),
           ],
@@ -277,13 +275,6 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> wit
             child: TabBarView(
               controller: _tabController,
               children: [
-                // Attendance Tab
-                AttendanceTabContent(
-                  selectedSector: widget.selectedSector,
-                  selectedMonth: _selectedMonth,
-                  selectedDate: _selectedDate,
-                  isAdmin: _isAdmin,
-                ),
                 // Production Tab
                 ProductionTabContent(
                   selectedSector: widget.selectedSector,

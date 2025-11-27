@@ -770,6 +770,82 @@ class ApiService {
     throw Exception(errorMessage);
   }
 
+  // Upload multiple photos for a maintenance issue
+  static Future<List<Map<String, dynamic>>> uploadMaintenanceIssuePhotos({
+    required int issueId,
+    required List<File> photoFiles,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/maintenance-issues/$issueId/photos'),
+    );
+
+    for (final file in photoFiles) {
+      if (await file.exists()) {
+        final fileStream = http.ByteStream(file.openRead());
+        final fileLength = await file.length();
+        final multipartFile = http.MultipartFile(
+          'photos',
+          fileStream,
+          fileLength,
+          filename: file.path.split('/').last.split('\\').last,
+          contentType: MediaType('image', 'jpeg'),
+        );
+        request.files.add(multipartFile);
+      }
+    }
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 201) {
+      final responseData = json.decode(response.body);
+      return List<Map<String, dynamic>>.from(responseData['photos'] ?? []);
+    }
+    String errorMessage = 'Failed to upload photos';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to upload photos';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Get photos for a maintenance issue
+  static Future<List<Map<String, dynamic>>> getMaintenanceIssuePhotos(int issueId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/maintenance-issues/$issueId/photos'),
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => json as Map<String, dynamic>).toList();
+    }
+    throw Exception('Failed to load photos');
+  }
+
+  // Delete a photo
+  static Future<void> deleteMaintenanceIssuePhoto(int photoId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/maintenance-issues/photos/$photoId'),
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    String errorMessage = 'Failed to delete photo';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete photo';
+    }
+    throw Exception(errorMessage);
+  }
+
   // Mahal Bookings API methods
   static Future<List<MahalBooking>> getMahalBookings({String? sector}) async {
     final queryParams = <String, String>{};
@@ -1126,6 +1202,81 @@ class ApiService {
       }
     } catch (e) {
       errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete credit details';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Sales Details
+  static Future<List<Map<String, dynamic>>> getSalesDetails({
+    String? sector,
+    String? date,
+    String? month,
+  }) async {
+    final queryParams = <String, String>{};
+    if (sector != null) queryParams['sector'] = sector;
+    if (date != null) queryParams['date'] = date;
+    if (month != null) queryParams['month'] = month;
+
+    final uri = Uri.parse('$baseUrl/sales-details').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => Map<String, dynamic>.from(json)).toList();
+    }
+    throw Exception('Failed to fetch sales details: ${response.body}');
+  }
+
+  static Future<List<Map<String, dynamic>>> getCreditDetailsFromSales({
+    String? sector,
+  }) async {
+    final queryParams = <String, String>{};
+    if (sector != null) queryParams['sector'] = sector;
+
+    final uri = Uri.parse('$baseUrl/sales-details/credits').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => Map<String, dynamic>.from(json)).toList();
+    }
+    throw Exception('Failed to fetch credit details from sales: ${response.body}');
+  }
+
+  static Future<Map<String, dynamic>> saveSalesDetails(Map<String, dynamic> record) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/sales-details'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode(record),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    String errorMessage = 'Failed to save sales details';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to save sales details';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<void> deleteSalesDetails(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/sales-details/$id'),
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    String errorMessage = 'Failed to delete sales details';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete sales details';
     }
     throw Exception(errorMessage);
   }

@@ -29,6 +29,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   List<Sector> _sectors = [];
   bool _isLoading = false;
   bool _isAdmin = false;
+  bool _sortAscending = true; // Sort direction for Sector column
 
   @override
   void initState() {
@@ -415,9 +416,25 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
                               headingRowColor: WidgetStateProperty.all(
                                 Colors.blue.shade100,
                               ),
+                              sortColumnIndex: widget.selectedSector == null ? 0 : null,
+                              sortAscending: _sortAscending,
                               columns: [
                                 if (widget.selectedSector == null)
-                                  const DataColumn(label: Text('Sector')),
+                                  DataColumn(
+                                    label: const Text('Sector'),
+                                    onSort: (columnIndex, ascending) {
+                                      setState(() {
+                                        _sortAscending = ascending;
+                                        filteredEmployees.sort((a, b) {
+                                          final aName = _getSectorName(a.sector).toLowerCase();
+                                          final bName = _getSectorName(b.sector).toLowerCase();
+                                          return ascending
+                                              ? aName.compareTo(bName)
+                                              : bName.compareTo(aName);
+                                        });
+                                      });
+                                    },
+                                  ),
                                 const DataColumn(label: Text('Name')),
                                 const DataColumn(label: Text('Contact')),
                                 const DataColumn(label: Text('Address')),

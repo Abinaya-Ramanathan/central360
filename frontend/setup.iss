@@ -1,7 +1,7 @@
 [Setup]
 ; App information
 AppName=Company360
-AppVersion=1.0.7
+AppVersion=1.0.8
 AppPublisher=Company360
 AppPublisherURL=
 AppSupportURL=

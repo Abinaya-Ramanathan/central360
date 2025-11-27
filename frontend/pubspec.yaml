@@ -1,7 +1,7 @@
 name: company360
 description: Company360 - Comprehensive Business Management App for managing employees, expenses, bookings, credit details, vehicle licenses, and more.
 publish_to: "none"  # Will be removed when ready to publish
-version: 1.0.7+8
+version: 1.0.8+9
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -23,6 +23,7 @@ dependencies:
   package_info_plus: ^8.0.0
   url_launcher: ^6.3.1
   shared_preferences: ^2.2.2
+  open_file: ^3.5.2
 
 dev_dependencies:
   flutter_test:

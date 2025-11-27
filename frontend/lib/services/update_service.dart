@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:open_file/open_file.dart';
 import 'dart:convert';
 import '../config/env_config.dart';
 
@@ -181,18 +182,37 @@ class UpdateService {
       // For Windows, use system temp directory
       Directory downloadDir;
       if (Platform.isAndroid) {
-        // Try to use Downloads directory
-        final externalDir = await getExternalStorageDirectory();
-        if (externalDir != null) {
-          // Navigate to Downloads folder
-          final downloadsDir = Directory('${externalDir.path.replaceAll('/Android/data/com.example.central360/files', '')}/Download');
-          if (!await downloadsDir.exists()) {
-            await downloadsDir.create(recursive: true);
+        // Try to use Downloads directory - use getExternalStorageDirectory and navigate to Downloads
+        try {
+          final externalDir = await getExternalStorageDirectory();
+          if (externalDir != null) {
+            // Navigate to Downloads folder
+            // Path format: /storage/emulated/0/Android/data/com.example.central360/files
+            // We want: /storage/emulated/0/Download
+            String downloadsPath;
+            if (externalDir.path.contains('/Android/data/')) {
+              // Extract the base storage path
+              final basePath = externalDir.path.split('/Android/data/')[0];
+              downloadsPath = '$basePath/Download';
+            } else {
+              // Fallback: try common Downloads paths
+              downloadsPath = '/storage/emulated/0/Download';
+            }
+            
+            final downloadsDir = Directory(downloadsPath);
+            if (!await downloadsDir.exists()) {
+              await downloadsDir.create(recursive: true);
+            }
+            downloadDir = downloadsDir;
+            debugPrint('Using Downloads directory: $downloadsPath');
+          } else {
+            throw Exception('Could not access external storage');
           }
-          downloadDir = downloadsDir;
-        } else {
+        } catch (e) {
+          debugPrint('Error accessing Downloads directory: $e');
           // Fallback to app's external files directory
           downloadDir = await getApplicationDocumentsDirectory();
+          debugPrint('Using fallback directory: ${downloadDir.path}');
         }
       } else {
         downloadDir = Directory.systemTemp;
@@ -234,35 +254,43 @@ class UpdateService {
           runInShell: true,
         );
       } else if (Platform.isAndroid) {
-        // For Android, try to open the APK file
-        // The file should be in Downloads folder for easier access
+        // For Android, use open_file package which properly handles APK installation
         try {
           final file = File(installerPath);
           if (!await file.exists()) {
-            throw Exception('APK file not found');
+            throw Exception('APK file not found at: $installerPath');
           }
           
-          // Try using file:// URI first (works if file is in accessible location)
-          final fileUri = Uri.file(installerPath);
-          if (await canLaunchUrl(fileUri)) {
-            await launchUrl(fileUri, mode: LaunchMode.externalApplication);
-          } else {
-            // Try content URI with FileProvider
+          debugPrint('Opening APK file: $installerPath');
+          
+          // Use open_file package which properly handles APK installation on Android
+          final result = await OpenFile.open(installerPath);
+          
+          debugPrint('OpenFile result: ${result.message}, type: ${result.type}');
+          
+          // Check if open_file succeeded (type 0 = done, other values indicate errors)
+          if (result.type != 0) {
+            // If open_file fails, try alternative method
+            debugPrint('OpenFile failed with type: ${result.type}, message: ${result.message}');
+            debugPrint('Trying alternative method...');
+            
+            // Try using content URI with FileProvider
             final packageName = 'com.example.central360';
             final fileName = installerPath.split('/').last;
             final contentUri = Uri.parse('content://$packageName.fileprovider/external_files/$fileName');
+            
             if (await canLaunchUrl(contentUri)) {
               await launchUrl(contentUri, mode: LaunchMode.externalApplication);
             } else {
-              // If both fail, provide clear instructions
-              throw Exception('Please open Downloads folder and tap the APK file to install');
+              // Last resort: provide clear instructions
+              throw Exception('APK downloaded successfully.\n\nPlease:\n1. Open your file manager\n2. Navigate to Downloads folder\n3. Tap on $fileName to install');
             }
           }
         } catch (e) {
           debugPrint('Error launching APK: $e');
           // Provide helpful error message with file location
           final fileName = installerPath.split('/').last;
-          throw Exception('APK downloaded as: $fileName\nPlease open your Downloads folder and tap the file to install.');
+          throw Exception('APK downloaded as: $fileName\n\nPlease open your Downloads folder and tap the file to install.\n\nFile location: $installerPath');
         }
       } else {
         throw UnsupportedError('Auto-install not supported on ${Platform.operatingSystem}');

@@ -19,7 +19,7 @@ class UploadPhotosDialog extends StatefulWidget {
 
 class _UploadPhotosDialogState extends State<UploadPhotosDialog> {
   final ImagePicker _picker = ImagePicker();
-  List<XFile> _selectedImages = [];
+  final List<XFile> _selectedImages = [];
   List<String> _existingPhotos = [];
   bool _isLoading = false;
   bool _isLoadingPhotos = true;

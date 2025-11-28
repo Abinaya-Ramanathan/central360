@@ -54,6 +54,7 @@ router.get('/credits', async (req, res) => {
       COALESCE(balance_paid, 0) as balance_paid,
       TO_CHAR(sale_date, 'YYYY-MM-DD') as sale_date,
       TO_CHAR(balance_paid_date, 'YYYY-MM-DD') as balance_paid_date,
+      details,
       created_at, updated_at
       FROM sales_details WHERE credit_amount > 0`;
     const params = [];
@@ -68,9 +69,23 @@ router.get('/credits', async (req, res) => {
     console.log(`[Credit Details] Query: ${query}, params:`, params);
     const { rows } = await db.query(query, params);
     console.log(`[Credit Details] Found ${rows.length} records with credit_amount > 0`);
+    
+    // Get balance payments for each sale
     for (const row of rows) {
-      console.log(`  - ${row.name}: sale_date=${row.sale_date}, credit_amount=${row.credit_amount}`);
+      const saleId = row.id;
+      // Get balance payments for this sale
+      const paymentsResult = await db.query(
+        `SELECT id, balance_paid, TO_CHAR(balance_paid_date, 'YYYY-MM-DD') as balance_paid_date, 
+         details, overall_balance, created_at, updated_at 
+         FROM sales_balance_payments 
+         WHERE sale_id = $1 
+         ORDER BY created_at ASC`,
+        [saleId]
+      );
+      row.balance_payments = paymentsResult.rows;
+      console.log(`  - ${row.name}: sale_date=${row.sale_date}, credit_amount=${row.credit_amount}, payments=${paymentsResult.rows.length}`);
     }
+    
     res.json(rows);
   } catch (err) {
     console.error('Error fetching credit details from sales:', err);
@@ -121,9 +136,10 @@ router.post('/', async (req, res) => {
           amount_pending = $9,
           balance_paid = $10,
           balance_paid_date = $11,
-          sale_date = $12,
+          details = $12,
+          sale_date = $13,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $13
+        WHERE id = $14
         RETURNING *`,
         [
           sector_code,
@@ -137,6 +153,7 @@ router.post('/', async (req, res) => {
           amount_pending,
           balance_paid || 0,
           balance_paid_date || null,
+          details || null,
           sale_date,
           id,
         ]
@@ -153,8 +170,8 @@ router.post('/', async (req, res) => {
       const { rows } = await db.query(
         `INSERT INTO sales_details (
           sector_code, name, contact_number, address, product_name, quantity,
-          amount_received, credit_amount, amount_pending, balance_paid, balance_paid_date, sale_date
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          amount_received, credit_amount, amount_pending, balance_paid, balance_paid_date, details, sale_date
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING *`,
         [
           sector_code,
@@ -168,6 +185,7 @@ router.post('/', async (req, res) => {
           amount_pending,
           balance_paid || 0,
           balance_paid_date || null,
+          details || null,
           sale_date,
         ]
       );
@@ -201,6 +219,118 @@ router.delete('/:id', async (req, res) => {
     console.error('Error deleting sales details:', err);
     res.status(500).json({
       message: 'Error deleting sales details',
+      error: err.message,
+    });
+  }
+});
+
+// Get balance payments for a sale
+router.get('/:id/balance-payments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await db.query(
+      `SELECT id, balance_paid, TO_CHAR(balance_paid_date, 'YYYY-MM-DD') as balance_paid_date, 
+       details, overall_balance, created_at, updated_at 
+       FROM sales_balance_payments 
+       WHERE sale_id = $1 
+       ORDER BY created_at ASC`,
+      [id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching balance payments:', err);
+    res.status(500).json({ message: 'Error fetching balance payments' });
+  }
+});
+
+// Create or update a balance payment
+router.post('/balance-payments', async (req, res) => {
+  try {
+    const {
+      id,
+      sale_id,
+      balance_paid,
+      balance_paid_date,
+      details,
+      overall_balance,
+    } = req.body;
+
+    if (!sale_id) {
+      return res.status(400).json({ message: 'sale_id is required' });
+    }
+
+    if (id) {
+      // Update existing balance payment
+      const { rows } = await db.query(
+        `UPDATE sales_balance_payments SET
+          balance_paid = $1,
+          balance_paid_date = $2,
+          details = $3,
+          overall_balance = $4,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $5
+        RETURNING id, balance_paid, TO_CHAR(balance_paid_date, 'YYYY-MM-DD') as balance_paid_date, 
+                   details, overall_balance, created_at, updated_at`,
+        [
+          balance_paid || 0,
+          balance_paid_date || null,
+          details || null,
+          overall_balance || 0,
+          id,
+        ]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'Balance payment not found' });
+      }
+
+      res.json(rows[0]);
+    } else {
+      // Create new balance payment
+      const { rows } = await db.query(
+        `INSERT INTO sales_balance_payments (
+          sale_id, balance_paid, balance_paid_date, details, overall_balance
+        ) VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, balance_paid, TO_CHAR(balance_paid_date, 'YYYY-MM-DD') as balance_paid_date, 
+                   details, overall_balance, created_at, updated_at`,
+        [
+          sale_id,
+          balance_paid || 0,
+          balance_paid_date || null,
+          details || null,
+          overall_balance || 0,
+        ]
+      );
+
+      res.status(201).json(rows[0]);
+    }
+  } catch (err) {
+    console.error('Error saving balance payment:', err);
+    res.status(500).json({
+      message: 'Error saving balance payment',
+      error: err.message,
+    });
+  }
+});
+
+// Delete a balance payment
+router.delete('/balance-payments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await db.query(
+      'DELETE FROM sales_balance_payments WHERE id = $1 RETURNING *',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Balance payment not found' });
+    }
+
+    res.status(200).json({ message: 'Balance payment deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting balance payment:', err);
+    res.status(500).json({
+      message: 'Error deleting balance payment',
       error: err.message,
     });
   }

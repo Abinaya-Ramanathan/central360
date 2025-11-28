@@ -26,10 +26,12 @@ class EmployeeDetailsScreen extends StatefulWidget {
 
 class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   List<Employee> _employees = [];
+  List<Employee> _filteredEmployees = [];
   List<Sector> _sectors = [];
   bool _isLoading = false;
   bool _isAdmin = false;
   bool _sortAscending = true; // Sort direction for Sector column
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -37,6 +39,28 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
     _isAdmin = AuthService.isAdmin;
     _loadSectors();
     _loadEmployees();
+    _searchController.addListener(_filterEmployees);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterEmployees() {
+    setState(() {
+      final query = _searchController.text.toLowerCase();
+      if (query.isEmpty) {
+        _filteredEmployees = List.from(_employees);
+      } else {
+        _filteredEmployees = _employees.where((employee) {
+          final sectorName = _getSectorName(employee.sector).toLowerCase();
+          final name = employee.name.toLowerCase();
+          return sectorName.contains(query) || name.contains(query);
+        }).toList();
+      }
+    });
   }
 
   Future<void> _loadSectors() async {
@@ -85,16 +109,8 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
       if (mounted) {
         setState(() {
           _employees = employees;
+          _filteredEmployees = List.from(employees);
         });
-        // Debug: Print employee count
-        debugPrint('Loaded ${employees.length} employees');
-        if (employees.isNotEmpty) {
-          debugPrint('First employee: ${employees.first.name}, Sector: ${employees.first.sector}');
-        }
-        if (widget.selectedSector != null) {
-          final filtered = employees.where((e) => e.sector == widget.selectedSector).toList();
-          debugPrint('Filtered employees for sector ${widget.selectedSector}: ${filtered.length}');
-        }
       }
     } catch (e) {
       debugPrint('Error loading employees: $e');
@@ -206,6 +222,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
       await ApiService.deleteEmployee(employee.id);
       setState(() {
         _employees.removeWhere((e) => e.id == employee.id);
+        _filterEmployees(); // Refresh filtered list
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -231,21 +248,14 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     // Filter employees by sector (case-insensitive comparison)
-    final filteredEmployees = widget.selectedSector == null
-        ? _employees
-        : _employees.where((e) => 
+    final sectorFilteredEmployees = widget.selectedSector == null
+        ? _filteredEmployees
+        : _filteredEmployees.where((e) => 
             e.sector.toUpperCase().trim() == widget.selectedSector!.toUpperCase().trim()
           ).toList();
     
-    // Debug: Log filtering info
-    if (widget.selectedSector != null && _employees.isNotEmpty) {
-      debugPrint('Total employees: ${_employees.length}');
-      debugPrint('Filtering by sector: ${widget.selectedSector}');
-      debugPrint('Filtered count: ${filteredEmployees.length}');
-      if (filteredEmployees.isEmpty && _employees.isNotEmpty) {
-        debugPrint('Available sectors in data: ${_employees.map((e) => e.sector).toSet().join(", ")}');
-      }
-    }
+    final filteredEmployees = sectorFilteredEmployees;
+    
 
     return Scaffold(
       appBar: AppBar(
@@ -363,6 +373,39 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
         ),
         child: Column(
           children: [
+            // Search Bar
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              color: Colors.grey.shade100,
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  return TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      labelText: 'Search by Sector or Name',
+                      hintText: 'Enter sector or name to search',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {}); // Update UI to hide clear button
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      _filterEmployees();
+                      setState(() {}); // Update UI to show/hide clear button
+                    },
+                  );
+                },
+              ),
+            ),
             // Employee Table
             Expanded(
               child: RefreshIndicator(
@@ -524,6 +567,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
                                                       if (index != -1) {
                                                         _employees[index] = updated;
                                                       }
+                                                      _filterEmployees(); // Refresh filtered list
                                                     });
                                                   } catch (e) {
                                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -608,11 +652,10 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
                 );
                 if (result != null) {
                   try {
-                    final created = await ApiService.createEmployee(result);
-                    debugPrint('Employee created: ${created.name}, Sector: ${created.sector}');
-                    debugPrint('Selected sector filter: ${widget.selectedSector}');
+                    await ApiService.createEmployee(result);
                     // Reload all employees from server to ensure consistency
                     await _loadEmployees();
+                    _filterEmployees(); // Refresh filtered list
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(

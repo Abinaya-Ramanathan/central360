@@ -31,6 +31,9 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
   final Map<int, bool> _editMode = {}; // Track which rows are in edit mode
   final Map<int, String> _editStatus = {}; // Track edited status
   final Map<int, DateTime?> _editDateResolved = {}; // Track edited date resolved
+  final Map<int, String> _editIssueDescription = {}; // Track edited issue description
+  final Map<int, DateTime?> _editDateCreated = {}; // Track edited date created
+  final Map<int, String> _editSectorCode = {}; // Track edited sector code
   bool _isLoading = false;
   bool _sortAscending = true; // Sort direction for Sector column
 
@@ -75,6 +78,9 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
           _editMode.clear();
           _editStatus.clear();
           _editDateResolved.clear();
+          _editIssueDescription.clear();
+          _editDateCreated.clear();
+          _editSectorCode.clear();
         });
       }
     } catch (e) {
@@ -141,22 +147,28 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
     final issue = _issues.firstWhere((i) => i.id == issueId);
     final newStatus = _editStatus[issueId] ?? issue.status;
     final newDateResolved = _editDateResolved[issueId];
+    final newIssueDescription = _editIssueDescription[issueId] ?? issue.issueDescription;
+    final newDateCreated = _editDateCreated[issueId] ?? issue.dateCreated;
+    final newSectorCode = _editSectorCode[issueId] ?? issue.sectorCode;
 
     setState(() => _isLoading = true);
     try {
       await ApiService.updateMaintenanceIssue(
         id: issueId,
-        issueDescription: issue.issueDescription,
-        dateCreated: issue.dateCreated,
+        issueDescription: newIssueDescription,
+        dateCreated: newDateCreated,
         status: newStatus,
         dateResolved: newDateResolved,
-        sectorCode: issue.sectorCode,
+        sectorCode: newSectorCode,
       );
       if (mounted) {
         setState(() {
           _editMode[issueId] = false;
           _editStatus.remove(issueId);
           _editDateResolved.remove(issueId);
+          _editIssueDescription.remove(issueId);
+          _editDateCreated.remove(issueId);
+          _editSectorCode.remove(issueId);
         });
         await _loadIssues();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -189,12 +201,18 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
         _editMode[issueId] = false;
         _editStatus.remove(issueId);
         _editDateResolved.remove(issueId);
+        _editIssueDescription.remove(issueId);
+        _editDateCreated.remove(issueId);
+        _editSectorCode.remove(issueId);
       } else {
         // Enter edit mode
         final issue = _issues.firstWhere((i) => i.id == issueId);
         _editMode[issueId] = true;
         _editStatus[issueId] = issue.status;
         _editDateResolved[issueId] = issue.dateResolved;
+        _editIssueDescription[issueId] = issue.issueDescription ?? '';
+        _editDateCreated[issueId] = issue.dateCreated;
+        _editSectorCode[issueId] = issue.sectorCode;
       }
     });
   }
@@ -213,6 +231,20 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
     }
   }
 
+  Future<void> _selectDateCreated(int issueId) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _editDateCreated[issueId] ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _editDateCreated[issueId] = picked;
+      });
+    }
+  }
+
   String _getImageUrl(String imageUrl) {
     if (imageUrl.startsWith('http')) {
       return imageUrl;
@@ -222,6 +254,9 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
   }
 
   Widget _buildPhotosCell(MaintenanceIssue issue) {
+    final issueId = issue.id!;
+    final isEditMode = _editMode[issueId] == true;
+    
     // Get photos from the issue, or fallback to imageUrl for backward compatibility
     final photos = issue.photos ?? [];
     final hasLegacyImage = issue.imageUrl != null && issue.imageUrl!.isNotEmpty;
@@ -235,86 +270,178 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
       );
     }
 
-    // Combine photos and legacy image
-    final allImages = <String>[];
+    // Build list of photo items with their IDs
+    final photoItems = <Map<String, dynamic>>[];
+    
+    // Add legacy image if exists (no ID, so we'll mark it specially)
     if (hasLegacyImage) {
-      allImages.add(issue.imageUrl!);
+      photoItems.add({
+        'id': null, // Legacy image has no ID
+        'imageUrl': issue.imageUrl!,
+        'isLegacy': true,
+      });
     }
+    
+    // Add photos with their IDs
     for (var photo in photos) {
-      allImages.add(photo.imageUrl);
+      photoItems.add({
+        'id': photo.id,
+        'imageUrl': photo.imageUrl,
+        'isLegacy': false,
+      });
     }
 
     return ListView.builder(
       scrollDirection: Axis.horizontal,
-      itemCount: allImages.length,
+      itemCount: photoItems.length,
       itemBuilder: (context, index) {
-        final imageUrl = allImages[index];
+        final photoItem = photoItems[index];
+        final imageUrl = photoItem['imageUrl'] as String;
+        final photoId = photoItem['id'] as int?;
+        final isLegacy = photoItem['isLegacy'] as bool;
+        
         return Padding(
           padding: const EdgeInsets.only(right: 4.0),
-          child: GestureDetector(
-            onTap: () {
-              // Show full image in a dialog
-              showDialog(
-                context: context,
-                builder: (context) => Dialog(
-                  child: Stack(
-                    children: [
-                      Image.network(
-                        _getImageUrl(imageUrl),
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(Icons.broken_image, size: 50),
-                          );
-                        },
+          child: Stack(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  // Show full image in a dialog
+                  showDialog(
+                    context: context,
+                    builder: (context) => Dialog(
+                      child: Stack(
+                        children: [
+                          Image.network(
+                            _getImageUrl(imageUrl),
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(
+                                child: Icon(Icons.broken_image, size: 50),
+                              );
+                            },
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IconButton(
+                              icon: const Icon(Icons.close, color: Colors.white),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ),
+                        ],
                       ),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ),
-                    ],
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      _getImageUrl(imageUrl),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(Icons.broken_image, size: 20, color: Colors.grey),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
-              );
-            },
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(4),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  _getImageUrl(imageUrl),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Icon(Icons.broken_image, size: 20, color: Colors.grey),
-                    );
-                  },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+              // Show delete button when in edit mode
+              if (isEditMode && !isLegacy && photoId != null)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: () => _deletePhoto(issueId, photoId),
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1),
                       ),
-                    );
-                  },
+                      child: const Icon(
+                        Icons.close,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
         );
       },
     );
+  }
+
+  Future<void> _deletePhoto(int issueId, int photoId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Photo'),
+        content: const Text('Are you sure you want to delete this photo?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await ApiService.deleteMaintenanceIssuePhoto(photoId);
+      await _loadIssues();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -476,23 +603,83 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                                 return DataRow(
                                   cells: [
                                     if (widget.selectedSector == null)
-                                      DataCell(Text(_getSectorName(issue.sectorCode))),
-                                    DataCell(
-                                      SizedBox(
-                                        width: 200,
-                                        child: Text(
-                                          issue.issueDescription ?? 'N/A',
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                      DataCell(
+                                        isEditMode
+                                            ? DropdownButton<String>(
+                                                value: _editSectorCode[issueId] ?? issue.sectorCode,
+                                                items: _sectors.map((sector) {
+                                                  return DropdownMenuItem<String>(
+                                                    value: sector.code,
+                                                    child: Text(sector.name),
+                                                  );
+                                                }).toList(),
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _editSectorCode[issueId] = value!;
+                                                  });
+                                                },
+                                                isExpanded: true,
+                                              )
+                                            : Text(_getSectorName(issue.sectorCode)),
                                       ),
+                                    DataCell(
+                                      isEditMode
+                                          ? SizedBox(
+                                              width: 200,
+                                              child: TextFormField(
+                                                initialValue: _editIssueDescription[issueId] ?? issue.issueDescription ?? '',
+                                                maxLines: 3,
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  contentPadding: EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                                ),
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _editIssueDescription[issueId] = value;
+                                                  });
+                                                },
+                                              ),
+                                            )
+                                          : SizedBox(
+                                              width: 200,
+                                              child: Text(
+                                                issue.issueDescription ?? 'N/A',
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
                                     ),
                                     DataCell(
-                                      Text(
-                                        issue.dateCreated != null
-                                            ? issue.dateCreated!.toIso8601String().split('T')[0]
-                                            : 'N/A',
-                                      ),
+                                      isEditMode
+                                          ? InkWell(
+                                              onTap: () => _selectDateCreated(issueId),
+                                              child: InputDecorator(
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  contentPadding: EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  _editDateCreated[issueId] != null
+                                                      ? _editDateCreated[issueId]!
+                                                          .toIso8601String()
+                                                          .split('T')[0]
+                                                      : issue.dateCreated != null
+                                                          ? issue.dateCreated!.toIso8601String().split('T')[0]
+                                                          : 'Select date',
+                                                ),
+                                              ),
+                                            )
+                                          : Text(
+                                              issue.dateCreated != null
+                                                  ? issue.dateCreated!.toIso8601String().split('T')[0]
+                                                  : 'N/A',
+                                            ),
                                     ),
                                     DataCell(
                                       isEditMode

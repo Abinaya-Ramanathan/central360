@@ -46,8 +46,14 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   bool _creditDateSortAscending = true; // true = ascending (oldest first), false = descending (newest first)
   bool _creditSectorSortAscending = true; // Sort direction for Sector column in Credit Details
   final Map<int, bool> _editModeCredit = {}; // Track which rows are in edit mode (key = record ID)
-  final Map<int, TextEditingController> _balancePaidControllers = {}; // Controllers for Balance Paid field (key = record ID)
-  final Map<int, DateTime?> _balancePaidDates = {}; // Selected dates for Balance Paid Date (key = record ID)
+  final Map<int, TextEditingController> _balancePaidControllers = {}; // Controllers for Balance Paid field (key = record ID or payment ID)
+  final Map<int, DateTime?> _balancePaidDates = {}; // Selected dates for Balance Paid Date (key = record ID or payment ID)
+  final Map<int, TextEditingController> _detailsControllers = {}; // Controllers for Details field (key = record ID or payment ID)
+  final Map<int, List<Map<String, dynamic>>> _balancePayments = {}; // Store balance payments for each credit record (key = sale_id)
+  final Map<int, bool> _addingNewPayment = {}; // Track if a new payment row is being added (key = sale_id)
+  final Map<String, TextEditingController> _newPaymentControllers = {}; // Controllers for new payment rows (key = "saleId_new")
+  final Map<String, DateTime?> _newPaymentDates = {}; // Dates for new payment rows (key = "saleId_new")
+  final Map<String, TextEditingController> _newPaymentDetailsControllers = {}; // Details controllers for new payment rows (key = "saleId_new")
 
   @override
   void initState() {
@@ -78,6 +84,15 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     }
     _creditSearchController.dispose();
     for (var controller in _balancePaidControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _detailsControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _newPaymentControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _newPaymentDetailsControllers.values) {
       controller.dispose();
     }
     super.dispose();
@@ -165,7 +180,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       final monthParam = '$year-$monthStr';
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
 
-      debugPrint('Loading sales data for date: $dateStr, month: $monthParam');
       
       final sales = await ApiService.getSalesDetails(
         sector: widget.selectedSector,
@@ -173,7 +187,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         month: monthParam,
       );
       
-      debugPrint('Loaded ${sales.length} sales records for date $dateStr');
 
       setState(() {
         _salesData = sales;
@@ -207,13 +220,13 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         sector: widget.selectedSector,
       );
 
-      debugPrint('=== Loading Credit Data ===');
-      debugPrint('Total credit records: ${credits.length}');
+
+      // Load balance payments for each credit record
+      _balancePayments.clear();
       for (var credit in credits) {
-        final name = credit['name']?.toString() ?? 'N/A';
-        final saleDate = credit['sale_date']?.toString().split('T')[0].split(' ')[0] ?? 'N/A';
-        final creditAmount = _parseDecimal(credit['credit_amount']);
-        debugPrint('  - $name: sale_date=$saleDate, credit_amount=₹$creditAmount');
+        final creditId = credit['id'] as int;
+        // Balance payments are already included in the response from backend
+        _balancePayments[creditId] = List<Map<String, dynamic>>.from(credit['balance_payments'] ?? []);
       }
 
       setState(() {
@@ -238,10 +251,14 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   void _toggleEditModeCredit(int recordId) {
     setState(() {
       if (_editModeCredit[recordId] == true) {
-        // Cancel edit mode - dispose controller and clear date
+        // Cancel edit mode - dispose controllers and clear date
         if (_balancePaidControllers.containsKey(recordId)) {
           _balancePaidControllers[recordId]!.dispose();
           _balancePaidControllers.remove(recordId);
+        }
+        if (_detailsControllers.containsKey(recordId)) {
+          _detailsControllers[recordId]!.dispose();
+          _detailsControllers.remove(recordId);
         }
         _balancePaidDates.remove(recordId);
         _editModeCredit[recordId] = false;
@@ -258,17 +275,52 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           );
           // Initialize balance_paid_date if exists
           _balancePaidDates[recordId] = FormatUtils.parseDate(record['balance_paid_date']);
+          // Initialize details controller
+          _detailsControllers[recordId] = TextEditingController(
+            text: record['details']?.toString() ?? '',
+          );
           _editModeCredit[recordId] = true;
         }
       }
     });
   }
 
-  Future<void> _saveCreditRecord(int recordId) async {
-    if (!_balancePaidControllers.containsKey(recordId)) {
-      return;
+  double _calculateOverallBalance(int saleId, int? paymentIndex) {
+    final record = _filteredCreditData.firstWhere(
+      (r) => r['id'] == saleId,
+      orElse: () => {},
+    );
+    if (record.isEmpty) return 0.0;
+    
+    final amountPending = _parseDecimal(record['amount_pending']);
+    final payments = _balancePayments[saleId] ?? [];
+    
+    if (paymentIndex == null) {
+      // Calculate for main row: Amount Pending - sum of all payments
+      double totalPaid = 0;
+      for (var payment in payments) {
+        totalPaid += _parseDecimal(payment['balance_paid']);
+      }
+      return amountPending - totalPaid;
+    } else {
+      // Calculate for a specific payment row
+      if (paymentIndex == 0) {
+        // First payment: Amount Pending - this payment
+        final payment = payments[paymentIndex];
+        final balancePaid = _parseDecimal(payment['balance_paid']);
+        return amountPending - balancePaid;
+      } else {
+        // Subsequent payments: previous overall_balance - this payment
+        final prevPayment = payments[paymentIndex - 1];
+        final prevOverallBalance = _parseDecimal(prevPayment['overall_balance']);
+        final currentPayment = payments[paymentIndex];
+        final balancePaid = _parseDecimal(currentPayment['balance_paid']);
+        return prevOverallBalance - balancePaid;
+      }
     }
+  }
 
+  Future<void> _saveCreditRecord(int recordId) async {
     // Find record by ID
     final record = _filteredCreditData.firstWhere(
       (r) => r['id'] == recordId,
@@ -278,58 +330,198 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     if (record.isEmpty) {
       return;
     }
-    final balancePaidText = _balancePaidControllers[recordId]!.text.trim();
-    final balancePaid = _parseDecimal(balancePaidText);
+
+    // Get Balance Paid, Balance Paid Date, and Details from controllers
+    final balancePaid = _balancePaidControllers.containsKey(recordId)
+        ? _parseDecimal(_balancePaidControllers[recordId]!.text.trim())
+        : 0.0;
     final balancePaidDate = _balancePaidDates[recordId];
+    final details = _detailsControllers.containsKey(recordId)
+        ? _detailsControllers[recordId]!.text.trim()
+        : record['details']?.toString() ?? '';
 
     setState(() => _isLoadingCredit = true);
 
     try {
-      // Format balance_paid_date as YYYY-MM-DD string
-      final balancePaidDateStr = balancePaidDate != null 
-          ? FormatUtils.formatDate(balancePaidDate) 
-          : null;
-
-      // Update the record with new balance_paid and balance_paid_date
-      final updatedRecord = {
-        'id': record['id'],
-        'sector_code': record['sector_code'],
-        'name': record['name'],
-        'contact_number': record['contact_number'],
-        'address': record['address'],
-        'product_name': record['product_name'],
-        'quantity': record['quantity'],
-        'amount_received': _parseDecimal(record['amount_received']),
-        'credit_amount': _parseDecimal(record['credit_amount']),
-        'balance_paid': balancePaid,
-        'balance_paid_date': balancePaidDateStr,
-        'sale_date': record['sale_date'],
-      };
-
-      await ApiService.saveSalesDetails(updatedRecord);
-
-      // Exit edit mode and dispose controllers
-      if (_balancePaidControllers.containsKey(recordId)) {
-        _balancePaidControllers[recordId]!.dispose();
-        _balancePaidControllers.remove(recordId);
+      // If this is the first payment, create a new payment record
+      final payments = _balancePayments[recordId] ?? [];
+      final amountPending = _parseDecimal(record['amount_pending']);
+      
+      if (payments.isEmpty && balancePaid > 0) {
+        // Create first payment
+        final overallBalance = amountPending - balancePaid;
+        final payment = {
+          'sale_id': recordId,
+          'balance_paid': balancePaid,
+          'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
+          'details': details.isEmpty ? null : details,
+          'overall_balance': overallBalance,
+        };
+        await ApiService.saveSalesBalancePayment(payment);
+      } else if (payments.isNotEmpty && balancePaid > 0) {
+        // Update the first payment with new values
+        final firstPayment = payments.first;
+        final firstPaymentId = firstPayment['id'] as int?;
+        if (firstPaymentId != null) {
+          final overallBalance = amountPending - balancePaid;
+          final payment = {
+            'id': firstPaymentId,
+            'sale_id': recordId,
+            'balance_paid': balancePaid,
+            'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
+            'details': details.isEmpty ? null : details,
+            'overall_balance': overallBalance,
+          };
+          await ApiService.saveSalesBalancePayment(payment);
+        }
       }
-      _balancePaidDates.remove(recordId);
+      
+      // Exit edit mode after save
       _editModeCredit[recordId] = false;
 
       // Reload credit data to reflect changes
       await _loadCreditData();
 
       if (mounted) {
-        UIHelpers.showSuccessSnackBar(context, 'Balance paid updated successfully');
+        UIHelpers.showSuccessSnackBar(context, 'Details updated successfully');
       }
     } catch (e) {
       debugPrint('Error saving credit record: $e');
       if (mounted) {
-        UIHelpers.showErrorSnackBar(context, 'Error saving balance paid: ${e.toString()}');
+        UIHelpers.showErrorSnackBar(context, 'Error saving details: ${e.toString()}');
       }
     } finally {
       if (mounted) {
         setState(() => _isLoadingCredit = false);
+      }
+    }
+  }
+
+  Future<void> _savePaymentRow(int saleId, int? paymentId) async {
+    setState(() => _isLoadingCredit = true);
+
+    try {
+      final record = _filteredCreditData.firstWhere(
+        (r) => r['id'] == saleId,
+        orElse: () => {},
+      );
+      if (record.isEmpty) return;
+
+      final amountPending = _parseDecimal(record['amount_pending']);
+      final payments = _balancePayments[saleId] ?? [];
+      
+      double balancePaid;
+      DateTime? balancePaidDate;
+      String details;
+      double overallBalance;
+
+      if (paymentId == null) {
+        // Saving a new payment row
+        final key = '${saleId}_new';
+        balancePaid = _parseDecimal(_newPaymentControllers[key]?.text ?? '0');
+        balancePaidDate = _newPaymentDates[key];
+        details = _newPaymentDetailsControllers.containsKey(key)
+            ? _newPaymentDetailsControllers[key]!.text.trim()
+            : '';
+        
+        // Calculate overall balance: previous overall balance - this payment
+        if (payments.isEmpty) {
+          // First payment: Amount Pending - this payment
+          overallBalance = amountPending - balancePaid;
+        } else {
+          // Subsequent payment: last payment's overall_balance - this payment
+          final lastPayment = payments.last;
+          final lastOverallBalance = _parseDecimal(lastPayment['overall_balance']);
+          overallBalance = lastOverallBalance - balancePaid;
+        }
+
+        final payment = {
+          'sale_id': saleId,
+          'balance_paid': balancePaid,
+          'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
+          'details': details.isEmpty ? null : details,
+          'overall_balance': overallBalance,
+        };
+
+        await ApiService.saveSalesBalancePayment(payment);
+        _cancelNewPaymentRow(saleId);
+      } else {
+        // Updating an existing payment row
+        final key = paymentId;
+        balancePaid = _balancePaidControllers.containsKey(key)
+            ? _parseDecimal(_balancePaidControllers[key]!.text.trim())
+            : _parseDecimal(payments.firstWhere((p) => p['id'] == paymentId)['balance_paid']);
+        balancePaidDate = _balancePaidDates[key];
+        details = _detailsControllers.containsKey(key)
+            ? _detailsControllers[key]!.text.trim()
+            : (payments.firstWhere((p) => p['id'] == paymentId)['details']?.toString() ?? '');
+
+        // Find payment index
+        final paymentIndex = payments.indexWhere((p) => p['id'] == paymentId);
+        overallBalance = _calculateOverallBalance(saleId, paymentIndex);
+
+        final payment = {
+          'id': paymentId,
+          'sale_id': saleId,
+          'balance_paid': balancePaid,
+          'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
+          'details': details.isEmpty ? null : details,
+          'overall_balance': overallBalance,
+        };
+
+        await ApiService.saveSalesBalancePayment(payment);
+      }
+
+      // Reload credit data to reflect changes
+      await _loadCreditData();
+
+      if (mounted) {
+        UIHelpers.showSuccessSnackBar(context, 'Payment saved successfully');
+      }
+    } catch (e) {
+      debugPrint('Error saving payment: $e');
+      if (mounted) {
+        UIHelpers.showErrorSnackBar(context, 'Error saving payment: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingCredit = false);
+      }
+    }
+  }
+
+  void _addNewPaymentRow(int saleId) {
+    setState(() {
+      _addingNewPayment[saleId] = true;
+    });
+  }
+
+  void _cancelNewPaymentRow(int saleId) {
+    setState(() {
+      _addingNewPayment[saleId] = false;
+      final key = '${saleId}_new';
+      if (_newPaymentControllers.containsKey(key)) {
+        _newPaymentControllers[key]!.dispose();
+        _newPaymentControllers.remove(key);
+      }
+      if (_newPaymentDetailsControllers.containsKey(key)) {
+        _newPaymentDetailsControllers[key]!.dispose();
+        _newPaymentDetailsControllers.remove(key);
+      }
+      _newPaymentDates.remove(key);
+    });
+  }
+
+  Future<void> _deletePaymentRow(int saleId, int paymentId) async {
+    try {
+      await ApiService.deleteSalesBalancePayment(paymentId);
+      await _loadCreditData();
+      if (mounted) {
+        UIHelpers.showSuccessSnackBar(context, 'Payment deleted successfully');
+      }
+    } catch (e) {
+      if (mounted) {
+        UIHelpers.showErrorSnackBar(context, 'Error deleting payment: ${e.toString()}');
       }
     }
   }
@@ -372,7 +564,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   double _parseDecimal(dynamic value) => FormatUtils.parseDecimal(value);
 
   // Use utility function instead of local method
-  String _formatDate(dynamic dateValue) => FormatUtils.formatDate(dateValue);
+  String _formatDate(dynamic dateValue) => FormatUtils.formatDateDisplay(dateValue);
 
   void _filterCreditData(String query) {
     setState(() {
@@ -664,7 +856,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         final currentSaleDate = record['sale_date']?.toString().split('T')[0].split(' ')[0] ?? '';
         final selectedDateStr = _selectedDate?.toIso8601String().split('T')[0] ?? '';
         
-        debugPrint('Entering edit mode - Current sale_date: $currentSaleDate, Selected date: $selectedDateStr');
         
         // Show a warning if the selected date is different from the record's sale_date
         if (currentSaleDate.isNotEmpty && currentSaleDate != selectedDateStr) {
@@ -731,22 +922,14 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       // This ensures Credit Taken Date matches the date selected in Sales Details tab
       // When credit is added/updated, the sale_date MUST be updated to the selected date
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
-      final oldCreditAmount = _parseDecimal(record['credit_amount']);
       final newCreditAmount = _parseDecimal(controllers['credit_amount']!.text);
       final oldSaleDate = record['sale_date']?.toString().split('T')[0].split(' ')[0] ?? '';
       
-      debugPrint('=== Saving Sales Record ===');
-      debugPrint('Record ID: $recordId');
-      debugPrint('Selected Date (from picker): $dateStr');
-      debugPrint('Old Sale Date: $oldSaleDate');
-      debugPrint('Old Credit Amount: $oldCreditAmount');
-      debugPrint('New Credit Amount: $newCreditAmount');
       
       // ALWAYS use the selected date when saving - this becomes the Credit Taken Date
       // This ensures that if credit is added on 27/11, the Credit Taken Date shows 27/11
       final saleDateToUse = dateStr;
       
-      debugPrint('Using sale_date: $saleDateToUse (will be saved to database)');
       
       // CRITICAL: When credit is present, sale_date MUST be the selected date
       // This is the Credit Taken Date - it must reflect when credit was actually added
@@ -815,14 +998,10 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         'sale_date': saleDateToUse, // Use selected date - this becomes the Credit Taken Date
       };
 
-      debugPrint('Saving with sale_date: $saleDateToUse');
       final savedRecord = await ApiService.saveSalesDetails(updatedRecord);
       final savedSaleDate = savedRecord['sale_date']?.toString().split('T')[0].split(' ')[0] ?? 'N/A';
-      debugPrint('✅ Saved record - sale_date in response: $savedSaleDate');
-      debugPrint('Expected date: $saleDateToUse, Got: $savedSaleDate');
       
       if (savedSaleDate != saleDateToUse) {
-        debugPrint('⚠️ WARNING: Date mismatch! Expected $saleDateToUse but got $savedSaleDate');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -835,12 +1014,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       }
       
       // Reload data to reflect the updated sale_date
-      debugPrint('Reloading sales data...');
       await _loadSalesData();
-      debugPrint('Reloading credit data...');
       await _loadCreditData();
-      
-      debugPrint('✅ Data reloaded. Credit data should now show updated date: $savedSaleDate');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -913,7 +1088,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sales and Credit Details'),
+        title: const Text('Sales and Credit details of Customer'),
         backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
         bottom: TabBar(
@@ -923,7 +1098,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           indicatorColor: Colors.orange,
           tabs: const [
             Tab(text: 'Sales Details'),
-            Tab(text: 'Credit Details'),
+            Tab(text: 'Customer Credit Details'),
           ],
         ),
         actions: [
@@ -1358,7 +1533,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Employees with Outstanding Credit',
+                    'Customer with outstanding credit',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -1403,7 +1578,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
               : _filteredCreditData.isEmpty
                   ? const Center(
                       child: Text(
-                        'No employees with outstanding credit',
+                        'No customers with outstanding credit',
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
@@ -1476,22 +1651,28 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 const DataColumn(label: Text('Balance Paid', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Balance Paid Date', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Overall Balance', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Details', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
-                              rows: _filteredCreditData.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final record = entry.value;
+                              rows: _filteredCreditData.expand((record) {
                                 final recordId = record['id'] as int;
                                 final amountPending = _parseDecimal(record['amount_pending']);
                                 final saleDateRaw = record['sale_date'];
                                 final saleDateFormatted = _formatDate(saleDateRaw);
-                                
-                                // Debug log for first few records
-                                if (index < 3) {
-                                  debugPrint('Credit Details Row $index - Name: ${record['name']}, sale_date (raw): $saleDateRaw, formatted: $saleDateFormatted');
-                                }
+                                final payments = _balancePayments[recordId] ?? [];
+                                final isAddingNewPayment = _addingNewPayment[recordId] == true;
 
-                                return DataRow(
+                                // Main row
+                                final List<DataRow> rows = [];
+                                
+                                // Calculate overall balance for main row (Amount Pending - sum of all payments)
+                                double totalPaid = 0;
+                                for (var payment in payments) {
+                                  totalPaid += _parseDecimal(payment['balance_paid']);
+                                }
+                                final mainOverallBalance = amountPending - totalPaid;
+                                
+                                rows.add(DataRow(
                                   cells: [
                                     if (widget.selectedSector == null && _isAdmin)
                                       DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
@@ -1512,7 +1693,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     DataCell(
                                       Text(
                                         '₹${amountPending.toStringAsFixed(2)}',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.red,
                                         ),
@@ -1527,6 +1708,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                               child: TextFormField(
                                                 controller: _balancePaidControllers[recordId],
                                                 decoration: const InputDecoration(
+                                                  labelText: 'Balance Paid',
                                                   border: OutlineInputBorder(),
                                                   isDense: true,
                                                 ),
@@ -1535,16 +1717,15 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                                                 ],
                                                 onChanged: (value) {
-                                                  // Update Overall Balance in real-time
-                                                  setState(() {});
+                                                  setState(() {}); // Update Overall Balance in real-time
                                                 },
                                               ),
                                             )
-                                          : Text('₹${_parseDecimal(record['balance_paid']).toStringAsFixed(2)}'),
+                                          : Text('₹${totalPaid.toStringAsFixed(2)}'),
                                     ),
                                     // Balance Paid Date - editable when in edit mode
                                     DataCell(
-                                      _editModeCredit[recordId] == true
+                                      _editModeCredit[recordId] == true && _balancePaidDates.containsKey(recordId)
                                           ? InkWell(
                                               onTap: () async {
                                                 final selectedDate = await showDatePicker(
@@ -1572,7 +1753,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                                     const SizedBox(width: 4),
                                                     Text(
                                                       _balancePaidDates[recordId] != null
-                                                          ? _formatDate(_balancePaidDates[recordId])
+                                                          ? FormatUtils.formatDateDisplay(_balancePaidDates[recordId])
                                                           : 'Select Date',
                                                       style: TextStyle(
                                                         color: _balancePaidDates[recordId] != null ? Colors.black : Colors.grey,
@@ -1583,30 +1764,42 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                               ),
                                             )
                                           : Text(
-                                              record['balance_paid_date'] != null
-                                                  ? _formatDate(record['balance_paid_date'])
+                                              payments.isNotEmpty && payments.last['balance_paid_date'] != null
+                                                  ? FormatUtils.formatDateDisplay(payments.last['balance_paid_date'])
                                                   : 'N/A',
                                             ),
                                     ),
-                                    // Overall Balance = Amount Pending - Balance Paid
+                                    // Overall Balance - calculated (Amount Pending - Balance Paid)
                                     DataCell(
-                                      Builder(
-                                        builder: (context) {
-                                          final balancePaid = _editModeCredit[recordId] == true && _balancePaidControllers.containsKey(recordId)
-                                              ? _parseDecimal(_balancePaidControllers[recordId]!.text)
-                                              : _parseDecimal(record['balance_paid']);
-                                          final overallBalance = amountPending - balancePaid;
-                                          return Text(
-                                            '₹${overallBalance.toStringAsFixed(2)}',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: overallBalance > 0 ? Colors.red : Colors.green,
-                                            ),
-                                          );
-                                        },
+                                      Text(
+                                        '₹${(_editModeCredit[recordId] == true && _balancePaidControllers.containsKey(recordId))
+                                            ? (amountPending - _parseDecimal(_balancePaidControllers[recordId]!.text)).toStringAsFixed(2)
+                                            : mainOverallBalance.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: (_editModeCredit[recordId] == true && _balancePaidControllers.containsKey(recordId))
+                                              ? ((amountPending - _parseDecimal(_balancePaidControllers[recordId]!.text)) > 0 ? Colors.red : Colors.green)
+                                              : (mainOverallBalance > 0 ? Colors.red : Colors.green),
+                                        ),
                                       ),
                                     ),
-                                    // Action - Edit/Save/Delete buttons
+                                    // Details (editable)
+                                    DataCell(
+                                      _editModeCredit[recordId] == true && _detailsControllers.containsKey(recordId)
+                                          ? SizedBox(
+                                              width: 200,
+                                              child: TextFormField(
+                                                controller: _detailsControllers[recordId],
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  isDense: true,
+                                                ),
+                                                maxLines: 2,
+                                              ),
+                                            )
+                                          : Text(record['details']?.toString() ?? ''),
+                                    ),
+                                    // Action - Edit/Save/Add/Delete buttons
                                     DataCell(
                                       _editModeCredit[recordId] == true
                                           ? Row(
@@ -1632,6 +1825,15 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                                   tooltip: 'Edit',
                                                   onPressed: () => _toggleEditModeCredit(recordId),
                                                 ),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.add,
+                                                    color: Colors.orange,
+                                                    size: 20,
+                                                  ),
+                                                  tooltip: 'Add Payment',
+                                                  onPressed: () => _addNewPaymentRow(recordId),
+                                                ),
                                                 // Delete button - only visible for abinaya (isMainAdmin)
                                                 if (widget.isMainAdmin)
                                                   IconButton(
@@ -1643,7 +1845,370 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                             ),
                                     ),
                                   ],
-                                );
+                                ));
+
+                                // Add existing payment rows
+                                for (int i = 0; i < payments.length; i++) {
+                                  final payment = payments[i];
+                                  final paymentId = payment['id'] as int;
+                                  final paymentKey = paymentId;
+                                  final isEditingPayment = _balancePaidControllers.containsKey(paymentKey);
+                                  
+                                  // Initialize controllers if editing
+                                  if (isEditingPayment && !_balancePaidControllers.containsKey(paymentKey)) {
+                                    _balancePaidControllers[paymentKey] = TextEditingController(
+                                      text: _parseDecimal(payment['balance_paid']).toStringAsFixed(2),
+                                    );
+                                    _balancePaidDates[paymentKey] = FormatUtils.parseDate(payment['balance_paid_date']);
+                                    _detailsControllers[paymentKey] = TextEditingController(
+                                      text: payment['details']?.toString() ?? '',
+                                    );
+                                  }
+                                  
+                                  final balancePaid = isEditingPayment && _balancePaidControllers.containsKey(paymentKey)
+                                      ? _parseDecimal(_balancePaidControllers[paymentKey]!.text)
+                                      : _parseDecimal(payment['balance_paid']);
+                                  
+                                  // Calculate overall balance for this payment
+                                  double paymentOverallBalance;
+                                  if (i == 0) {
+                                    paymentOverallBalance = amountPending - balancePaid;
+                                  } else {
+                                    final prevPayment = payments[i - 1];
+                                    final prevOverallBalance = _parseDecimal(prevPayment['overall_balance']);
+                                    paymentOverallBalance = prevOverallBalance - balancePaid;
+                                  }
+                                  
+                                  rows.add(DataRow(
+                                    cells: [
+                                      // Sector (if visible)
+                                      if (widget.selectedSector == null && _isAdmin)
+                                        const DataCell(Text('')), // Empty cell
+                                      // Name - empty
+                                      const DataCell(Text('')),
+                                      // Contact Number - empty
+                                      const DataCell(Text('')),
+                                      // Address - empty
+                                      const DataCell(Text('')),
+                                      // Product Name - empty
+                                      const DataCell(Text('')),
+                                      // Quantity - empty
+                                      const DataCell(Text('')),
+                                      // Amount Pending - empty
+                                      const DataCell(Text('')),
+                                      // Credit Taken Date - empty
+                                      const DataCell(Text('')),
+                                      // Balance Paid - show value or editable field
+                                      DataCell(
+                                        isEditingPayment && _balancePaidControllers.containsKey(paymentKey)
+                                            ? SizedBox(
+                                                width: 120,
+                                                child: TextFormField(
+                                                  controller: _balancePaidControllers[paymentKey],
+                                                  decoration: const InputDecoration(
+                                                    labelText: 'Balance Paid',
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                  ),
+                                                  keyboardType: TextInputType.number,
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                                  ],
+                                                  onChanged: (value) {
+                                                    setState(() {});
+                                                  },
+                                                ),
+                                              )
+                                            : Text('₹${_parseDecimal(payment['balance_paid']).toStringAsFixed(2)}'),
+                                      ),
+                                      // Balance Paid Date - show value or editable field
+                                      DataCell(
+                                        isEditingPayment && _balancePaidDates.containsKey(paymentKey)
+                                            ? InkWell(
+                                                onTap: () async {
+                                                  final selectedDate = await showDatePicker(
+                                                    context: context,
+                                                    initialDate: _balancePaidDates[paymentKey] ?? DateTime.now(),
+                                                    firstDate: DateTime(2000),
+                                                    lastDate: DateTime(2100),
+                                                  );
+                                                  if (selectedDate != null) {
+                                                    setState(() {
+                                                      _balancePaidDates[paymentKey] = selectedDate;
+                                                    });
+                                                  }
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                  decoration: BoxDecoration(
+                                                    border: Border.all(color: Colors.grey),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(Icons.calendar_today, size: 16, color: Colors.grey[700]),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        _balancePaidDates[paymentKey] != null
+                                                            ? FormatUtils.formatDateDisplay(_balancePaidDates[paymentKey])
+                                                            : 'Select Date',
+                                                        style: TextStyle(
+                                                          color: _balancePaidDates[paymentKey] != null ? Colors.black : Colors.grey,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              )
+                                            : Text(
+                                                payment['balance_paid_date'] != null
+                                                    ? FormatUtils.formatDateDisplay(payment['balance_paid_date'])
+                                                    : 'N/A',
+                                              ),
+                                      ),
+                                      // Overall Balance - calculated (NOT editable)
+                                      DataCell(
+                                        Text(
+                                          '₹${paymentOverallBalance.toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: paymentOverallBalance > 0 ? Colors.red : Colors.green,
+                                          ),
+                                        ),
+                                      ),
+                                      // Details - show value or editable field
+                                      DataCell(
+                                        isEditingPayment && _detailsControllers.containsKey(paymentKey)
+                                            ? SizedBox(
+                                                width: 200,
+                                                child: TextFormField(
+                                                  controller: _detailsControllers[paymentKey],
+                                                  decoration: const InputDecoration(
+                                                    labelText: 'Details',
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                  ),
+                                                  maxLines: 2,
+                                                ),
+                                              )
+                                            : Text(payment['details']?.toString() ?? ''),
+                                      ),
+                                      // Action - Edit/Save/Delete buttons
+                                      DataCell(
+                                        isEditingPayment
+                                            ? Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(Icons.save, color: Colors.green, size: 20),
+                                                    tooltip: 'Save Payment',
+                                                    onPressed: () => _savePaymentRow(recordId, paymentId),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
+                                                    tooltip: 'Cancel',
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        if (_balancePaidControllers.containsKey(paymentKey)) {
+                                                          _balancePaidControllers[paymentKey]!.dispose();
+                                                          _balancePaidControllers.remove(paymentKey);
+                                                        }
+                                                        _balancePaidDates.remove(paymentKey);
+                                                        if (_detailsControllers.containsKey(paymentKey)) {
+                                                          _detailsControllers[paymentKey]!.dispose();
+                                                          _detailsControllers.remove(paymentKey);
+                                                        }
+                                                      });
+                                                    },
+                                                  ),
+                                                ],
+                                              )
+                                            : Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                                    tooltip: 'Edit Payment',
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _balancePaidControllers[paymentKey] = TextEditingController(
+                                                          text: _parseDecimal(payment['balance_paid']).toStringAsFixed(2),
+                                                        );
+                                                        _balancePaidDates[paymentKey] = FormatUtils.parseDate(payment['balance_paid_date']);
+                                                        _detailsControllers[paymentKey] = TextEditingController(
+                                                          text: payment['details']?.toString() ?? '',
+                                                        );
+                                                      });
+                                                    },
+                                                  ),
+                                                  if (widget.isMainAdmin)
+                                                    IconButton(
+                                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                                      tooltip: 'Delete Payment',
+                                                      onPressed: () async {
+                                                        final confirmed = await UIHelpers.showDeleteConfirmationDialog(
+                                                          context: context,
+                                                          itemName: 'payment',
+                                                        );
+                                                        if (confirmed == true) {
+                                                          await _deletePaymentRow(recordId, paymentId);
+                                                        }
+                                                      },
+                                                    ),
+                                                ],
+                                              ),
+                                      ),
+                                    ],
+                                  ));
+                                }
+                                
+                                // Add new payment row if adding
+                                if (isAddingNewPayment) {
+                                  final newKey = '${recordId}_new';
+                                  final newPaymentController = _newPaymentControllers[newKey] ?? TextEditingController();
+                                  final newPaymentDate = _newPaymentDates[newKey];
+                                  final newDetailsController = _newPaymentDetailsControllers[newKey] ?? TextEditingController();
+                                  
+                                  // Calculate overall balance for new payment
+                                  double newOverallBalance;
+                                  final newBalancePaid = _parseDecimal(newPaymentController.text);
+                                  if (payments.isEmpty) {
+                                    newOverallBalance = amountPending - newBalancePaid;
+                                  } else {
+                                    final lastPayment = payments.last;
+                                    final lastOverallBalance = _parseDecimal(lastPayment['overall_balance']);
+                                    newOverallBalance = lastOverallBalance - newBalancePaid;
+                                  }
+                                  
+                                  rows.add(DataRow(
+                                    cells: [
+                                      if (widget.selectedSector == null && _isAdmin)
+                                        const DataCell(Text('')),
+                                      const DataCell(Text('')),
+                                      const DataCell(Text('')),
+                                      const DataCell(Text('')),
+                                      const DataCell(Text('')),
+                                      const DataCell(Text('')),
+                                      const DataCell(Text('')),
+                                      const DataCell(Text('')),
+                                      // Balance Paid - editable
+                                      DataCell(
+                                        SizedBox(
+                                          width: 120,
+                                          child: TextFormField(
+                                            controller: newPaymentController,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Balance Paid',
+                                              border: OutlineInputBorder(),
+                                              isDense: true,
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                            ],
+                                            onChanged: (value) {
+                                              setState(() {});
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                      // Balance Paid Date - editable
+                                      DataCell(
+                                        InkWell(
+                                          onTap: () async {
+                                            final selectedDate = await showDatePicker(
+                                              context: context,
+                                              initialDate: newPaymentDate ?? DateTime.now(),
+                                              firstDate: DateTime(2000),
+                                              lastDate: DateTime(2100),
+                                            );
+                                            if (selectedDate != null) {
+                                              setState(() {
+                                                _newPaymentDates[newKey] = selectedDate;
+                                              });
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: Colors.grey),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.calendar_today, size: 16, color: Colors.grey[700]),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  newPaymentDate != null
+                                                      ? FormatUtils.formatDateDisplay(newPaymentDate)
+                                                      : 'Select Date',
+                                                  style: TextStyle(
+                                                    color: newPaymentDate != null ? Colors.black : Colors.grey,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      // Overall Balance - calculated
+                                      DataCell(
+                                        Text(
+                                          '₹${newOverallBalance.toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: newOverallBalance > 0 ? Colors.red : Colors.green,
+                                          ),
+                                        ),
+                                      ),
+                                      // Details - editable
+                                      DataCell(
+                                        SizedBox(
+                                          width: 200,
+                                          child: TextFormField(
+                                            controller: newDetailsController,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Details',
+                                              border: OutlineInputBorder(),
+                                              isDense: true,
+                                            ),
+                                            maxLines: 2,
+                                          ),
+                                        ),
+                                      ),
+                                      // Action - Save/Cancel buttons
+                                      DataCell(
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.save, color: Colors.green, size: 20),
+                                              tooltip: 'Save Payment',
+                                              onPressed: () => _savePaymentRow(recordId, null),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
+                                              tooltip: 'Cancel',
+                                              onPressed: () => _cancelNewPaymentRow(recordId),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ));
+                                  
+                                  // Store controllers if not already stored
+                                  if (!_newPaymentControllers.containsKey(newKey)) {
+                                    _newPaymentControllers[newKey] = newPaymentController;
+                                  }
+                                  if (!_newPaymentDetailsControllers.containsKey(newKey)) {
+                                    _newPaymentDetailsControllers[newKey] = newDetailsController;
+                                  }
+                                }
+                                
+                                return rows;
                               }).toList(),
                             ),
                           ),

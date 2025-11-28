@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/driver_license.dart';
 import '../services/api_service.dart';
+import '../utils/format_utils.dart';
 
 class AddDriverLicenseDialog extends StatefulWidget {
   final String? selectedSector;
@@ -20,6 +21,7 @@ class _AddDriverLicenseDialogState extends State<AddDriverLicenseDialog> {
   final _formKey = GlobalKey<FormState>();
   final _driverNameController = TextEditingController();
   final _licenseNumberController = TextEditingController();
+  final _expiryDateController = TextEditingController();
   DateTime? _expiryDate;
   bool _isSubmitting = false;
 
@@ -30,6 +32,7 @@ class _AddDriverLicenseDialogState extends State<AddDriverLicenseDialog> {
       _driverNameController.text = widget.driverLicense!.driverName;
       _licenseNumberController.text = widget.driverLicense!.licenseNumber;
       _expiryDate = widget.driverLicense!.expiryDate;
+      _expiryDateController.text = FormatUtils.formatDateDisplay(_expiryDate);
     }
   }
 
@@ -37,24 +40,30 @@ class _AddDriverLicenseDialogState extends State<AddDriverLicenseDialog> {
   void dispose() {
     _driverNameController.dispose();
     _licenseNumberController.dispose();
+    _expiryDateController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectExpiryDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _expiryDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
+  void _onDateTextChanged(String value) {
+    if (value.trim().isEmpty) {
       setState(() {
-        _expiryDate = picked;
+        _expiryDate = null;
+      });
+      return;
+    }
+    final parsedDate = FormatUtils.parseDate(value);
+    if (parsedDate != null) {
+      setState(() {
+        _expiryDate = parsedDate;
       });
     }
   }
 
   Future<void> _submit() async {
+    // Parse date from text field if not already set
+    if (_expiryDate == null && _expiryDateController.text.trim().isNotEmpty) {
+      _expiryDate = FormatUtils.parseDate(_expiryDateController.text);
+    }
     if (_formKey.currentState!.validate() && _expiryDate != null) {
       setState(() => _isSubmitting = true);
 
@@ -137,16 +146,24 @@ class _AddDriverLicenseDialogState extends State<AddDriverLicenseDialog> {
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: _selectExpiryDate,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Expiry Date *',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(_expiryDate != null ? _expiryDate!.toIso8601String().split('T')[0] : 'Select Date'),
+                TextFormField(
+                  controller: _expiryDateController,
+                  decoration: const InputDecoration(
+                    labelText: 'Expiry Date *',
+                    border: OutlineInputBorder(),
+                    hintText: 'DD/MM/YYYY',
                   ),
+                  onChanged: _onDateTextChanged,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Required';
+                    }
+                    final parsedDate = FormatUtils.parseDate(value);
+                    if (parsedDate == null) {
+                      return 'Invalid format. Use DD/MM/YYYY';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 24),
                 SizedBox(

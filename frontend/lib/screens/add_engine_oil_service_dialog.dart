@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/engine_oil_service.dart';
 import '../services/api_service.dart';
+import '../utils/format_utils.dart';
 
 class AddEngineOilServiceDialog extends StatefulWidget {
   final String? selectedSector;
@@ -24,6 +25,8 @@ class _AddEngineOilServiceDialogState extends State<AddEngineOilServiceDialog> {
   final _servicePartNameController = TextEditingController();
   final _serviceInKmsController = TextEditingController();
   final _serviceInHrsController = TextEditingController();
+  final _serviceDateController = TextEditingController();
+  final _nextServiceDateController = TextEditingController();
   DateTime? _serviceDate;
   DateTime? _nextServiceDate;
   bool _isSubmitting = false;
@@ -39,6 +42,8 @@ class _AddEngineOilServiceDialogState extends State<AddEngineOilServiceDialog> {
       _serviceInKmsController.text = widget.engineOilService!.serviceInKms?.toString() ?? '';
       _serviceInHrsController.text = widget.engineOilService!.serviceInHrs?.toString() ?? '';
       _nextServiceDate = widget.engineOilService!.nextServiceDate;
+      _serviceDateController.text = FormatUtils.formatDateDisplay(_serviceDate);
+      _nextServiceDateController.text = FormatUtils.formatDateDisplay(_nextServiceDate);
     }
   }
 
@@ -49,38 +54,46 @@ class _AddEngineOilServiceDialogState extends State<AddEngineOilServiceDialog> {
     _servicePartNameController.dispose();
     _serviceInKmsController.dispose();
     _serviceInHrsController.dispose();
+    _serviceDateController.dispose();
+    _nextServiceDateController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectServiceDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _serviceDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
+  void _onServiceDateTextChanged(String value) {
+    if (value.trim().isEmpty) {
       setState(() {
-        _serviceDate = picked;
+        _serviceDate = null;
+      });
+      return;
+    }
+    final parsedDate = FormatUtils.parseDate(value);
+    if (parsedDate != null) {
+      setState(() {
+        _serviceDate = parsedDate;
       });
     }
   }
 
-  Future<void> _selectNextServiceDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _nextServiceDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
+  void _onNextServiceDateTextChanged(String value) {
+    if (value.trim().isEmpty) {
       setState(() {
-        _nextServiceDate = picked;
+        _nextServiceDate = null;
+      });
+      return;
+    }
+    final parsedDate = FormatUtils.parseDate(value);
+    if (parsedDate != null) {
+      setState(() {
+        _nextServiceDate = parsedDate;
       });
     }
   }
 
   Future<void> _submit() async {
+    // Parse date from text field if not already set
+    if (_serviceDate == null && _serviceDateController.text.trim().isNotEmpty) {
+      _serviceDate = FormatUtils.parseDate(_serviceDateController.text);
+    }
     if (_formKey.currentState!.validate() && _serviceDate != null) {
       setState(() => _isSubmitting = true);
 
@@ -173,16 +186,24 @@ class _AddEngineOilServiceDialogState extends State<AddEngineOilServiceDialog> {
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: _selectServiceDate,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Service Date *',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(_serviceDate != null ? _serviceDate!.toIso8601String().split('T')[0] : 'Select Date'),
+                TextFormField(
+                  controller: _serviceDateController,
+                  decoration: const InputDecoration(
+                    labelText: 'Service Date *',
+                    border: OutlineInputBorder(),
+                    hintText: 'DD/MM/YYYY',
                   ),
+                  onChanged: _onServiceDateTextChanged,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Required';
+                    }
+                    final parsedDate = FormatUtils.parseDate(value);
+                    if (parsedDate == null) {
+                      return 'Invalid format. Use DD/MM/YYYY';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -199,16 +220,24 @@ class _AddEngineOilServiceDialogState extends State<AddEngineOilServiceDialog> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: _selectNextServiceDate,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Next Service Date',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(_nextServiceDate != null ? _nextServiceDate!.toIso8601String().split('T')[0] : 'Select Date'),
+                TextFormField(
+                  controller: _nextServiceDateController,
+                  decoration: const InputDecoration(
+                    labelText: 'Next Service Date',
+                    border: OutlineInputBorder(),
+                    hintText: 'DD/MM/YYYY',
                   ),
+                  onChanged: _onNextServiceDateTextChanged,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return null; // Optional field
+                    }
+                    final parsedDate = FormatUtils.parseDate(value);
+                    if (parsedDate == null) {
+                      return 'Invalid format. Use DD/MM/YYYY';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 24),
                 SizedBox(

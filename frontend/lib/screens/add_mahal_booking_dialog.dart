@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/mahal_booking.dart';
 import '../services/api_service.dart';
+import '../utils/format_utils.dart';
 
 class AddMahalBookingDialog extends StatefulWidget {
   final String selectedSector;
@@ -27,6 +28,7 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
   final _advanceReceivedController = TextEditingController();
   final _quotedAmountController = TextEditingController();
   final _amountReceivedController = TextEditingController();
+  final _eventDateController = TextEditingController();
 
   String? _selectedMahalDetail;
   String? _selectedFoodService;
@@ -51,6 +53,7 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
       _selectedMahalDetail = widget.booking!.mahalDetail;
       _selectedFoodService = widget.booking!.foodService;
       _eventDate = widget.booking!.eventDate;
+      _eventDateController.text = FormatUtils.formatDateDisplay(_eventDate);
       _eventNameController.text = widget.booking!.eventName ?? '';
       _eventTimingController.text = widget.booking!.eventTiming ?? '';
       _clientNameController.text = widget.booking!.clientName;
@@ -77,19 +80,21 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
     _advanceReceivedController.dispose();
     _quotedAmountController.dispose();
     _amountReceivedController.dispose();
+    _eventDateController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectEventDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _eventDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
+  void _onEventDateTextChanged(String value) {
+    if (value.trim().isEmpty) {
       setState(() {
-        _eventDate = picked;
+        _eventDate = null;
+      });
+      return;
+    }
+    final parsedDate = FormatUtils.parseDate(value);
+    if (parsedDate != null) {
+      setState(() {
+        _eventDate = parsedDate;
       });
     }
   }
@@ -107,10 +112,15 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
       return;
     }
 
+    // Parse date from text field if not already set
+    if (_eventDate == null && _eventDateController.text.trim().isNotEmpty) {
+      _eventDate = FormatUtils.parseDate(_eventDateController.text);
+    }
+
     if (_eventDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select an event date'),
+          content: Text('Please enter a valid event date in DD/MM/YYYY format'),
           backgroundColor: Colors.red,
         ),
       );
@@ -262,29 +272,31 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                 ),
                 const SizedBox(height: 16),
                 // Event Date
-                InkWell(
-                  onTap: _selectEventDate,
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Event Date *',
-                      prefixIcon: const Icon(Icons.calendar_today, color: Colors.purple),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.purple, width: 2),
-                      ),
+                TextFormField(
+                  controller: _eventDateController,
+                  decoration: InputDecoration(
+                    labelText: 'Event Date *',
+                    hintText: 'DD/MM/YYYY',
+                    prefixIcon: const Icon(Icons.calendar_today, color: Colors.purple),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      _eventDate != null
-                          ? _eventDate!.toIso8601String().split('T')[0]
-                          : 'Select Date',
-                      style: TextStyle(
-                        color: _eventDate != null ? Colors.black : Colors.grey,
-                      ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.purple, width: 2),
                     ),
                   ),
+                  onChanged: _onEventDateTextChanged,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Event date is required';
+                    }
+                    final parsedDate = FormatUtils.parseDate(value);
+                    if (parsedDate == null) {
+                      return 'Invalid format. Use DD/MM/YYYY';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 // Event Timing

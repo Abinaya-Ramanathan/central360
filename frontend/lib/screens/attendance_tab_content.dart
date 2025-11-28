@@ -99,13 +99,17 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         _employees = employees;
         for (var emp in employees) {
           if (!_attendanceData.containsKey(emp.id)) {
-            _attendanceData[emp.id] = {
-              'status': null,
-              'outstanding_advance': 0.0,
-              'advance_taken': 0.0,
-              'advance_paid': 0.0,
-              'previous_outstanding': 0.0,
-            };
+          _attendanceData[emp.id] = {
+            'status': null,
+            'outstanding_advance': 0.0,
+            'advance_taken': 0.0,
+            'advance_paid': 0.0,
+            'previous_outstanding': 0.0,
+            'bulk_advance': 0.0,
+            'bulk_advance_taken': 0.0,
+            'bulk_advance_paid': 0.0,
+            'previous_bulk_advance': 0.0,
+          };
           }
         }
       });
@@ -121,6 +125,8 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         if (_attendanceData.containsKey(emp.id)) {
           _attendanceData[emp.id]!['advance_taken'] = 0.0;
           _attendanceData[emp.id]!['advance_paid'] = 0.0;
+          _attendanceData[emp.id]!['bulk_advance_taken'] = 0.0;
+          _attendanceData[emp.id]!['bulk_advance_paid'] = 0.0;
         }
       }
       
@@ -141,6 +147,30 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         }
       }
 
+      // Get previous bulk advance for each employee (from previous day)
+      // This ensures bulk advance persists across dates until it's paid off
+      for (var emp in _employees) {
+        try {
+          // Get bulk advance from the day before the selected date
+          // This gets the most recent bulk_advance value up to and including the previous date
+          final previousBulkAdvance = await ApiService.getBulkAdvance(emp.id, previousDateStr);
+          if (_attendanceData.containsKey(emp.id)) {
+            // Store the previous bulk advance for calculation
+            _attendanceData[emp.id]!['previous_bulk_advance'] = previousBulkAdvance;
+            // Initially set bulk_advance to previous value (will be recalculated if record exists)
+            _attendanceData[emp.id]!['bulk_advance'] = previousBulkAdvance;
+          }
+        } catch (e) {
+          // If error getting previous bulk advance, default to 0
+          // But log the error for debugging
+          debugPrint('Error loading previous bulk advance for ${emp.id}: $e');
+          if (_attendanceData.containsKey(emp.id)) {
+            _attendanceData[emp.id]!['previous_bulk_advance'] = 0.0;
+            _attendanceData[emp.id]!['bulk_advance'] = 0.0;
+          }
+        }
+      }
+
       final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
       final attendanceRecords = await ApiService.getAttendance(
         sector: widget.selectedSector, // null for all sectors
@@ -148,17 +178,31 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
       );
 
       // If there's an existing record for this date, load its advance_taken and advance_paid
-      // Otherwise, they remain 0 (only outstanding_advance carries forward)
+      // Otherwise, they remain 0 (only outstanding_advance and bulk_advance carry forward)
       for (var record in attendanceRecords) {
         final empIdStr = record['employee_id'].toString();
         final emp = _employees.firstWhere((e) => e.id == empIdStr, orElse: () => _employees.first);
         if (_attendanceData.containsKey(emp.id)) {
           final data = _attendanceData[emp.id]!;
+          
+          // OUTSTANDING ADVANCE CALCULATION (Independent)
           final previous = _parseDecimal(data['previous_outstanding']);
           final taken = _parseDecimal(record['advance_taken']);
           final paid = _parseDecimal(record['advance_paid']);
           // Calculate: previous outstanding + advance taken - advance paid
+          // This is completely independent from bulk advance
           final newOutstanding = previous + taken - paid;
+          
+          // BULK ADVANCE CALCULATION (Independent - NOT added to outstanding advance)
+          // Use the previous_bulk_advance that was loaded (from most recent record up to previous date)
+          final previousBulk = _parseDecimal(data['previous_bulk_advance']);
+          final bulkTaken = _parseDecimal(record['bulk_advance_taken']);
+          final bulkPaid = _parseDecimal(record['bulk_advance_paid']);
+          // Calculate: previous bulk advance + bulk advance taken - bulk advance paid
+          // This ensures bulk advance persists until fully paid off
+          // If previousBulk is 10000, bulkTaken is 0, bulkPaid is 0, then bulk_advance = 10000
+          final newBulkAdvance = previousBulk + bulkTaken - bulkPaid;
+          
           final status = record['status'] as String?;
 
           _attendanceData[emp.id] = {
@@ -167,7 +211,27 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
             'outstanding_advance': newOutstanding,
             'advance_taken': taken,  // Only load if record exists for this date
             'advance_paid': paid,     // Only load if record exists for this date
+            'previous_bulk_advance': previousBulk,  // Keep the previous value for recalculation
+            'bulk_advance': newBulkAdvance,  // Calculated value that will be saved
+            'bulk_advance_taken': bulkTaken,  // Only load if record exists for this date
+            'bulk_advance_paid': bulkPaid,     // Only load if record exists for this date
           };
+        }
+      }
+      
+      // For employees without existing records, ensure bulk_advance is set to previous_bulk_advance
+      // This ensures it persists even when there's no record for the current date
+      for (var emp in _employees) {
+        if (_attendanceData.containsKey(emp.id)) {
+          final data = _attendanceData[emp.id]!;
+          // If bulk_advance is not set or is 0, but previous_bulk_advance has a value, use previous
+          // This handles the case where there's no existing record for this date
+          final currentBulk = _parseDecimal(data['bulk_advance']);
+          final prevBulk = _parseDecimal(data['previous_bulk_advance']);
+          if (currentBulk == 0 && prevBulk > 0) {
+            // No record exists for this date, so bulk_advance should carry forward
+            data['bulk_advance'] = prevBulk;
+          }
         }
       }
       setState(() {});
@@ -197,6 +261,12 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         final taken = _parseDecimal(data['advance_taken']);
         final paid = _parseDecimal(data['advance_paid']);
         data['outstanding_advance'] = previous + taken - paid;
+        
+        // Recalculate bulk advance
+        final previousBulk = _parseDecimal(data['previous_bulk_advance']);
+        final bulkTaken = _parseDecimal(data['bulk_advance_taken']);
+        final bulkPaid = _parseDecimal(data['bulk_advance_paid']);
+        data['bulk_advance'] = previousBulk + bulkTaken - bulkPaid;
       }
     }
     setState(() {});
@@ -223,11 +293,20 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
 
     setState(() => _isLoading = true);
     try {
-      // Recalculate outstanding advance before saving to ensure it's up to date
+      // Recalculate outstanding advance and bulk advance before saving to ensure they're up to date
       _recalculateOutstanding();
       
       final attendanceRecords = _employees.map((emp) {
         final data = _attendanceData[emp.id] ?? {};
+        final previousBulk = _parseDecimal(data['previous_bulk_advance']);
+        final bulkTaken = _parseDecimal(data['bulk_advance_taken']);
+        final bulkPaid = _parseDecimal(data['bulk_advance_paid']);
+        
+        // Ensure bulk_advance is calculated correctly before saving
+        // It should be: previous_bulk_advance + bulk_advance_taken - bulk_advance_paid
+        // This ensures bulk advance persists across dates until fully paid off
+        final finalBulkAdvance = previousBulk + bulkTaken - bulkPaid;
+        
         return {
           'employee_id': int.parse(emp.id),
           'employee_name': emp.name,
@@ -237,6 +316,9 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
           'outstanding_advance': _parseDecimal(data['outstanding_advance']),
           'advance_taken': _parseDecimal(data['advance_taken']),
           'advance_paid': _parseDecimal(data['advance_paid']),
+          'bulk_advance': finalBulkAdvance,  // Use calculated value to ensure persistence
+          'bulk_advance_taken': bulkTaken,
+          'bulk_advance_paid': bulkPaid,
         };
       }).toList();
 
@@ -331,6 +413,9 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                 const DataColumn(label: Text('Outstanding Advance')),
                                 const DataColumn(label: Text('Advance Taken')),
                                 const DataColumn(label: Text('Advance Paid')),
+                                const DataColumn(label: Text('Bulk Advance')),
+                                const DataColumn(label: Text('Bulk Advance Taken')),
+                                const DataColumn(label: Text('Bulk Advance Paid')),
                               ],
                               rows: _employees.map((employee) {
                                 final data = _attendanceData[employee.id] ?? {
@@ -338,6 +423,9 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                   'outstanding_advance': 0.0,
                                   'advance_taken': 0.0,
                                   'advance_paid': 0.0,
+                                  'bulk_advance': 0.0,
+                                  'bulk_advance_taken': 0.0,
+                                  'bulk_advance_paid': 0.0,
                                 };
                                 return DataRow(
                                   cells: [
@@ -415,6 +503,53 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                               ),
                                             )
                                           : Text('₹${(data['advance_paid'] ?? 0.0).toStringAsFixed(2)}'),
+                                    ),
+                                    DataCell(
+                                      Text(
+                                        '₹${(data['bulk_advance'] ?? 0.0).toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      _isEditMode
+                                          ? SizedBox(
+                                              width: 120,
+                                              child: TextFormField(
+                                                initialValue: (data['bulk_advance_taken'] ?? 0.0).toString(),
+                                                keyboardType: TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                                ],
+                                                onChanged: (value) {
+                                                  _attendanceData[employee.id]?['bulk_advance_taken'] =
+                                                      double.tryParse(value) ?? 0.0;
+                                                  _recalculateOutstanding();
+                                                },
+                                              ),
+                                            )
+                                          : Text('₹${(data['bulk_advance_taken'] ?? 0.0).toStringAsFixed(2)}'),
+                                    ),
+                                    DataCell(
+                                      _isEditMode
+                                          ? SizedBox(
+                                              width: 120,
+                                              child: TextFormField(
+                                                initialValue: (data['bulk_advance_paid'] ?? 0.0).toString(),
+                                                keyboardType: TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                                ],
+                                                onChanged: (value) {
+                                                  _attendanceData[employee.id]?['bulk_advance_paid'] =
+                                                      double.tryParse(value) ?? 0.0;
+                                                  _recalculateOutstanding();
+                                                },
+                                              ),
+                                            )
+                                          : Text('₹${(data['bulk_advance_paid'] ?? 0.0).toStringAsFixed(2)}'),
                                     ),
                                   ],
                                 );

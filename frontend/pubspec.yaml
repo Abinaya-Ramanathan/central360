@@ -1,7 +1,7 @@
 name: company360
 description: Company360 - Comprehensive Business Management App for managing employees, expenses, bookings, credit details, vehicle licenses, and more.
 publish_to: "none"  # Will be removed when ready to publish
-version: 1.0.8+9
+version: 1.0.9+10
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

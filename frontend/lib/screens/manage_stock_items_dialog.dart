@@ -19,9 +19,11 @@ class ManageStockItemsDialog extends StatefulWidget {
 
 class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
   List<Map<String, dynamic>> _stockItems = [];
+  List<Map<String, dynamic>> _filteredStockItems = [];
   List<Sector> _sectors = [];
   bool _isLoading = false;
   bool _sortAscending = true; // Sort direction for Sector column
+  String? _searchSectorCode; // Selected sector for search filter
 
   @override
   void initState() {
@@ -46,6 +48,7 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
         
         setState(() {
           _stockItems = filteredStockItems;
+          _filteredStockItems = filteredStockItems;
           _sectors = sectors;
         });
       }
@@ -171,10 +174,59 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
               ],
             ),
             const Divider(),
+            // Sector Search Filter
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.search, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('Search by Sector:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _searchSectorCode,
+                      decoration: InputDecoration(
+                        hintText: 'All Sectors',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('All Sectors'),
+                        ),
+                        ..._sectors.map((sector) {
+                          return DropdownMenuItem<String>(
+                            value: sector.code,
+                            child: Text('${sector.code} - ${sector.name}'),
+                          );
+                        }),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _searchSectorCode = value;
+                          if (value == null) {
+                            _filteredStockItems = _stockItems;
+                          } else {
+                            _filteredStockItems = _stockItems.where((item) {
+                              return item['sector_code']?.toString() == value;
+                            }).toList();
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _stockItems.isEmpty
+                  : _filteredStockItems.isEmpty
                       ? const Center(
                           child: Text(
                             'No stock items found',
@@ -211,7 +263,7 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
                                 const DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
-                              rows: _stockItems.map((item) {
+                              rows: _filteredStockItems.map((item) {
                                 final sectorCode = item['sector_code']?.toString();
                                 final showVehicleFields = sectorCode == 'SSEW';
                                 

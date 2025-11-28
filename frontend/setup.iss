@@ -1,7 +1,7 @@
 [Setup]
 ; App information
 AppName=Company360
-AppVersion=1.0.8
+AppVersion=1.0.9
 AppPublisher=Company360
 AppPublisherURL=
 AppSupportURL=
@@ -19,6 +19,11 @@ WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
+UninstallDisplayIcon={app}\company360.exe
+VersionInfoVersion=1.0.9.10
+VersionInfoCompany=Company360
+VersionInfoDescription=Company360 - Comprehensive Business Management Application
+VersionInfoCopyright=Copyright (C) 2024 Company360
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -55,6 +60,17 @@ Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\Company360"; Filen
 [Run]
 Filename: "{app}\company360.exe"; Description: "{cm:LaunchProgram,Company360}"; Flags: nowait postinstall skipifsilent
 
-[Code]
-// Optional: Add custom code here if needed
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\data"
 
+[Code]
+// Custom code for version checking and installation
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  Result := True;
+end;

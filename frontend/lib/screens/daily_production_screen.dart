@@ -72,9 +72,7 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
   }
 
   Future<void> _loadProducts({bool showLoading = true}) async {
-    print('Daily Production: _loadProducts() called, sector: ${widget.selectedSector}, showLoading: $showLoading');
     if (widget.selectedSector == null) {
-      print('Daily Production: No sector selected, returning early');
       return;
     }
 
@@ -169,13 +167,11 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
 
   Future<void> _loadProductionData() async {
     if (_selectedDate == null) {
-      print('Daily Production: Cannot load production data - date is null');
       return;
     }
     
     // Always ensure products are loaded first
     if (widget.selectedSector == null) {
-      print('Daily Production: Cannot load production data - no sector selected');
       if (mounted) {
         setState(() {
           _productionData = [];

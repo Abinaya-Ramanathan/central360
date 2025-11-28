@@ -275,7 +275,7 @@ class UpdateService {
             debugPrint('Trying alternative method...');
             
             // Try using content URI with FileProvider
-            final packageName = 'com.example.central360';
+            const packageName = 'com.example.central360';
             final fileName = installerPath.split('/').last;
             final contentUri = Uri.parse('content://$packageName.fileprovider/external_files/$fileName');
             

@@ -20,9 +20,11 @@ class ManageProductsDialog extends StatefulWidget {
 
 class _ManageProductsDialogState extends State<ManageProductsDialog> {
   List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _filteredProducts = [];
   List<Sector> _sectors = [];
   bool _isLoading = false;
   bool _sortAscending = true; // Sort direction for Sector column
+  String? _searchSectorCode; // Selected sector for search filter
 
   @override
   void initState() {
@@ -47,6 +49,7 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
         
         setState(() {
           _products = filteredProducts;
+          _filteredProducts = filteredProducts;
           _sectors = sectors;
         });
       }
@@ -172,10 +175,59 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
               ],
             ),
             const Divider(),
+            // Sector Search Filter
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.search, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('Search by Sector:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _searchSectorCode,
+                      decoration: InputDecoration(
+                        hintText: 'All Sectors',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('All Sectors'),
+                        ),
+                        ..._sectors.map((sector) {
+                          return DropdownMenuItem<String>(
+                            value: sector.code,
+                            child: Text('${sector.code} - ${sector.name}'),
+                          );
+                        }),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _searchSectorCode = value;
+                          if (value == null) {
+                            _filteredProducts = _products;
+                          } else {
+                            _filteredProducts = _products.where((product) {
+                              return product['sector_code']?.toString() == value;
+                            }).toList();
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _products.isEmpty
+                  : _filteredProducts.isEmpty
                       ? const Center(
                           child: Text(
                             'No products found',
@@ -206,7 +258,7 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
                               ),
                               const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                             ],
-                            rows: _products.map((product) {
+                            rows: _filteredProducts.map((product) {
                               return DataRow(
                                 cells: [
                                   DataCell(Text(product['product_name']?.toString() ?? 'N/A')),

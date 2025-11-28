@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../models/sector.dart';
+import '../utils/format_utils.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'add_vehicle_license_dialog.dart';
@@ -462,11 +463,11 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                             DataCell(Text(license.name)),
                             DataCell(Text(license.model)),
                             DataCell(Text(license.registrationNumber)),
-                            DataCell(Text(license.permitDate != null ? license.permitDate!.toIso8601String().split('T')[0] : 'N/A')),
-                            DataCell(Text(license.insuranceDate != null ? license.insuranceDate!.toIso8601String().split('T')[0] : 'N/A')),
-                            DataCell(Text(license.fitnessDate != null ? license.fitnessDate!.toIso8601String().split('T')[0] : 'N/A')),
-                            DataCell(Text(license.pollutionDate != null ? license.pollutionDate!.toIso8601String().split('T')[0] : 'N/A')),
-                            DataCell(Text(license.taxDate != null ? license.taxDate!.toIso8601String().split('T')[0] : 'N/A')),
+                            DataCell(Text(FormatUtils.formatDateDisplay(license.permitDate))),
+                            DataCell(Text(FormatUtils.formatDateDisplay(license.insuranceDate))),
+                            DataCell(Text(FormatUtils.formatDateDisplay(license.fitnessDate))),
+                            DataCell(Text(FormatUtils.formatDateDisplay(license.pollutionDate))),
+                            DataCell(Text(FormatUtils.formatDateDisplay(license.taxDate))),
                             DataCell(
                               Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -585,7 +586,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                               DataCell(Text(_getSectorName(license.sectorCode))),
                             DataCell(Text(license.driverName)),
                             DataCell(Text(license.licenseNumber)),
-                            DataCell(Text(license.expiryDate.toIso8601String().split('T')[0])),
+                            DataCell(Text(FormatUtils.formatDateDisplay(license.expiryDate))),
                             DataCell(
                               Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -759,10 +760,10 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                             DataCell(Text(service.vehicleName)),
                             DataCell(Text(service.model)),
                             DataCell(Text(service.servicePartName)),
-                            DataCell(Text(service.serviceDate.toIso8601String().split('T')[0])),
+                            DataCell(Text(FormatUtils.formatDateDisplay(service.serviceDate))),
                             DataCell(Text(service.serviceInKms?.toString() ?? 'N/A')),
                             DataCell(Text(service.serviceInHrs?.toString() ?? 'N/A')),
-                            DataCell(Text(service.nextServiceDate != null ? service.nextServiceDate!.toIso8601String().split('T')[0] : 'N/A')),
+                            DataCell(Text(FormatUtils.formatDateDisplay(service.nextServiceDate))),
                             DataCell(
                               Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -837,11 +838,11 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
               _buildViewField('Name', license.name),
               _buildViewField('Model', license.model),
               _buildViewField('Registration Number', license.registrationNumber),
-              _buildViewField('Permit Date', license.permitDate != null ? license.permitDate!.toIso8601String().split('T')[0] : 'N/A'),
-              _buildViewField('Insurance Date', license.insuranceDate != null ? license.insuranceDate!.toIso8601String().split('T')[0] : 'N/A'),
-              _buildViewField('Fitness Date', license.fitnessDate != null ? license.fitnessDate!.toIso8601String().split('T')[0] : 'N/A'),
-              _buildViewField('Pollution Date', license.pollutionDate != null ? license.pollutionDate!.toIso8601String().split('T')[0] : 'N/A'),
-              _buildViewField('Tax Date', license.taxDate != null ? license.taxDate!.toIso8601String().split('T')[0] : 'N/A'),
+              _buildViewField('Permit Date', FormatUtils.formatDateDisplay(license.permitDate)),
+              _buildViewField('Insurance Date', FormatUtils.formatDateDisplay(license.insuranceDate)),
+              _buildViewField('Fitness Date', FormatUtils.formatDateDisplay(license.fitnessDate)),
+              _buildViewField('Pollution Date', FormatUtils.formatDateDisplay(license.pollutionDate)),
+              _buildViewField('Tax Date', FormatUtils.formatDateDisplay(license.taxDate)),
             ],
           ),
         ),
@@ -869,7 +870,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                 _buildViewField('Sector', _getSectorName(license.sectorCode)),
               _buildViewField('Driver Name', license.driverName),
               _buildViewField('License Number', license.licenseNumber),
-              _buildViewField('Expiry Date', license.expiryDate.toIso8601String().split('T')[0]),
+              _buildViewField('Expiry Date', FormatUtils.formatDateDisplay(license.expiryDate)),
             ],
           ),
         ),
@@ -898,10 +899,10 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
               _buildViewField('Vehicle Name', service.vehicleName),
               _buildViewField('Model', service.model),
               _buildViewField('Service Part Name', service.servicePartName),
-              _buildViewField('Service Date', service.serviceDate.toIso8601String().split('T')[0]),
+              _buildViewField('Service Date', FormatUtils.formatDateDisplay(service.serviceDate)),
               _buildViewField('Service in Kms', service.serviceInKms?.toString() ?? 'N/A'),
               _buildViewField('Service in Hrs', service.serviceInHrs?.toString() ?? 'N/A'),
-              _buildViewField('Next Service Date', service.nextServiceDate != null ? service.nextServiceDate!.toIso8601String().split('T')[0] : 'N/A'),
+              _buildViewField('Next Service Date', FormatUtils.formatDateDisplay(service.nextServiceDate)),
             ],
           ),
         ),

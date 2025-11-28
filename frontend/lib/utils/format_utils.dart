@@ -1,4 +1,5 @@
 /// Utility functions for formatting and parsing common data types
+library;
 
 class FormatUtils {
   /// Parse a dynamic value to a double, returning 0.0 if parsing fails
@@ -41,9 +42,7 @@ class FormatUtils {
             }
             
             // If still null, use parsed date but extract date components
-            if (dateTime == null) {
-              dateTime = DateTime(parsed.year, parsed.month, parsed.day);
-            }
+            dateTime ??= DateTime(parsed.year, parsed.month, parsed.day);
           }
         }
       } else if (dateValue is DateTime) {
@@ -78,8 +77,24 @@ class FormatUtils {
         return DateTime(dateValue.year, dateValue.month, dateValue.day);
       }
       if (dateValue is String) {
-        final dateStr = dateValue.split('T')[0].split(' ')[0];
-        final dateParts = dateStr.split('-');
+        final dateStr = dateValue.trim();
+        
+        // Try parsing DD/MM/YYYY format first
+        final ddmmyyyyParts = dateStr.split('/');
+        if (ddmmyyyyParts.length == 3) {
+          final day = int.tryParse(ddmmyyyyParts[0]);
+          final month = int.tryParse(ddmmyyyyParts[1]);
+          final year = int.tryParse(ddmmyyyyParts[2]);
+          if (day != null && month != null && year != null) {
+            if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+              return DateTime(year, month, day);
+            }
+          }
+        }
+        
+        // Try parsing YYYY-MM-DD format
+        final dateStr2 = dateStr.split('T')[0].split(' ')[0];
+        final dateParts = dateStr2.split('-');
         if (dateParts.length == 3) {
           final year = int.tryParse(dateParts[0]);
           final month = int.tryParse(dateParts[1]);
@@ -88,7 +103,7 @@ class FormatUtils {
             return DateTime(year, month, day);
           }
         }
-        return DateTime.tryParse(dateStr);
+        return DateTime.tryParse(dateStr2);
       }
     } catch (e) {
       // Ignore parse errors

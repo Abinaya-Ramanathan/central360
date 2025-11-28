@@ -13,9 +13,9 @@ class AddStockItemDialog extends StatefulWidget {
 
 class _AddStockItemDialogState extends State<AddStockItemDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _itemNameController = TextEditingController();
-  final _vehicleTypeController = TextEditingController();
-  final _partNumberController = TextEditingController();
+  final List<TextEditingController> _itemNameControllers = [TextEditingController()];
+  final List<TextEditingController> _vehicleTypeControllers = [TextEditingController()];
+  final List<TextEditingController> _partNumberControllers = [TextEditingController()];
   String? _selectedSectorCode;
   List<Sector> _sectors = [];
   bool _isLoading = false;
@@ -44,6 +44,27 @@ class _AddStockItemDialogState extends State<AddStockItemDialog> {
     }
   }
 
+  void _addItemRow() {
+    setState(() {
+      _itemNameControllers.add(TextEditingController());
+      _vehicleTypeControllers.add(TextEditingController());
+      _partNumberControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeItemRow(int index) {
+    if (_itemNameControllers.length > 1) {
+      setState(() {
+        _itemNameControllers[index].dispose();
+        _vehicleTypeControllers[index].dispose();
+        _partNumberControllers[index].dispose();
+        _itemNameControllers.removeAt(index);
+        _vehicleTypeControllers.removeAt(index);
+        _partNumberControllers.removeAt(index);
+      });
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedSectorCode == null) {
@@ -53,33 +74,67 @@ class _AddStockItemDialogState extends State<AddStockItemDialog> {
       return;
     }
 
-    setState(() => _isLoading = true);
-    try {
-      await ApiService.createStockItem(
-        _itemNameController.text.trim(),
-        _selectedSectorCode!,
-        vehicleType: _vehicleTypeController.text.trim().isEmpty ? null : _vehicleTypeController.text.trim(),
-        partNumber: _partNumberController.text.trim().isEmpty ? null : _partNumberController.text.trim(),
+    // Validate that at least one item name is filled
+    bool hasAtLeastOneItem = false;
+    for (var controller in _itemNameControllers) {
+      if (controller.text.trim().isNotEmpty) {
+        hasAtLeastOneItem = true;
+        break;
+      }
+    }
+
+    if (!hasAtLeastOneItem) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter at least one item name')),
       );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    int successCount = 0;
+    int errorCount = 0;
+    List<String> errorMessages = [];
+
+    try {
+      for (int i = 0; i < _itemNameControllers.length; i++) {
+        final itemName = _itemNameControllers[i].text.trim();
+        if (itemName.isEmpty) continue; // Skip empty items
+
+        try {
+          await ApiService.createStockItem(
+            itemName,
+            _selectedSectorCode!,
+            vehicleType: _vehicleTypeControllers[i].text.trim().isEmpty 
+                ? null 
+                : _vehicleTypeControllers[i].text.trim(),
+            partNumber: _partNumberControllers[i].text.trim().isEmpty 
+                ? null 
+                : _partNumberControllers[i].text.trim(),
+          );
+          successCount++;
+        } catch (e) {
+          errorCount++;
+          String errorMessage = e.toString();
+          if (errorMessage.startsWith('Exception: ')) {
+            errorMessage = errorMessage.substring(11);
+          }
+          errorMessages.add('$itemName: $errorMessage');
+        }
+      }
+
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Stock item created successfully'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        String errorMessage = e.toString();
-        if (errorMessage.startsWith('Exception: ')) {
-          errorMessage = errorMessage.substring(11);
+        String message;
+        if (errorCount == 0) {
+          message = '$successCount stock item(s) created successfully';
+        } else {
+          message = '$successCount item(s) created, $errorCount failed. ${errorMessages.join("; ")}';
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
-            duration: const Duration(seconds: 4),
+            content: Text(message),
+            duration: Duration(seconds: errorCount > 0 ? 6 : 2),
+            backgroundColor: errorCount > 0 ? Colors.orange : Colors.green,
           ),
         );
       }
@@ -92,9 +147,15 @@ class _AddStockItemDialogState extends State<AddStockItemDialog> {
 
   @override
   void dispose() {
-    _itemNameController.dispose();
-    _vehicleTypeController.dispose();
-    _partNumberController.dispose();
+    for (var controller in _itemNameControllers) {
+      controller.dispose();
+    }
+    for (var controller in _vehicleTypeControllers) {
+      controller.dispose();
+    }
+    for (var controller in _partNumberControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -114,69 +175,11 @@ class _AddStockItemDialogState extends State<AddStockItemDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Item Name
-              TextFormField(
-                controller: _itemNameController,
-                decoration: InputDecoration(
-                  labelText: 'Item Name *',
-                  hintText: 'e.g., Rice, Oil, etc.',
-                  prefixIcon: const Icon(Icons.inventory, color: Colors.brown),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.brown, width: 2),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Item name is required';
-                  }
-                  return null;
-                },
-              ),
-              // Vehicle Type and Part Number (only for SSEW sector)
-              if (_selectedSectorCode == 'SSEW') ...[
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _vehicleTypeController,
-                  decoration: InputDecoration(
-                    labelText: 'Vehicle Type',
-                    hintText: 'e.g., Truck, Car, etc.',
-                    prefixIcon: const Icon(Icons.directions_car, color: Colors.brown),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.brown, width: 2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _partNumberController,
-                  decoration: InputDecoration(
-                    labelText: 'Part Number',
-                    hintText: 'e.g., PN-12345',
-                    prefixIcon: const Icon(Icons.tag, color: Colors.brown),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.brown, width: 2),
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              // Sector Dropdown
+              // Sector Dropdown (shared for all items)
               DropdownButtonFormField<String>(
                 initialValue: _selectedSectorCode,
                 decoration: InputDecoration(
-                  labelText: 'Sector *',
+                  labelText: 'Sector * (applies to all items)',
                   prefixIcon: const Icon(Icons.business, color: Colors.brown),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -204,6 +207,111 @@ class _AddStockItemDialogState extends State<AddStockItemDialog> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              // Items List
+              ...List.generate(_itemNameControllers.length, (index) {
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Item ${index + 1}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.brown.shade700,
+                            ),
+                          ),
+                        ),
+                        if (_itemNameControllers.length > 1)
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _removeItemRow(index),
+                            tooltip: 'Remove this item',
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Item Name
+                    TextFormField(
+                      controller: _itemNameControllers[index],
+                      decoration: InputDecoration(
+                        labelText: 'Item Name *',
+                        hintText: 'e.g., Rice, Oil, etc.',
+                        prefixIcon: const Icon(Icons.inventory, color: Colors.brown),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.brown, width: 2),
+                        ),
+                      ),
+                      validator: (value) {
+                        // Only validate if other items have values or this is the first item
+                        bool hasOtherItems = false;
+                        for (int i = 0; i < _itemNameControllers.length; i++) {
+                          if (i != index && _itemNameControllers[i].text.trim().isNotEmpty) {
+                            hasOtherItems = true;
+                            break;
+                          }
+                        }
+                        if (hasOtherItems && (value == null || value.trim().isEmpty)) {
+                          return 'Item name is required';
+                        }
+                        return null;
+                      },
+                    ),
+                    // Vehicle Type and Part Number (only for SSEW sector)
+                    if (_selectedSectorCode == 'SSEW') ...[
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _vehicleTypeControllers[index],
+                        decoration: InputDecoration(
+                          labelText: 'Vehicle Type',
+                          hintText: 'e.g., Truck, Car, etc.',
+                          prefixIcon: const Icon(Icons.directions_car, color: Colors.brown),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.brown, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _partNumberControllers[index],
+                        decoration: InputDecoration(
+                          labelText: 'Part Number',
+                          hintText: 'e.g., PN-12345',
+                          prefixIcon: const Icon(Icons.tag, color: Colors.brown),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.brown, width: 2),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (index < _itemNameControllers.length - 1) const SizedBox(height: 16),
+                  ],
+                );
+              }),
+              const SizedBox(height: 16),
+              // Add More Items Button
+              OutlinedButton.icon(
+                onPressed: _addItemRow,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Another Item'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.brown.shade700,
+                  side: BorderSide(color: Colors.brown.shade700),
+                ),
               ),
             ],
           ),

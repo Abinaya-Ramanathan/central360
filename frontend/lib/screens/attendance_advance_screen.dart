@@ -97,7 +97,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
       final advanceList = <Map<String, dynamic>>[];
 
-      // For each employee, get the most recent outstanding_advance up to and including the selected date
+      // For each employee, get the most recent outstanding_advance and bulk_advance up to and including the selected date
       // This will persist across dates until it becomes 0
       for (var employee in employees) {
         try {
@@ -107,16 +107,20 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
           // (previous + advance_taken - advance_paid) and persists until paid off
           final outstandingAdvance = await ApiService.getOutstandingAdvance(employee.id, dateStr);
           
-          debugPrint('Advance Details - Employee: ${employee.name} (ID: ${employee.id}), Date: $dateStr, Outstanding Advance: $outstandingAdvance');
+          // Get the most recent bulk_advance from attendance records
+          final bulkAdvance = await ApiService.getBulkAdvance(employee.id, dateStr);
           
-          // Only show employees with outstanding advance > 0
+          debugPrint('Advance Details - Employee: ${employee.name} (ID: ${employee.id}), Date: $dateStr, Outstanding Advance: $outstandingAdvance, Bulk Advance: $bulkAdvance');
+          
+          // Only show employees with outstanding advance > 0 or bulk advance > 0
           // Use a small epsilon to handle floating point precision issues
-          if (outstandingAdvance > 0.01) {
+          if (outstandingAdvance > 0.01 || bulkAdvance > 0.01) {
             advanceList.add({
               'employee_id': employee.id,
               'employee_name': employee.name,
               'sector_code': employee.sector,
               'outstanding_advance': outstandingAdvance,
+              'bulk_advance': bulkAdvance,
             });
           }
         } catch (e, stackTrace) {
@@ -128,7 +132,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       
       debugPrint('Advance Details - Total employees with outstanding advance: ${advanceList.length}');
       for (var item in advanceList) {
-        debugPrint('  - ${item['employee_name']}: ₹${item['outstanding_advance']}');
+        debugPrint('  - ${item['employee_name']}: Outstanding: ₹${item['outstanding_advance']}, Bulk: ₹${item['bulk_advance']}');
       }
 
       if (mounted) {
@@ -387,7 +391,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Employees with Outstanding Advance',
+                      'Employees with Outstanding Advance / Bulk Advance',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     IconButton(
@@ -451,8 +455,15 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                                       const DataColumn(
                                         label: Text('Outstanding Advance', style: TextStyle(fontWeight: FontWeight.bold)),
                                       ),
+                                      // Only show Bulk Advance column if any employee has bulk_advance > 0
+                                      if (_advanceDetails.any((detail) => ((detail['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01))
+                                        const DataColumn(
+                                          label: Text('Bulk Advance', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        ),
                                     ],
                                     rows: _advanceDetails.map((detail) {
+                                      final bulkAdvance = (detail['bulk_advance'] as num?)?.toDouble() ?? 0.0;
+                                      final showBulkColumn = _advanceDetails.any((d) => ((d['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01);
                                       return DataRow(
                                         cells: [
                                           if (widget.selectedSector == null && widget.isAdmin)
@@ -467,6 +478,19 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                                               ),
                                             ),
                                           ),
+                                          // Only show Bulk Advance cell if column is shown
+                                          if (showBulkColumn)
+                                            DataCell(
+                                              Text(
+                                                bulkAdvance > 0.01
+                                                    ? '₹${bulkAdvance.toStringAsFixed(2)}'
+                                                    : '₹0.00',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: bulkAdvance > 0.01 ? Colors.blue.shade700 : Colors.grey,
+                                                ),
+                                              ),
+                                            ),
                                         ],
                                       );
                                     }).toList(),

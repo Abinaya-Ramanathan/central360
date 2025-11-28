@@ -29,7 +29,7 @@ process.on('unhandledRejection', (reason, promise) => {
 async function runMigrations() {
   try {
     const migrationsDir = path.join(__dirname, 'migrations');
-    const migrationFiles = ['001_complete_schema.sql', '002_default_data.sql', '003_add_vehicle_fields_to_stock_items.sql', '032_add_maintenance_issue_photos.sql', '033_add_sales_details.sql', '034_add_balance_paid_to_sales_details.sql', '035_add_balance_paid_date_to_sales_details.sql'];
+    const migrationFiles = ['001_complete_schema.sql', '002_default_data.sql', '003_add_vehicle_fields_to_stock_items.sql', '032_add_maintenance_issue_photos.sql', '033_add_sales_details.sql', '034_add_balance_paid_to_sales_details.sql', '035_add_balance_paid_date_to_sales_details.sql', '036_add_bulk_advance_columns.sql', '037_add_company_purchase_details.sql', '038_update_company_purchase_details.sql', '039_add_balance_payments_table.sql', '040_add_sales_balance_payments_table.sql', '041_add_details_to_sales_details.sql'];
     
     for (const file of migrationFiles) {
       const migrationPath = path.join(migrationsDir, file);

@@ -12,6 +12,7 @@ frontend/installer/
 backend/dist/
 *.exe
 *.dll
+*.apk
 
 # Environment files
 .env

@@ -4,6 +4,7 @@ import 'daily_report_details_screen.dart';
 import 'maintenance_issue_screen.dart';
 import 'mahal_booking_screen.dart';
 import 'sales_credit_details_screen.dart';
+import 'company_purchase_credit_details_screen.dart';
 import 'vehicle_driver_license_screen.dart';
 import 'attendance_advance_screen.dart';
 import '../models/sector.dart';
@@ -455,11 +456,43 @@ class _HomeScreenState extends State<HomeScreen> {
                                   },
                                   icon: const Icon(Icons.credit_card),
                                   label: const Text(
-                                    'Sales and Credit Details',
+                                    'Sales and Credit details of Customer',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.indigo.shade700,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Company Purchase and Credit Details - available for all users
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => CompanyPurchaseCreditDetailsScreen(
+                                          username: widget.username,
+                                          selectedSector: _selectedSector,
+                                          isMainAdmin: _isMainAdmin,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.shopping_cart),
+                                  label: const Text(
+                                    'Company Purchase and Credit Details',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.purple.shade700,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),

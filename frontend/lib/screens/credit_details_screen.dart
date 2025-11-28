@@ -62,10 +62,11 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
         _filteredCreditData = _creditData;
       } else {
         _filteredCreditData = _creditData.where((record) {
-          final name = (record['name']?.toString() ?? '').toLowerCase();
-          final address = (record['address']?.toString() ?? '').toLowerCase();
+          final shopName = (record['name']?.toString() ?? '').toLowerCase();
+          final purchaseDetails = (record['purchase_details']?.toString() ?? '').toLowerCase();
           final searchQuery = query.toLowerCase();
-          return name.contains(searchQuery) || address.contains(searchQuery);
+          // Search by shop name (name field) and item name (within purchase_details)
+          return shopName.contains(searchQuery) || purchaseDetails.contains(searchQuery);
         }).toList();
       }
       // Apply sorting after filtering
@@ -971,8 +972,8 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                labelText: 'Search by Name or Address',
-                hintText: 'Enter name or address to search',
+                labelText: 'Search by Item Name or Shop Name',
+                hintText: 'Enter item name or shop name to search',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(

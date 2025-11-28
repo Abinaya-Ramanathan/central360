@@ -49,6 +49,9 @@ router.post('/', async (req, res) => {
       outstanding_advance,
       advance_taken,
       advance_paid,
+      bulk_advance,
+      bulk_advance_taken,
+      bulk_advance_paid,
     } = req.body;
 
     // Check if attendance record already exists
@@ -61,10 +64,11 @@ router.post('/', async (req, res) => {
       // Update existing record
       const { rows } = await db.query(
         `UPDATE attendance SET
-          status = $1, outstanding_advance = $2, advance_taken = $3, advance_paid = $4
-        WHERE employee_id = $5 AND date = $6
+          status = $1, outstanding_advance = $2, advance_taken = $3, advance_paid = $4,
+          bulk_advance = $5, bulk_advance_taken = $6, bulk_advance_paid = $7
+        WHERE employee_id = $8 AND date = $9
         RETURNING *`,
-        [status, outstanding_advance, advance_taken, advance_paid, employee_id, date]
+        [status, outstanding_advance, advance_taken, advance_paid, bulk_advance || 0, bulk_advance_taken || 0, bulk_advance_paid || 0, employee_id, date]
       );
       res.json(rows[0]);
     } else {
@@ -72,8 +76,9 @@ router.post('/', async (req, res) => {
       const { rows } = await db.query(
         `INSERT INTO attendance (
           employee_id, employee_name, sector, date, status,
-          outstanding_advance, advance_taken, advance_paid
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          outstanding_advance, advance_taken, advance_paid,
+          bulk_advance, bulk_advance_taken, bulk_advance_paid
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *`,
         [
           employee_id,
@@ -84,6 +89,9 @@ router.post('/', async (req, res) => {
           outstanding_advance || 0,
           advance_taken || 0,
           advance_paid || 0,
+          bulk_advance || 0,
+          bulk_advance_taken || 0,
+          bulk_advance_paid || 0,
         ]
       );
       res.status(201).json(rows[0]);
@@ -131,6 +139,43 @@ router.get('/outstanding/:employeeId/:date', async (req, res) => {
   }
 });
 
+// Get latest bulk advance for an employee before a given date
+// This gets the bulk_advance from the most recent attendance record BEFORE the given date
+router.get('/bulk-advance/:employeeId/:date', async (req, res) => {
+  try {
+    const { employeeId, date } = req.params;
+    console.log(`[Bulk Advance] Request for employeeId: ${employeeId}, date: ${date}`);
+    
+    // Get the bulk_advance from the most recent record up to and including the given date
+    // This includes any transactions on the date itself
+    const { rows } = await db.query(
+      `SELECT bulk_advance, date
+       FROM attendance 
+       WHERE employee_id = $1 AND date <= $2::date
+       ORDER BY date DESC 
+       LIMIT 1`,
+      [employeeId, date]
+    );
+    
+    console.log(`[Bulk Advance] Found ${rows.length} record(s) for employeeId: ${employeeId}, date: ${date}`);
+    if (rows.length > 0) {
+      console.log(`[Bulk Advance] Record date: ${rows[0].date}, bulk_advance: ${rows[0].bulk_advance}`);
+    }
+    
+    // Return the bulk_advance from the most recent record up to and including the given date
+    // This represents the cumulative bulk advance as of the given date (including that date's transactions)
+    const bulkAdvance = rows.length > 0 
+      ? parseFloat(rows[0].bulk_advance) || 0 
+      : 0;
+    
+    console.log(`[Bulk Advance] Returning bulk_advance: ${bulkAdvance} for employeeId: ${employeeId}, date: ${date}`);
+    res.json({ bulk_advance: bulkAdvance });
+  } catch (err) {
+    console.error('Error fetching bulk advance:', err);
+    res.status(500).json({ message: 'Error fetching bulk advance' });
+  }
+});
+
 // Bulk update attendance
 router.post('/bulk', async (req, res) => {
   try {
@@ -147,6 +192,9 @@ router.post('/bulk', async (req, res) => {
         outstanding_advance,
         advance_taken,
         advance_paid,
+        bulk_advance,
+        bulk_advance_taken,
+        bulk_advance_paid,
       } = record;
 
       const existing = await db.query(
@@ -157,18 +205,20 @@ router.post('/bulk', async (req, res) => {
       if (existing.rows.length > 0) {
         const { rows } = await db.query(
           `UPDATE attendance SET
-            status = $1, outstanding_advance = $2, advance_taken = $3, advance_paid = $4
-          WHERE employee_id = $5 AND date = $6
+            status = $1, outstanding_advance = $2, advance_taken = $3, advance_paid = $4,
+            bulk_advance = $5, bulk_advance_taken = $6, bulk_advance_paid = $7
+          WHERE employee_id = $8 AND date = $9
           RETURNING *`,
-          [status, outstanding_advance, advance_taken, advance_paid, employee_id, date]
+          [status, outstanding_advance, advance_taken, advance_paid, bulk_advance || 0, bulk_advance_taken || 0, bulk_advance_paid || 0, employee_id, date]
         );
         results.push(rows[0]);
       } else {
         const { rows } = await db.query(
           `INSERT INTO attendance (
             employee_id, employee_name, sector, date, status,
-            outstanding_advance, advance_taken, advance_paid
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            outstanding_advance, advance_taken, advance_paid,
+            bulk_advance, bulk_advance_taken, bulk_advance_paid
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           RETURNING *`,
           [
             employee_id,
@@ -179,6 +229,9 @@ router.post('/bulk', async (req, res) => {
             outstanding_advance || 0,
             advance_taken || 0,
             advance_paid || 0,
+            bulk_advance || 0,
+            bulk_advance_taken || 0,
+            bulk_advance_paid || 0,
           ]
         );
         results.push(rows[0]);

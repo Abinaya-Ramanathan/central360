@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/vehicle_license.dart';
 import '../services/api_service.dart';
+import '../utils/format_utils.dart';
 
 class AddVehicleLicenseDialog extends StatefulWidget {
   final String? selectedSector;
@@ -21,6 +22,11 @@ class _AddVehicleLicenseDialogState extends State<AddVehicleLicenseDialog> {
   final _nameController = TextEditingController();
   final _modelController = TextEditingController();
   final _registrationNumberController = TextEditingController();
+  final _permitDateController = TextEditingController();
+  final _insuranceDateController = TextEditingController();
+  final _fitnessDateController = TextEditingController();
+  final _pollutionDateController = TextEditingController();
+  final _taxDateController = TextEditingController();
   DateTime? _permitDate;
   DateTime? _insuranceDate;
   DateTime? _fitnessDate;
@@ -40,6 +46,11 @@ class _AddVehicleLicenseDialogState extends State<AddVehicleLicenseDialog> {
       _fitnessDate = widget.vehicleLicense!.fitnessDate;
       _pollutionDate = widget.vehicleLicense!.pollutionDate;
       _taxDate = widget.vehicleLicense!.taxDate;
+      _permitDateController.text = FormatUtils.formatDateDisplay(_permitDate);
+      _insuranceDateController.text = FormatUtils.formatDateDisplay(_insuranceDate);
+      _fitnessDateController.text = FormatUtils.formatDateDisplay(_fitnessDate);
+      _pollutionDateController.text = FormatUtils.formatDateDisplay(_pollutionDate);
+      _taxDateController.text = FormatUtils.formatDateDisplay(_taxDate);
     }
   }
 
@@ -48,20 +59,52 @@ class _AddVehicleLicenseDialogState extends State<AddVehicleLicenseDialog> {
     _nameController.dispose();
     _modelController.dispose();
     _registrationNumberController.dispose();
+    _permitDateController.dispose();
+    _insuranceDateController.dispose();
+    _fitnessDateController.dispose();
+    _pollutionDateController.dispose();
+    _taxDateController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectDate(BuildContext context, DateTime? initialDate, Function(DateTime) onDateSelected) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      onDateSelected(picked);
+  void _onDateTextChanged(String value, Function(DateTime?) onDateChanged) {
+    if (value.trim().isEmpty) {
+      onDateChanged(null);
+      setState(() {});
+      return;
+    }
+    final parsedDate = FormatUtils.parseDate(value);
+    if (parsedDate != null) {
+      onDateChanged(parsedDate);
       setState(() {});
     }
+  }
+
+  Widget _buildDateField({
+    required String label,
+    required TextEditingController controller,
+    required DateTime? dateValue,
+    required Function(DateTime?) onDateChanged,
+  }) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        hintText: 'DD/MM/YYYY',
+      ),
+      onChanged: (value) => _onDateTextChanged(value, onDateChanged),
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return null; // Optional field
+        }
+        final parsedDate = FormatUtils.parseDate(value);
+        if (parsedDate == null) {
+          return 'Invalid format. Use DD/MM/YYYY';
+        }
+        return null;
+      },
+    );
   }
 
   Future<void> _submit() async {
@@ -154,64 +197,39 @@ class _AddVehicleLicenseDialogState extends State<AddVehicleLicenseDialog> {
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: () => _selectDate(context, _permitDate, (date) => _permitDate = date),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Permit Date',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(_permitDate != null ? _permitDate!.toIso8601String().split('T')[0] : 'Select Date'),
-                  ),
+                _buildDateField(
+                  label: 'Permit Date',
+                  controller: _permitDateController,
+                  dateValue: _permitDate,
+                  onDateChanged: (date) => _permitDate = date,
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: () => _selectDate(context, _insuranceDate, (date) => _insuranceDate = date),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Insurance Date',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(_insuranceDate != null ? _insuranceDate!.toIso8601String().split('T')[0] : 'Select Date'),
-                  ),
+                _buildDateField(
+                  label: 'Insurance Date',
+                  controller: _insuranceDateController,
+                  dateValue: _insuranceDate,
+                  onDateChanged: (date) => _insuranceDate = date,
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: () => _selectDate(context, _fitnessDate, (date) => _fitnessDate = date),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Fitness Date',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(_fitnessDate != null ? _fitnessDate!.toIso8601String().split('T')[0] : 'Select Date'),
-                  ),
+                _buildDateField(
+                  label: 'Fitness Date',
+                  controller: _fitnessDateController,
+                  dateValue: _fitnessDate,
+                  onDateChanged: (date) => _fitnessDate = date,
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: () => _selectDate(context, _pollutionDate, (date) => _pollutionDate = date),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Pollution Date',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(_pollutionDate != null ? _pollutionDate!.toIso8601String().split('T')[0] : 'Select Date'),
-                  ),
+                _buildDateField(
+                  label: 'Pollution Date',
+                  controller: _pollutionDateController,
+                  dateValue: _pollutionDate,
+                  onDateChanged: (date) => _pollutionDate = date,
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: () => _selectDate(context, _taxDate, (date) => _taxDate = date),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Tax Date',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(_taxDate != null ? _taxDate!.toIso8601String().split('T')[0] : 'Select Date'),
-                  ),
+                _buildDateField(
+                  label: 'Tax Date',
+                  controller: _taxDateController,
+                  dateValue: _taxDate,
+                  onDateChanged: (date) => _taxDate = date,
                 ),
                 const SizedBox(height: 24),
                 SizedBox(

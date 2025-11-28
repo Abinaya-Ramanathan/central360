@@ -6,6 +6,7 @@ import '../models/sector.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
+import '../utils/format_utils.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'add_mahal_booking_dialog.dart';
@@ -281,7 +282,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
                               ),
                             ),
                             DataCell(Text(event.mahalDetail, style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.eventDate.toIso8601String().split('T')[0], style: const TextStyle(color: Colors.black87))),
+                            DataCell(Text(FormatUtils.formatDateDisplay(event.eventDate), style: const TextStyle(color: Colors.black87))),
                             DataCell(Text(event.eventTiming ?? 'N/A', style: const TextStyle(color: Colors.black87))),
                             DataCell(Text(event.eventName ?? 'N/A', style: const TextStyle(color: Colors.black87))),
                             DataCell(Text(event.clientName, style: const TextStyle(color: Colors.black87))),
@@ -516,7 +517,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
             children: [
               _buildViewField('Booking ID', event.bookingId ?? 'N/A'),
               _buildViewField('Mahal Detail', event.mahalDetail),
-              _buildViewField('Event Date', event.eventDate.toIso8601String().split('T')[0]),
+              _buildViewField('Event Date', FormatUtils.formatDateDisplay(event.eventDate)),
               _buildViewField('Event Timing', event.eventTiming ?? 'N/A'),
               _buildViewField('Event Name', event.eventName ?? 'N/A'),
               _buildViewField('Client Name', event.clientName),

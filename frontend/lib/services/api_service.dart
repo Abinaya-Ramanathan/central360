@@ -1885,11 +1885,8 @@ class ApiService {
     throw Exception('Failed to load overall stock');
   }
 
-  static Future<void> updateOverallStock(List<Map<String, dynamic>> updates, {String? date}) async {
-    final queryParams = <String, String>{};
-    if (date != null) queryParams['date'] = date;
-    
-    final uri = Uri.parse('$baseUrl/overall-stock').replace(queryParameters: queryParams);
+  static Future<void> updateOverallStock(List<Map<String, dynamic>> updates) async {
+    final uri = Uri.parse('$baseUrl/overall-stock');
     final response = await http.put(
       uri,
       headers: {'Content-Type': 'application/json'},

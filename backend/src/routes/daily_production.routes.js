@@ -31,15 +31,48 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Helper function to parse numeric values (accepts both string and number)
+function parseNumeric(value) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+  if (typeof value === 'number') {
+    return parseFloat(value); // Keep as float for decimal support
+  }
+  if (typeof value === 'string') {
+    // Trim whitespace
+    const trimmed = value.trim();
+    
+    // Check if it's a fraction (e.g., "1/2", "3/4")
+    if (trimmed.includes('/')) {
+      const parts = trimmed.split('/');
+      if (parts.length === 2) {
+        const numerator = parseFloat(parts[0].trim());
+        const denominator = parseFloat(parts[1].trim());
+        if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
+          return numerator / denominator;
+        }
+      }
+    }
+    
+    // Try parsing as regular number (decimal supported)
+    const parsed = parseFloat(trimmed);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
 // Create or update daily production record
 router.post('/', async (req, res) => {
   try {
     const {
       id,
       product_name,
+      sector_code,
       morning_production,
       afternoon_production,
       evening_production,
+      unit,
       production_date,
     } = req.body;
 
@@ -47,6 +80,14 @@ router.post('/', async (req, res) => {
     if (!product_name || !production_date) {
       return res.status(400).json({ message: 'Product name and production date are required' });
     }
+    if (!sector_code) {
+      return res.status(400).json({ message: 'Sector code is required' });
+    }
+
+    // Parse numeric values (accepts both string and number)
+    const morningProd = parseNumeric(morning_production);
+    const afternoonProd = parseNumeric(afternoon_production);
+    const eveningProd = parseNumeric(evening_production);
 
     let rows;
     
@@ -54,15 +95,17 @@ router.post('/', async (req, res) => {
     if (id) {
       const result = await db.query(
         `UPDATE daily_production SET
-          product_name = $1, morning_production = $2, afternoon_production = $3,
-          evening_production = $4, production_date = $5, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $6
+          product_name = $1, sector_code = $2, morning_production = $3, afternoon_production = $4,
+          evening_production = $5, unit = $6, production_date = $7, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $8
         RETURNING *`,
         [
           product_name,
-          morning_production || 0,
-          afternoon_production || 0,
-          evening_production || 0,
+          sector_code,
+          morningProd,
+          afternoonProd,
+          eveningProd,
+          unit || null,
           production_date,
           id,
         ]
@@ -72,10 +115,10 @@ router.post('/', async (req, res) => {
         return res.status(404).json({ message: 'Daily production record not found' });
       }
     } else {
-      // Check if record exists for this product and date
+      // Check if record exists for this product, sector, and date
       const existingResult = await db.query(
-        'SELECT id FROM daily_production WHERE product_name = $1 AND production_date = $2',
-        [product_name, production_date]
+        'SELECT id FROM daily_production WHERE product_name = $1 AND sector_code = $2 AND production_date = $3',
+        [product_name, sector_code, production_date]
       );
       
       if (existingResult.rows.length > 0) {
@@ -84,13 +127,14 @@ router.post('/', async (req, res) => {
         const result = await db.query(
           `UPDATE daily_production SET
             morning_production = $1, afternoon_production = $2,
-            evening_production = $3, updated_at = CURRENT_TIMESTAMP
-          WHERE id = $4
+            evening_production = $3, unit = $4, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $5
           RETURNING *`,
           [
-            morning_production || 0,
-            afternoon_production || 0,
-            evening_production || 0,
+            morningProd,
+            afternoonProd,
+            eveningProd,
+            unit || null,
             existingId,
           ]
         );
@@ -99,15 +143,17 @@ router.post('/', async (req, res) => {
         // Create new record
         const result = await db.query(
           `INSERT INTO daily_production (
-            product_name, morning_production, afternoon_production,
-            evening_production, production_date
-          ) VALUES ($1, $2, $3, $4, $5)
+            product_name, sector_code, morning_production, afternoon_production,
+            evening_production, unit, production_date
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING *`,
           [
             product_name,
-            morning_production || 0,
-            afternoon_production || 0,
-            evening_production || 0,
+            sector_code,
+            morningProd,
+            afternoonProd,
+            eveningProd,
+            unit || null,
             production_date,
           ]
         );

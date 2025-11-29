@@ -70,15 +70,6 @@ class _AddSectorDialogState extends State<AddSectorDialog> {
           }
         }
         
-        // Log full error details for debugging
-        debugPrint('=== SECTOR CREATION ERROR ===');
-        debugPrint('Full error: $e');
-        debugPrint('Error message: $errorMessage');
-        debugPrint('Debug info: $debugInfo');
-        debugPrint('Sector code: ${_codeController.text}');
-        debugPrint('Sector name: ${_nameController.text}');
-        debugPrint('============================');
-        
         // Show more detailed error in a dialog for better visibility
         if (mounted) {
           showDialog(

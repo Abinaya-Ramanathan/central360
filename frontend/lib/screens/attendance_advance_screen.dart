@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'attendance_tab_content.dart';
+import 'present_days_count_tab_content.dart';
 import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
@@ -35,7 +36,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _selectedMonth = DateTime.now().month;
     _selectedDate = DateTime.now();
     _loadSectors();
@@ -110,8 +111,6 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
           // Get the most recent bulk_advance from attendance records
           final bulkAdvance = await ApiService.getBulkAdvance(employee.id, dateStr);
           
-          debugPrint('Advance Details - Employee: ${employee.name} (ID: ${employee.id}), Date: $dateStr, Outstanding Advance: $outstandingAdvance, Bulk Advance: $bulkAdvance');
-          
           // Only show employees with outstanding advance > 0 or bulk advance > 0
           // Use a small epsilon to handle floating point precision issues
           if (outstandingAdvance > 0.01 || bulkAdvance > 0.01) {
@@ -123,16 +122,9 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
               'bulk_advance': bulkAdvance,
             });
           }
-        } catch (e, stackTrace) {
-          // Skip employees with errors but log them
-          debugPrint('Error loading advance for ${employee.name}: $e');
-          debugPrint('Stack trace: $stackTrace');
+        } catch (e) {
+          // Skip employees with errors
         }
-      }
-      
-      debugPrint('Advance Details - Total employees with outstanding advance: ${advanceList.length}');
-      for (var item in advanceList) {
-        debugPrint('  - ${item['employee_name']}: Outstanding: ₹${item['outstanding_advance']}, Bulk: ₹${item['bulk_advance']}');
       }
 
       if (mounted) {
@@ -219,6 +211,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
           tabs: const [
             Tab(text: 'Attendance Entry'),
             Tab(text: 'Advance Details'),
+            Tab(text: 'Present Days Count'),
           ],
         ),
         actions: [
@@ -501,6 +494,11 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                           ),
               ),
             ],
+          ),
+          // Present Days Count Tab
+          PresentDaysCountTabContent(
+            selectedSector: widget.selectedSector,
+            isAdmin: widget.isAdmin,
           ),
         ],
       ),

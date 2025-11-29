@@ -4,6 +4,7 @@ import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../utils/format_utils.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -76,6 +77,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
       setState(() {
         _employees = employees;
         // Initialize attendance data for each employee
+        // Reset status to null for all employees (status is date-specific)
         for (var emp in employees) {
           if (!_attendanceData.containsKey(emp.id)) {
             _attendanceData[emp.id] = {
@@ -85,6 +87,9 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
               'advance_paid': 0.0,
               'previous_outstanding': 0.0,
             };
+          } else {
+            // Reset status to null when loading new date (status is date-specific)
+            _attendanceData[emp.id]!['status'] = null;
           }
         }
       });
@@ -124,23 +129,12 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
   }
 
   void _recalculateOutstanding() {
-    // Helper function to safely parse decimal values
-    double parseDecimal(dynamic value) {
-      if (value == null) return 0.0;
-      if (value is num) return value.toDouble();
-      if (value is String) {
-        final parsed = double.tryParse(value);
-        return parsed ?? 0.0;
-      }
-      return 0.0;
-    }
-    
     for (var emp in _employees) {
       if (_attendanceData.containsKey(emp.id)) {
         final data = _attendanceData[emp.id]!;
-        final previous = parseDecimal(data['previous_outstanding']);
-        final taken = parseDecimal(data['advance_taken']);
-        final paid = parseDecimal(data['advance_paid']);
+        final previous = FormatUtils.parseDecimal(data['previous_outstanding']);
+        final taken = FormatUtils.parseDecimal(data['advance_taken']);
+        final paid = FormatUtils.parseDecimal(data['advance_paid']);
         data['outstanding_advance'] = previous + taken - paid;
       }
     }
@@ -172,6 +166,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
       }
 
       // Update attendance data for all employees
+      // First, reset status to null for all employees (status is date-specific)
       for (var emp in _employees) {
         // Ensure employee has an entry in _attendanceData
         if (!_attendanceData.containsKey(emp.id)) {
@@ -182,21 +177,17 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
             'advance_paid': 0.0,
             'previous_outstanding': 0.0,
           };
+        } else {
+          // Reset status to null for new date (status is date-specific)
+          _attendanceData[emp.id]!['status'] = null;
         }
-        
+      }
+      
+      // Now load data for employees with records for this specific date
+      for (var emp in _employees) {
         final data = _attendanceData[emp.id]!;
         // Keep the previous_outstanding that was loaded earlier (from previous day)
-        // Helper function to safely parse decimal values
-        double parseDecimal(dynamic value) {
-          if (value == null) return 0.0;
-          if (value is num) return value.toDouble();
-          if (value is String) {
-            final parsed = double.tryParse(value);
-            return parsed ?? 0.0;
-          }
-          return 0.0;
-        }
-        final previousOutstanding = parseDecimal(data['previous_outstanding']);
+        final previousOutstanding = FormatUtils.parseDecimal(data['previous_outstanding']);
         
         // Check both string and int versions of employee_id
         final empIdStr = emp.id;
@@ -208,27 +199,15 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
           // Employee has saved data for this date
           final record = loadedRecords[empIdStr] ?? loadedRecords[empIdInt.toString()]!;
           
-          // Helper function to safely parse decimal values from PostgreSQL
-          double parseDecimal(dynamic value) {
-            if (value == null) return 0.0;
-            if (value is num) return value.toDouble();
-            if (value is String) {
-              final parsed = double.tryParse(value);
-              return parsed ?? 0.0;
-            }
-            return 0.0;
-          }
-          
-          final taken = parseDecimal(record['advance_taken']);
-          final paid = parseDecimal(record['advance_paid']);
-          final status = record['status'];
-          
+          final taken = FormatUtils.parseDecimal(record['advance_taken']);
+          final paid = FormatUtils.parseDecimal(record['advance_paid']);
+          final status = record['status']; // Get status from record for this specific date
           
           // Calculate outstanding: previous day's outstanding + today's taken - today's paid
           final newOutstanding = previousOutstanding + taken - paid;
           
           _attendanceData[emp.id] = {
-            'status': status, // Use saved status
+            'status': status, // Use saved status for this date
             'previous_outstanding': previousOutstanding, // Keep previous day's value
             'outstanding_advance': newOutstanding, // Recalculate
             'advance_taken': taken,
@@ -236,9 +215,9 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
           };
           
         } else {
-          // Employee has no saved data for this date - keep defaults but preserve previous_outstanding
+          // Employee has no saved data for this date - status remains null
           _attendanceData[emp.id] = {
-            'status': null, // No status selected yet
+            'status': null, // No status selected yet for this date
             'previous_outstanding': previousOutstanding,
             'outstanding_advance': previousOutstanding, // Start with previous outstanding
             'advance_taken': 0.0,
@@ -366,43 +345,57 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
   Future<void> _saveAttendance() async {
     if (widget.selectedSector == null || _selectedDate == null) return;
 
-    // Validate that all employees have a status selected
-    final employeesWithoutStatus = _employees.where((emp) {
-      final data = _attendanceData[emp.id];
-      return data == null || data['status'] == null;
-    }).toList();
-
-    if (employeesWithoutStatus.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please select status for all employees. Missing: ${employeesWithoutStatus.map((e) => e.name).join(', ')}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
     setState(() => _isLoading = true);
     try {
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
-      final records = _employees.map((emp) {
-        final data = _attendanceData[emp.id] ?? {};
-        return {
-          'employee_id': int.parse(emp.id),
-          'employee_name': emp.name,
-          'sector': widget.selectedSector!,
-          'date': dateStr,
-          'status': data['status'], // Status is required (validated above)
-          'outstanding_advance': data['outstanding_advance'] ?? 0.0,
-          'advance_taken': data['advance_taken'] ?? 0.0,
-          'advance_paid': data['advance_paid'] ?? 0.0,
-        };
-      }).toList();
+      
+      // Only save employees that have a status selected or have been edited
+      // Filter to include employees with status or with any advance changes
+      final records = _employees
+          .where((emp) {
+            final data = _attendanceData[emp.id];
+            // Save if employee has a status OR if they have advance changes (taken/paid)
+            return data != null && (
+              data['status'] != null ||
+              (data['advance_taken'] != null && (data['advance_taken'] ?? 0.0) > 0.0) ||
+              (data['advance_paid'] != null && (data['advance_paid'] ?? 0.0) > 0.0)
+            );
+          })
+          .map((emp) {
+            final data = _attendanceData[emp.id] ?? {};
+            return {
+              'employee_id': int.parse(emp.id),
+              'employee_name': emp.name,
+              'sector': widget.selectedSector!,
+              'date': dateStr,
+              'status': data['status'] ?? 'present', // Default to 'present' if not set
+              'outstanding_advance': data['outstanding_advance'] ?? 0.0,
+              'advance_taken': data['advance_taken'] ?? 0.0,
+              'advance_paid': data['advance_paid'] ?? 0.0,
+            };
+          })
+          .toList();
+
+      if (records.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No changes to save. Please select at least one employee status or enter advance details.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
 
       await ApiService.bulkSaveAttendance(records);
       setState(() => _isEditMode = false);
+      // Reload attendance data to reflect saved changes
+      await _loadAttendanceData();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Attendance saved successfully')),
+        SnackBar(
+          content: Text('Attendance saved successfully for ${records.length} employee(s)'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

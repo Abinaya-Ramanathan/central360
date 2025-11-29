@@ -271,14 +271,6 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
         sector: widget.selectedSector,
       );
 
-      debugPrint('=== Loading Credit Data ===');
-      debugPrint('Total credit records: ${credits.length}');
-      for (var credit in credits) {
-        final name = credit['name']?.toString() ?? 'N/A';
-        final purchaseDate = credit['purchase_date']?.toString().split('T')[0].split(' ')[0] ?? 'N/A';
-        final creditAmount = _parseDecimal(credit['credit_amount']);
-        debugPrint('  - $name: purchase_date=$purchaseDate, credit_amount=₹$creditAmount');
-      }
 
       setState(() {
         _creditData = credits;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'employee_details_screen.dart';
-import 'daily_report_details_screen.dart';
+import 'daily_expense_without_credit_screen.dart';
 import 'maintenance_issue_screen.dart';
 import 'mahal_booking_screen.dart';
 import 'sales_credit_details_screen.dart';
@@ -374,6 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               // Daily Report Details - available for all users
+                              // Daily Expense without Credit Details
                               const SizedBox(height: 16),
                               SizedBox(
                                 width: double.infinity,
@@ -383,20 +384,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => DailyReportDetailsScreen(
+                                        builder: (context) => DailyExpenseWithoutCreditScreen(
                                           username: widget.username,
                                           selectedSector: _selectedSector,
                                         ),
                                       ),
                                     );
                                   },
-                                  icon: const Icon(Icons.report),
+                                  icon: const Icon(Icons.receipt_long),
                                   label: const Text(
-                                    'Production and Expense Details',
+                                    'Daily Expense without Credit Details',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.teal.shade700,
+                                    backgroundColor: Colors.purple.shade700,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -519,7 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   },
                                   icon: const Icon(Icons.warehouse),
                                   label: const Text(
-                                    'Stock Management',
+                                    'Daily Production and Stock Management',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                   style: ElevatedButton.styleFrom(

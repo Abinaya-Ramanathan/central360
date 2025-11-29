@@ -28,6 +28,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   bool _isLoading = false;
   final TextEditingController _searchController = TextEditingController();
   bool _sortAscending = true; // Sort direction for Sector column
+  Map<String, String?> _productionUnits = {}; // Store unit for each product
 
   List<Sector> _sectors = [];
 
@@ -137,6 +138,12 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
         }
       } else {
         _products = await ApiService.getProducts(sector: widget.selectedSector);
+        // Ensure all products have sector_code set
+        for (var product in _products) {
+          if (product['sector_code'] == null || product['sector_code'].toString().isEmpty) {
+            product['sector_code'] = widget.selectedSector;
+          }
+        }
       }
       setState(() {});
     } catch (e) {
@@ -157,11 +164,13 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
       if (_products.isEmpty) {
         setState(() {
           _productionData = [];
+          _filteredProductionData = [];
         });
         return;
       }
     }
 
+    setState(() => _isLoading = true);
     try {
       final year = widget.selectedDate!.year;
       final month = widget.selectedMonth ?? widget.selectedDate!.month;
@@ -176,7 +185,11 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
       // Filter by sector if not "All Sectors"
       final filteredRecords = widget.selectedSector == null && widget.isAdmin
           ? records
-          : records.where((r) => r['sector_code']?.toString() == widget.selectedSector).toList();
+          : records.where((r) {
+              final recordSector = r['sector_code']?.toString() ?? '';
+              final selectedSector = widget.selectedSector ?? '';
+              return recordSector == selectedSector;
+            }).toList();
 
       // Create a map keyed by product_name + sector_code for "All Sectors" view
       final Map<String, Map<String, dynamic>> existingRecordsMap = {};
@@ -198,7 +211,12 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
             : productName;
         
         if (existingRecordsMap.containsKey(key)) {
-          finalData.add(existingRecordsMap[key]!);
+          final existingRecord = existingRecordsMap[key]!;
+          // Ensure unit field exists even if null
+          if (!existingRecord.containsKey('unit')) {
+            existingRecord['unit'] = null;
+          }
+          finalData.add(existingRecord);
           existingRecordsMap.remove(key);
         } else {
           finalData.add({
@@ -207,6 +225,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
             'morning_production': 0,
             'afternoon_production': 0,
             'evening_production': 0,
+            'unit': null,
             'production_date': dateStr,
           });
         }
@@ -215,9 +234,11 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
       setState(() {
         _productionData = finalData;
         _filteredProductionData = finalData;
+        _isLoading = false;
       });
     } catch (e) {
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading production data: $e')),
         );
@@ -257,10 +278,8 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
       return;
     }
 
-    // Use filtered data if search is active, otherwise use all data
-    final dataToEdit = _searchController.text.isNotEmpty ? _filteredProductionData : _productionData;
-    
-    if (dataToEdit.isEmpty) {
+    // Always use all production data (not filtered) to ensure all records can be saved
+    if (_productionData.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No products available for this sector')),
       );
@@ -271,7 +290,8 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
     final Map<String, TextEditingController> afternoonControllers = {};
     final Map<String, TextEditingController> eveningControllers = {};
 
-    for (var record in dataToEdit) {
+    // Create controllers for all production data (not just filtered)
+    for (var record in _productionData) {
       final productName = record['product_name']?.toString() ?? '';
       final sectorCode = record['sector_code']?.toString() ?? widget.selectedSector;
       // Create unique key for controllers when "All Sectors" is selected
@@ -288,6 +308,10 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
       eveningControllers[controllerKey] = TextEditingController(
         text: _parseIntFromDynamic(record['evening_production']).toString(),
       );
+      // Initialize unit from existing record
+      if (!_productionUnits.containsKey(controllerKey)) {
+        _productionUnits[controllerKey] = record['unit']?.toString();
+      }
     }
 
     await showDialog<bool>(
@@ -299,7 +323,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: dataToEdit.map((record) {
+              children: _productionData.map((record) {
                 final productName = record['product_name']?.toString() ?? '';
                 final sectorCode = record['sector_code']?.toString() ?? widget.selectedSector;
                 final controllerKey = widget.selectedSector == null && widget.isAdmin
@@ -326,8 +350,10 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                                 labelText: 'Morning',
                                 border: OutlineInputBorder(),
                               ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -338,8 +364,10 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                                 labelText: 'Afternoon',
                                 border: OutlineInputBorder(),
                               ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -350,10 +378,44 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                                 labelText: 'Evening',
                                 border: OutlineInputBorder(),
                               ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                              ],
                             ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _productionUnits[controllerKey],
+                              decoration: const InputDecoration(
+                                labelText: 'Unit',
+                                border: OutlineInputBorder(),
+                              ),
+                              style: const TextStyle(color: Colors.black),
+                              dropdownColor: Colors.white,
+                              items: const [
+                                DropdownMenuItem(value: null, child: Text('-', style: TextStyle(color: Colors.black))),
+                                DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(color: Colors.black))),
+                                DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(color: Colors.black))),
+                                DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(color: Colors.black))),
+                                DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(color: Colors.black))),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  _productionUnits[controllerKey] = value;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Expanded(child: SizedBox()), // Spacer
+                          const SizedBox(width: 8),
+                          const Expanded(child: SizedBox()), // Spacer
                         ],
                       ),
                     ],
@@ -385,16 +447,32 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
               try {
                 final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
 
-                // Save all records (not just filtered ones)
+                // Save all records from _productionData (controllers are created for all records)
+                int successCount = 0;
+                int failCount = 0;
+                String? lastError;
+                
                 for (var record in _productionData) {
                   final productName = record['product_name']?.toString() ?? '';
                   final sectorCode = record['sector_code']?.toString() ?? widget.selectedSector;
                   final recordId = _parseIdFromDynamic(record['id']);
                   
+                  // Skip if product name or sector code is missing
+                  if (productName.isEmpty || sectorCode == null || sectorCode.isEmpty) {
+                    continue;
+                  }
+                  
                   // Create unique key for controllers when "All Sectors" is selected
                   final controllerKey = widget.selectedSector == null && widget.isAdmin
                       ? '$productName|$sectorCode'
                       : productName;
+
+                  // Check if controller exists (should always exist since we create for all _productionData)
+                  if (!morningControllers.containsKey(controllerKey) ||
+                      !afternoonControllers.containsKey(controllerKey) ||
+                      !eveningControllers.containsKey(controllerKey)) {
+                    continue; // Skip if controller doesn't exist (shouldn't happen)
+                  }
 
                   final productionRecord = {
                     if (recordId != null) 'id': recordId,
@@ -403,10 +481,18 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                     'morning_production': _parseIntValue(morningControllers[controllerKey]!.text),
                     'afternoon_production': _parseIntValue(afternoonControllers[controllerKey]!.text),
                     'evening_production': _parseIntValue(eveningControllers[controllerKey]!.text),
+                    'unit': _productionUnits[controllerKey],
                     'production_date': dateStr,
                   };
 
-                  await ApiService.saveDailyProduction(productionRecord);
+                  try {
+                    await ApiService.saveDailyProduction(productionRecord);
+                    successCount++;
+                  } catch (e) {
+                    failCount++;
+                    lastError = e.toString();
+                    // Continue saving other records even if one fails
+                  }
                 }
 
                 for (var controller in morningControllers.values) {
@@ -421,10 +507,37 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
 
                 if (mounted) {
                   Navigator.pop(context, true);
+                  
+                  // Show appropriate message based on save results
+                  if (failCount > 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Saved $successCount record(s). $failCount failed. ${lastError ?? ''}'),
+                        backgroundColor: Colors.orange,
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Production data saved successfully'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                  
+                  // Add a small delay to ensure backend has committed the transaction
+                  await Future.delayed(const Duration(milliseconds: 500));
+                  
+                  // Reload production data to reflect changes
+                  // First ensure products are loaded
+                  if (_products.isEmpty) {
+                    await _loadProducts();
+                  }
                   await _loadProductionData();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Production data saved successfully')),
-                  );
+                  // Refresh filtered data after reload
+                  _filterProductionData();
                 }
               } catch (e) {
                 for (var controller in morningControllers.values) {
@@ -557,28 +670,32 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                                 const DataColumn(label: Text('Afternoon Production', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Evening Production', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Overall Production', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
                               rows: _filteredProductionData.map((record) {
-                            final morning = _parseIntFromDynamic(record['morning_production']);
-                            final afternoon = _parseIntFromDynamic(record['afternoon_production']);
-                            final evening = _parseIntFromDynamic(record['evening_production']);
+                            final morning = _parseIntFromDynamic(record['morning_production'] ?? 0);
+                            final afternoon = _parseIntFromDynamic(record['afternoon_production'] ?? 0);
+                            final evening = _parseIntFromDynamic(record['evening_production'] ?? 0);
                             final overall = morning + afternoon + evening;
-                            return DataRow(
-                              cells: [
-                                if (showSectorColumn)
-                                  DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
-                                DataCell(Text(record['product_name']?.toString() ?? '')),
-                                DataCell(Text('$morning')),
-                                DataCell(Text('$afternoon')),
-                                DataCell(Text('$evening')),
-                                DataCell(
-                                  Text(
-                                    '$overall',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            );
+                            
+                            // Build cells list explicitly to ensure it matches columns
+                            final List<DataCell> cells = [];
+                            if (showSectorColumn) {
+                              cells.add(DataCell(Text(_getSectorName(record['sector_code']?.toString()))));
+                            }
+                            cells.add(DataCell(Text(record['product_name']?.toString() ?? '')));
+                            cells.add(DataCell(Text('$morning')));
+                            cells.add(DataCell(Text('$afternoon')));
+                            cells.add(DataCell(Text('$evening')));
+                            cells.add(DataCell(
+                              Text(
+                                '$overall',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ));
+                            cells.add(DataCell(Text(record['unit']?.toString() ?? '-')));
+                            
+                            return DataRow(cells: cells);
                           }).toList(),
                         ),
                       ),

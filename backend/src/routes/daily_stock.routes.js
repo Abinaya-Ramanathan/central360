@@ -39,6 +39,37 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Helper function to parse numeric values (accepts both string and number)
+function parseNumeric(value) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+  if (typeof value === 'number') {
+    return parseFloat(value); // Keep as float for decimal support
+  }
+  if (typeof value === 'string') {
+    // Trim whitespace
+    const trimmed = value.trim();
+    
+    // Check if it's a fraction (e.g., "1/2", "3/4")
+    if (trimmed.includes('/')) {
+      const parts = trimmed.split('/');
+      if (parts.length === 2) {
+        const numerator = parseFloat(parts[0].trim());
+        const denominator = parseFloat(parts[1].trim());
+        if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
+          return numerator / denominator;
+        }
+      }
+    }
+    
+    // Try parsing as regular number (decimal supported)
+    const parsed = parseFloat(trimmed);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
 // Update daily stock records
 router.put('/', async (req, res) => {
   try {
@@ -51,11 +82,14 @@ router.put('/', async (req, res) => {
 
     const results = [];
     for (const update of updates) {
-      const { id, item_id, quantity_taken, reason } = update;
+      const { id, item_id, quantity_taken, unit, reason } = update;
 
       if (!item_id) {
         continue;
       }
+
+      // Parse numeric value (accepts both string and number)
+      const quantityTaken = parseNumeric(quantity_taken);
 
       // Get the date from query or use current date
       const { date } = req.query;
@@ -66,8 +100,8 @@ router.put('/', async (req, res) => {
         const existing = await db.query('SELECT * FROM daily_stock WHERE id = $1', [id]);
         if (existing.rows.length > 0) {
           const result = await db.query(
-            'UPDATE daily_stock SET quantity_taken = $1, reason = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-            [quantity_taken || '0', reason || '', id]
+            'UPDATE daily_stock SET quantity_taken = $1, unit = $2, reason = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
+            [quantityTaken, unit || null, reason || '', id]
           );
           results.push(result.rows[0]);
         }
@@ -81,17 +115,101 @@ router.put('/', async (req, res) => {
         if (existing.rows.length > 0) {
           // Update existing record
           const result = await db.query(
-            'UPDATE daily_stock SET quantity_taken = $1, reason = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-            [quantity_taken || '0', reason || '', existing.rows[0].id]
+            'UPDATE daily_stock SET quantity_taken = $1, unit = $2, reason = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
+            [quantityTaken, unit || null, reason || '', existing.rows[0].id]
           );
           results.push(result.rows[0]);
         } else {
           // Create new record
           const result = await db.query(
-            'INSERT INTO daily_stock (item_id, quantity_taken, reason, stock_date) VALUES ($1, $2, $3, $4) RETURNING *',
-            [item_id, quantity_taken || '0', reason || '', stockDate]
+            'INSERT INTO daily_stock (item_id, quantity_taken, unit, reason, stock_date) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [item_id, quantityTaken, unit || null, reason || '', stockDate]
           );
           results.push(result.rows[0]);
+        }
+
+        // Recalculate remaining stock in overall_stock after saving daily stock
+        try {
+          // Import the helper function (we'll need to export it from overall_stock.routes.js)
+          // For now, let's recalculate inline
+          const newStockQuery = await db.query(
+            'SELECT new_stock_gram, new_stock_kg, new_stock_litre, new_stock_pieces FROM overall_stock WHERE item_id = $1',
+            [item_id]
+          );
+
+          if (newStockQuery.rows.length > 0) {
+            const newGram = parseNumeric(newStockQuery.rows[0].new_stock_gram);
+            const newKg = parseNumeric(newStockQuery.rows[0].new_stock_kg);
+            const newLitre = parseNumeric(newStockQuery.rows[0].new_stock_litre);
+
+            // Get total daily stock taken for each unit type
+            const dailyStockQuery = await db.query(
+              `SELECT 
+                COALESCE(SUM(CASE WHEN unit = 'gram' THEN 
+                  CASE WHEN quantity_taken LIKE '%/%' THEN
+                    CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
+                  ELSE CAST(quantity_taken AS DECIMAL) END
+                ELSE 0 END), 0) as total_gram,
+                COALESCE(SUM(CASE WHEN unit = 'kg' THEN 
+                  CASE WHEN quantity_taken LIKE '%/%' THEN
+                    CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
+                  ELSE CAST(quantity_taken AS DECIMAL) END
+                ELSE 0 END), 0) as total_kg,
+                COALESCE(SUM(CASE WHEN unit = 'Litre' THEN 
+                  CASE WHEN quantity_taken LIKE '%/%' THEN
+                    CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
+                  ELSE CAST(quantity_taken AS DECIMAL) END
+                ELSE 0 END), 0) as total_litre,
+                COALESCE(SUM(CASE WHEN unit = 'pieces' THEN 
+                  CASE WHEN quantity_taken LIKE '%/%' THEN
+                    CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
+                  ELSE CAST(quantity_taken AS DECIMAL) END
+                ELSE 0 END), 0) as total_pieces
+              FROM daily_stock 
+              WHERE item_id = $1`,
+              [item_id]
+            );
+
+            const totalTakenGram = parseNumeric(dailyStockQuery.rows[0]?.total_gram || '0');
+            const totalTakenKg = parseNumeric(dailyStockQuery.rows[0]?.total_kg || '0');
+            const totalTakenLitre = parseNumeric(dailyStockQuery.rows[0]?.total_litre || '0');
+            const totalTakenPieces = parseNumeric(dailyStockQuery.rows[0]?.total_pieces || '0');
+
+            // Convert everything to grams for unified calculation
+            // 1 litre = 1000 gram, 1 kg = 1000 gram
+            const newStockInGram = newGram + (newKg * 1000) + (newLitre * 1000);
+            const totalTakenInGram = totalTakenGram + (totalTakenKg * 1000) + (totalTakenLitre * 1000);
+            
+            // Calculate total remaining in grams
+            let totalRemainingInGram = Math.max(0, newStockInGram - totalTakenInGram);
+            
+            // Convert to different units for display
+            // All three columns show the same remaining quantity in different units:
+            // - Remaining Stock in gram: total remaining in grams (e.g., 4750)
+            // - Remaining Stock in kg: total remaining converted to kg (e.g., 4.75)
+            // - Remaining Stock in litre: total remaining converted to litres (e.g., 4.75)
+            const remainingKg = totalRemainingInGram / 1000; // Decimal value (e.g., 4.75)
+            const remainingLitre = totalRemainingInGram / 1000; // Same as kg (e.g., 4.75)
+            
+            // Calculate remaining pieces separately (pieces don't convert to gram/kg/litre)
+            const newPieces = parseNumeric(newStockQuery.rows[0].new_stock_pieces);
+            const remainingPieces = Math.max(0, newPieces - totalTakenPieces);
+
+            // Update remaining stock
+            await db.query(
+              `UPDATE overall_stock 
+               SET remaining_stock_gram = $1, 
+                   remaining_stock_kg = $2, 
+                   remaining_stock_litre = $3,
+                   remaining_stock_pieces = $4,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE item_id = $5`,
+              [totalRemainingInGram, remainingKg, remainingLitre, remainingPieces, item_id]
+            );
+          }
+        } catch (recalcError) {
+          // Log error but don't fail the daily stock save
+          console.error('Error recalculating remaining stock:', recalcError);
         }
       }
     }

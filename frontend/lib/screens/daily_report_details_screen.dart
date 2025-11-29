@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'production_tab_content.dart';
-import 'expense_tab_content.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import '../models/sector.dart';
@@ -21,10 +20,9 @@ class DailyReportDetailsScreen extends StatefulWidget {
   State<DailyReportDetailsScreen> createState() => _DailyReportDetailsScreenState();
 }
 
-class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> with SingleTickerProviderStateMixin {
+class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> {
   int? _selectedMonth;
   DateTime? _selectedDate;
-  late TabController _tabController;
   bool _isAdmin = false;
   List<Sector> _sectors = [];
 
@@ -68,17 +66,10 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> wit
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _selectedMonth = DateTime.now().month;
     _selectedDate = DateTime.now();
     _isAdmin = widget.username.toLowerCase() == 'admin' || widget.username.toLowerCase() == 'srisurya';
     _loadSectors();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _selectMonth() async {
@@ -130,19 +121,9 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> wit
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Production and Expense Details'),
+        title: const Text('Production Details'),
         backgroundColor: Colors.teal.shade700,
         foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.orange,
-          tabs: const [
-            Tab(text: 'Production'),
-            Tab(text: 'Expense'),
-          ],
-        ),
         actions: [
           // Sector Display
           Padding(
@@ -270,26 +251,13 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> wit
               ],
             ),
           ),
-          // Tab Content
+          // Production Content
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // Production Tab
-                ProductionTabContent(
-                  selectedSector: widget.selectedSector,
-                  selectedMonth: _selectedMonth,
-                  selectedDate: _selectedDate,
-                  isAdmin: _isAdmin,
-                ),
-                // Expense Tab
-                ExpenseTabContent(
-                  selectedSector: widget.selectedSector,
-                  selectedMonth: _selectedMonth,
-                  selectedDate: _selectedDate,
-                  isAdmin: _isAdmin,
-                ),
-              ],
+            child: ProductionTabContent(
+              selectedSector: widget.selectedSector,
+              selectedMonth: _selectedMonth,
+              selectedDate: _selectedDate,
+              isAdmin: _isAdmin,
             ),
           ),
         ],

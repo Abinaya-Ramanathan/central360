@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../models/sector.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
+import 'production_tab_content.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
@@ -26,8 +28,6 @@ class StockManagementScreen extends StatefulWidget {
 class _StockManagementScreenState extends State<StockManagementScreen> with SingleTickerProviderStateMixin {
   int? _selectedMonth;
   DateTime? _selectedDate;
-  int? _selectedMonthOverall;
-  DateTime? _selectedDateOverall;
   late TabController _tabController;
   List<Map<String, dynamic>> _stockItems = [];
   List<Map<String, dynamic>> _dailyStock = [];
@@ -42,7 +42,20 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   bool _sortAscendingOverall = true; // Sort direction for Sector column in Overall Stock
   final Map<String, TextEditingController> _dailyQuantityControllers = {};
   final Map<String, TextEditingController> _dailyReasonControllers = {};
+  final Map<String, String?> _dailyQuantityUnits = {}; // Store unit for each quantity
   final Map<String, TextEditingController> _overallNewStockControllers = {};
+  final Map<String, String?> _overallNewStockUnits = {}; // Store unit for new stock (deprecated - keeping for compatibility)
+  final Map<String, String?> _overallRemainingStockUnits = {}; // Store unit for remaining stock (deprecated)
+  
+  // New controllers for unit-specific columns
+  final Map<String, TextEditingController> _overallRemainingStockGramControllers = {};
+  final Map<String, TextEditingController> _overallRemainingStockKgControllers = {};
+  final Map<String, TextEditingController> _overallRemainingStockLitreControllers = {};
+  final Map<String, TextEditingController> _overallRemainingStockPiecesControllers = {};
+  final Map<String, TextEditingController> _overallNewStockGramControllers = {};
+  final Map<String, TextEditingController> _overallNewStockKgControllers = {};
+  final Map<String, TextEditingController> _overallNewStockLitreControllers = {};
+  final Map<String, TextEditingController> _overallNewStockPiecesControllers = {};
 
   final List<String> _months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -52,11 +65,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _selectedMonth = DateTime.now().month;
     _selectedDate = DateTime.now();
-    _selectedMonthOverall = DateTime.now().month;
-    _selectedDateOverall = DateTime.now();
     final usernameLower = widget.username.toLowerCase();
     _isAdmin = usernameLower == 'admin' || usernameLower == 'abinaya' || usernameLower == 'srisurya';
     _loadSectors();
@@ -73,6 +84,30 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       controller.dispose();
     }
     for (var controller in _overallNewStockControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallRemainingStockGramControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallRemainingStockKgControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallRemainingStockLitreControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallNewStockGramControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallNewStockKgControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallNewStockLitreControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallRemainingStockPiecesControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallNewStockPiecesControllers.values) {
       controller.dispose();
     }
     super.dispose();
@@ -171,6 +206,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             _dailyReasonControllers[key] = TextEditingController(
               text: item['reason']?.toString() ?? '',
             );
+            _dailyQuantityUnits[key] = item['unit']?.toString();
           }
         });
       }
@@ -188,21 +224,52 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   }
 
   Future<void> _loadOverallStock() async {
-    if (_selectedMonthOverall == null || _selectedDateOverall == null) return;
-    
     setState(() => _isLoading = true);
     try {
-      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDateOverall!);
       final stock = await ApiService.getOverallStock(
-        month: _selectedMonthOverall,
-        date: dateStr,
         sector: widget.selectedSector,
       );
       if (mounted) {
+        // Clear all controllers
         for (var controller in _overallNewStockControllers.values) {
           controller.dispose();
         }
+        for (var controller in _overallRemainingStockGramControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _overallRemainingStockKgControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _overallRemainingStockLitreControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _overallNewStockGramControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _overallNewStockKgControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _overallNewStockLitreControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _overallRemainingStockPiecesControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _overallNewStockPiecesControllers.values) {
+          controller.dispose();
+        }
+        
         _overallNewStockControllers.clear();
+        _overallNewStockUnits.clear();
+        _overallRemainingStockUnits.clear();
+        _overallRemainingStockGramControllers.clear();
+        _overallRemainingStockKgControllers.clear();
+        _overallRemainingStockLitreControllers.clear();
+        _overallRemainingStockPiecesControllers.clear();
+        _overallNewStockGramControllers.clear();
+        _overallNewStockKgControllers.clear();
+        _overallNewStockLitreControllers.clear();
+        _overallNewStockPiecesControllers.clear();
         
         final existingItemIds = stock.map((s) => s['item_id'] as int).toSet();
         final missingItems = _stockItems.where((item) => !existingItemIds.contains(item['id'] as int)).toList();
@@ -219,6 +286,14 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             'sector_name': sectorName,
             'remaining_stock': '0',
             'new_stock': '0',
+            'remaining_stock_gram': '0',
+            'remaining_stock_kg': '0',
+            'remaining_stock_litre': '0',
+            'remaining_stock_pieces': '0',
+            'new_stock_gram': '0',
+            'new_stock_kg': '0',
+            'new_stock_litre': '0',
+            'new_stock_pieces': '0',
           });
         }
         
@@ -231,6 +306,34 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             final key = '${itemId}_$id';
             _overallNewStockControllers[key] = TextEditingController(
               text: item['new_stock']?.toString() ?? '',
+            );
+            _overallNewStockUnits[key] = item['unit']?.toString();
+            _overallRemainingStockUnits[key] = item['unit']?.toString(); // Same unit for both
+            
+            // Initialize unit-specific controllers
+            _overallRemainingStockGramControllers[key] = TextEditingController(
+              text: item['remaining_stock_gram']?.toString() ?? '',
+            );
+            _overallRemainingStockKgControllers[key] = TextEditingController(
+              text: item['remaining_stock_kg']?.toString() ?? '',
+            );
+            _overallRemainingStockLitreControllers[key] = TextEditingController(
+              text: item['remaining_stock_litre']?.toString() ?? '',
+            );
+            _overallNewStockGramControllers[key] = TextEditingController(
+              text: item['new_stock_gram']?.toString() ?? '',
+            );
+            _overallNewStockKgControllers[key] = TextEditingController(
+              text: item['new_stock_kg']?.toString() ?? '',
+            );
+            _overallNewStockLitreControllers[key] = TextEditingController(
+              text: item['new_stock_litre']?.toString() ?? '',
+            );
+            _overallRemainingStockPiecesControllers[key] = TextEditingController(
+              text: item['remaining_stock_pieces']?.toString() ?? '',
+            );
+            _overallNewStockPiecesControllers[key] = TextEditingController(
+              text: item['new_stock_pieces']?.toString() ?? '',
             );
           }
         });
@@ -276,7 +379,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       setState(() {
         _selectedMonth = picked;
       });
+      // Only load daily stock if we're on the Daily Stock tab (index 1)
+      if (_tabController.index == 1) {
       _loadDailyStock();
+      }
     }
   }
 
@@ -292,57 +398,13 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       setState(() {
         _selectedDate = picked;
       });
+      // Only load daily stock if we're on the Daily Stock tab (index 1)
+      if (_tabController.index == 1) {
       _loadDailyStock();
     }
-  }
-
-  Future<void> _selectMonthOverall() async {
-    final int? picked = await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Month'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _months.length,
-            itemBuilder: (context, index) {
-              final monthNumber = index + 1;
-              final isSelected = monthNumber == _selectedMonthOverall;
-              return ListTile(
-                title: Text(_months[index]),
-                selected: isSelected,
-                onTap: () => Navigator.pop(context, monthNumber),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-
-    if (picked != null && mounted) {
-      setState(() {
-        _selectedMonthOverall = picked;
-      });
-      _loadOverallStock();
     }
   }
 
-  Future<void> _selectDateOverall() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDateOverall ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-
-    if (picked != null && mounted) {
-      setState(() {
-        _selectedDateOverall = picked;
-      });
-      _loadOverallStock();
-    }
-  }
 
   Future<void> _saveDailyStock() async {
     setState(() => _isLoading = true);
@@ -360,6 +422,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             'id': id == -1 ? null : id,
             'item_id': itemId,
             'quantity_taken': quantityController.text.trim(),
+            'unit': _dailyQuantityUnits[key],
             'reason': reasonController.text.trim(),
           });
         }
@@ -394,28 +457,53 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     setState(() => _isLoading = true);
     try {
       final updates = <Map<String, dynamic>>[];
-      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDateOverall!);
       for (var item in _overallStock) {
         final id = item['id'] as int;
         final itemId = item['item_id'] as int;
         final key = '${itemId}_$id';
-        final newStockController = _overallNewStockControllers[key];
         
-        if (newStockController != null) {
+        // Get only new stock values (remaining stock is auto-calculated)
+        final newGramController = _overallNewStockGramControllers[key];
+        final newKgController = _overallNewStockKgControllers[key];
+        final newLitreController = _overallNewStockLitreControllers[key];
+        final newPiecesController = _overallNewStockPiecesControllers[key];
+        
+        // Get values (empty string if controller doesn't exist or is empty)
+        final newGramValue = newGramController?.text.trim() ?? '';
+        final newKgValue = newKgController?.text.trim() ?? '';
+        final newLitreValue = newLitreController?.text.trim() ?? '';
+        final newPiecesValue = newPiecesController?.text.trim() ?? '';
+        
+        // Only add update if at least one column has a non-empty value
+        // You don't need to fill all columns - just fill the ones you need!
+        if (newGramValue.isNotEmpty || newKgValue.isNotEmpty || newLitreValue.isNotEmpty || newPiecesValue.isNotEmpty) {
           updates.add({
             'id': id == -1 ? null : id,
             'item_id': itemId,
-            'new_stock': newStockController.text.trim(),
+            'remaining_stock_gram': '', // Will be auto-calculated
+            'remaining_stock_kg': '', // Will be auto-calculated
+            'remaining_stock_litre': '', // Will be auto-calculated
+            'remaining_stock_pieces': '', // Will be auto-calculated
+            'new_stock_gram': newGramValue,
+            'new_stock_kg': newKgValue,
+            'new_stock_litre': newLitreValue,
+            'new_stock_pieces': newPiecesValue,
           });
         }
       }
       
-      await ApiService.updateOverallStock(updates, date: dateStr);
+      await ApiService.updateOverallStock(updates);
       if (mounted) {
         setState(() {
           _isEditModeOverall = false;
         });
-        _loadOverallStock();
+        // Add a delay to ensure database transaction is committed
+        await Future.delayed(const Duration(milliseconds: 500));
+        // Clear existing stock data to force reload
+        setState(() {
+          _overallStock = [];
+        });
+        await _loadOverallStock();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Overall stock updated successfully')),
         );
@@ -649,6 +737,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
+            Tab(text: 'Production'),
             Tab(text: 'Daily Stock'),
             Tab(text: 'Overall Stock'),
           ],
@@ -657,6 +746,72 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       body: TabBarView(
         controller: _tabController,
         children: [
+          // Production Tab
+          Column(
+            children: [
+              // Month and Date Selection
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                color: Colors.grey.shade100,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: _selectMonth,
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Select Month',
+                            prefixIcon: const Icon(Icons.calendar_month),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _selectedMonth != null ? _months[_selectedMonth! - 1] : 'Select Month',
+                            style: TextStyle(
+                              color: _selectedMonth != null ? Colors.black : Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: InkWell(
+                        onTap: _selectDate,
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Select Date',
+                            prefixIcon: const Icon(Icons.calendar_today),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _selectedDate != null
+                                ? _selectedDate!.toIso8601String().split('T')[0]
+                                : 'Select Date',
+                            style: TextStyle(
+                              color: _selectedDate != null ? Colors.black : Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Production Tab Content
+              Expanded(
+                child: ProductionTabContent(
+                  selectedSector: widget.selectedSector,
+                  selectedMonth: _selectedMonth,
+                  selectedDate: _selectedDate,
+                  isAdmin: _isAdmin,
+                ),
+              ),
+            ],
+          ),
           // Daily Stock Tab
           Column(
             children: [
@@ -727,6 +882,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: DataTable(
+                              columnSpacing: 12,
                               sortColumnIndex: widget.selectedSector == null ? 0 : null,
                               sortAscending: _sortAscendingDaily,
                               columns: [
@@ -752,6 +908,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                   const DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
                                 ],
                                 const DataColumn(label: Text('Quantity Taken', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Reason', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
                               rows: filteredDailyStock.map((record) {
@@ -775,13 +932,17 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                     DataCell(
                                       _isEditModeDaily
                                           ? SizedBox(
-                                              width: 100,
+                                              width: 90,
                                               child: TextField(
                                                 controller: quantityController,
-                                                keyboardType: TextInputType.number,
+                                                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                ],
                                                 decoration: const InputDecoration(
                                                   border: OutlineInputBorder(),
                                                   isDense: true,
+                                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                                 ),
                                               ),
                                             )
@@ -789,13 +950,45 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                     ),
                                     DataCell(
                                       _isEditModeDaily
+                                          ? ConstrainedBox(
+                                              constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
+                                              child: DropdownButtonFormField<String>(
+                                                value: _dailyQuantityUnits[key],
+                                                isDense: true,
+                                                isExpanded: true,
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  isDense: true,
+                                                  contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                                                ),
+                                                style: const TextStyle(fontSize: 11, color: Colors.black),
+                                                dropdownColor: Colors.white,
+                                                items: const [
+                                                  DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                  DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                  DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                  DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                  DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                ],
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _dailyQuantityUnits[key] = value;
+                                                  });
+                                                },
+                                              ),
+                                            )
+                                          : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
+                                    ),
+                                    DataCell(
+                                      _isEditModeDaily
                                           ? SizedBox(
-                                              width: 200,
+                                              width: 180,
                                               child: TextField(
                                                 controller: reasonController,
                                                 decoration: const InputDecoration(
                                                   border: OutlineInputBorder(),
                                                   isDense: true,
+                                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                                 ),
                                               ),
                                             )
@@ -853,44 +1046,11 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           // Overall Stock Tab
           Column(
             children: [
-              // Month and Date Selection
+              // Search Bar
               Container(
                 padding: const EdgeInsets.all(16),
                 color: Colors.grey.shade100,
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _selectMonthOverall,
-                            icon: const Icon(Icons.calendar_month),
-                            label: Text(_selectedMonthOverall != null ? _months[_selectedMonthOverall! - 1] : 'Select Month'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black87,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _selectDateOverall,
-                            icon: const Icon(Icons.date_range),
-                            label: Text(_selectedDateOverall != null
-                                ? DateFormat('dd/MM/yyyy').format(_selectedDateOverall!)
-                                : 'Select Date'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black87,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Search Bar
-                    TextField(
+                child: TextField(
                       decoration: InputDecoration(
                         hintText: 'Search by Item Name, Vehicle Type, or Part Number',
                         prefixIcon: const Icon(Icons.search),
@@ -905,8 +1065,6 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                           _searchQuery = value;
                         });
                       },
-                    ),
-                  ],
                 ),
               ),
               // Overall Stock Table
@@ -920,6 +1078,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: DataTable(
+                              columnSpacing: 12,
                               sortColumnIndex: widget.selectedSector == null ? 0 : null,
                               sortAscending: _sortAscendingOverall,
                               columns: [
@@ -944,14 +1103,91 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                   const DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
                                   const DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
                                 ],
-                                const DataColumn(label: Text('Remaining Stock', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('New Stock', style: TextStyle(fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('Remaining Stock\nin gram', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('Remaining Stock\nin kg', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('Remaining Stock\nin litre', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('Remaining Stock\nin pieces', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('New Stock\nin gram', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('New Stock\nin kg', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('New Stock\nin litre', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('New Stock\nin pieces', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
                               ],
                               rows: filteredOverallStock.map((record) {
                                 final id = record['id'] as int;
                                 final itemId = record['item_id'] as int;
                                 final key = '${itemId}_$id';
-                                final newStockController = _overallNewStockControllers[key];
                                 
                                 final itemSectorCode = record['sector_code']?.toString();
                                 final showVehicleForThisItem = _shouldShowVehicleFieldsForItem(itemSectorCode);
@@ -965,21 +1201,145 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                       DataCell(Text(showVehicleForThisItem ? (record['vehicle_type']?.toString() ?? '') : '')),
                                       DataCell(Text(showVehicleForThisItem ? (record['part_number']?.toString() ?? '') : '')),
                                     ],
-                                    DataCell(Text(record['remaining_stock']?.toString() ?? '0')),
+                                    // Remaining Stock in gram (read-only, auto-calculated)
                                     DataCell(
-                                      _isEditModeOverall
+                                      Container(
+                                        color: Colors.blue.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: Text(
+                                          record['remaining_stock_gram']?.toString() ?? '0',
+                                          style: const TextStyle(fontWeight: FontWeight.w500),
+                                        ),
+                                      ),
+                                    ),
+                                    // Remaining Stock in kg (read-only, auto-calculated)
+                                    DataCell(
+                                      Container(
+                                        color: Colors.blue.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: Text(
+                                          record['remaining_stock_kg']?.toString() ?? '0',
+                                          style: const TextStyle(fontWeight: FontWeight.w500),
+                                        ),
+                                      ),
+                                    ),
+                                    // Remaining Stock in litre (read-only, auto-calculated)
+                                    DataCell(
+                                      Container(
+                                        color: Colors.blue.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: Text(
+                                          record['remaining_stock_litre']?.toString() ?? '0',
+                                          style: const TextStyle(fontWeight: FontWeight.w500),
+                                        ),
+                                      ),
+                                    ),
+                                    // Remaining Stock in pieces (read-only, auto-calculated)
+                                    DataCell(
+                                      Container(
+                                        color: Colors.blue.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: Text(
+                                          record['remaining_stock_pieces']?.toString() ?? '0',
+                                          style: const TextStyle(fontWeight: FontWeight.w500),
+                                        ),
+                                      ),
+                                    ),
+                                    // New Stock in gram
+                                    DataCell(
+                                      Container(
+                                        color: Colors.green.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: _isEditModeOverall
                                           ? SizedBox(
-                                              width: 100,
+                                                width: 90,
                                               child: TextField(
-                                                controller: newStockController,
-                                                keyboardType: TextInputType.number,
+                                                  controller: _overallNewStockGramControllers[key],
+                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                  ],
                                                 decoration: const InputDecoration(
                                                   border: OutlineInputBorder(),
                                                   isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                                 ),
                                               ),
                                             )
-                                          : Text(record['new_stock']?.toString() ?? '0'),
+                                            : Text(record['new_stock_gram']?.toString() ?? '0'),
+                                      ),
+                                    ),
+                                    // New Stock in kg
+                                    DataCell(
+                                      Container(
+                                        color: Colors.green.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: _isEditModeOverall
+                                            ? SizedBox(
+                                                width: 90,
+                                                child: TextField(
+                                                  controller: _overallNewStockKgControllers[key],
+                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                  ],
+                                                  decoration: const InputDecoration(
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                  ),
+                                                ),
+                                              )
+                                            : Text(record['new_stock_kg']?.toString() ?? '0'),
+                                      ),
+                                    ),
+                                    // New Stock in litre
+                                    DataCell(
+                                      Container(
+                                        color: Colors.green.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: _isEditModeOverall
+                                            ? SizedBox(
+                                                width: 90,
+                                                child: TextField(
+                                                  controller: _overallNewStockLitreControllers[key],
+                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                  ],
+                                                  decoration: const InputDecoration(
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                  ),
+                                                ),
+                                              )
+                                            : Text(record['new_stock_litre']?.toString() ?? '0'),
+                                      ),
+                                    ),
+                                    // New Stock in pieces
+                                    DataCell(
+                                      Container(
+                                        color: Colors.green.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: _isEditModeOverall
+                                            ? SizedBox(
+                                                width: 90,
+                                                child: TextField(
+                                                  controller: _overallNewStockPiecesControllers[key],
+                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                  ],
+                                                  decoration: const InputDecoration(
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                  ),
+                                                ),
+                                              )
+                                            : Text(record['new_stock_pieces']?.toString() ?? '0'),
+                                      ),
                                     ),
                                   ],
                                 );

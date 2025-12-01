@@ -10,21 +10,21 @@ router.get('/version', (_req, res) => {
     // TODO: Update these values when releasing a new version
     // You can also read from a config file or environment variables
     const versionInfo = {
-      version: '1.0.10',  // Update this when releasing new version
-      buildNumber: '11',  // Update this when releasing new version
+      version: '1.0.12',  // Update this when releasing new version
+      buildNumber: '13',  // Update this when releasing new version
       platforms: {
         windows: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.10/Company360-Setup.exe',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.12/Company360-Setup.exe',
           isRequired: false,
         },
         android: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.10/company360-v1.0.10.apk',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.12/company360-v1.0.12.apk',
           isRequired: false,
         }
       },
-      releaseNotes: 'Added Daily Production and Stock Management page with Production tab, improved numeric field handling (accepts both string and integer), code refactoring and cleanup',
+      releaseNotes: 'Added color highlighting for main rows in credit details pages, improved UI for payment rows, and various bug fixes',
       isRequired: false,  // Set to true for critical security updates
-      releaseDate: '2025-01-16T00:00:00Z',
+      releaseDate: '2025-12-01T00:00:00Z',
     };
     
     res.json(versionInfo);

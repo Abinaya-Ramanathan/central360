@@ -34,7 +34,6 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
   bool _isAdmin = false;
   
   // Purchase Details Tab State
-  int? _selectedMonth;
   DateTime? _selectedDate;
   List<Map<String, dynamic>> _purchaseData = [];
   bool _isLoadingPurchase = false;
@@ -67,7 +66,6 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _isAdmin = AuthService.isAdmin;
-    _selectedMonth = DateTime.now().month;
     _selectedDate = DateTime.now();
     _loadSectors();
     _loadPurchaseData();
@@ -127,40 +125,6 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
     return sector.name;
   }
 
-  Future<void> _selectMonth() async {
-    final months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    final selected = await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Month'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: 12,
-            itemBuilder: (context, index) {
-              return ListTile(
-                title: Text(months[index]),
-                onTap: () => Navigator.pop(context, index + 1),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-    
-    if (selected != null) {
-      setState(() {
-        _selectedMonth = selected;
-      });
-      _loadPurchaseData();
-    }
-  }
-
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -178,13 +142,10 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
 
   Future<void> _loadPurchaseData() async {
     if (widget.selectedSector == null && !_isAdmin) return;
-    if (_selectedMonth == null || _selectedDate == null) return;
+    if (_selectedDate == null) return;
 
     setState(() => _isLoadingPurchase = true);
     try {
-      final monthStr = _selectedMonth.toString().padLeft(2, '0');
-      final year = _selectedDate!.year;
-      final monthParam = '$year-$monthStr';
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
 
       
@@ -193,18 +154,16 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
       final purchases = await ApiService.getCompanyPurchaseDetails(
         sector: widget.selectedSector,
         date: dateStr, // Filter by exact date - only show records from this date
-        month: monthParam,
       );
       
-      // If no purchases found with exact date match, try loading without date filter for the month
+      // If no purchases found with exact date match, try loading without date filter
       // This handles cases where date might have been saved with timezone offset
       if (purchases.isEmpty) {
-        final purchasesByMonth = await ApiService.getCompanyPurchaseDetails(
+        final allPurchases = await ApiService.getCompanyPurchaseDetails(
           sector: widget.selectedSector,
-          month: monthParam,
         );
         // Filter manually to include records within 1 day of selected date (timezone tolerance)
-        final filteredPurchases = purchasesByMonth.where((p) {
+        final filteredPurchases = allPurchases.where((p) {
           final purchaseDate = p['purchase_date']?.toString().split('T')[0].split(' ')[0] ?? '';
           return purchaseDate == dateStr;
         }).toList();
@@ -1437,45 +1396,12 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
   Widget _buildPurchaseDetailsTab() {
     return Column(
       children: [
-        // Month and Date Selection
+        // Date Selection
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.grey.shade100,
           child: Row(
             children: [
-              Expanded(
-                child: InkWell(
-                  onTap: _selectMonth,
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Select Month',
-                      prefixIcon: const Icon(Icons.calendar_month),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      _selectedMonth != null
-                          ? [
-                              'January',
-                              'February',
-                              'March',
-                              'April',
-                              'May',
-                              'June',
-                              'July',
-                              'August',
-                              'September',
-                              'October',
-                              'November',
-                              'December'
-                            ][_selectedMonth! - 1]
-                          : 'Select Month',
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
               Expanded(
                 child: InkWell(
                   onTap: _selectDate,
@@ -1900,26 +1826,35 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                                 const DataColumn(label: Text('Details', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
-                              rows: _filteredCreditData.expand((record) {
-                                final recordId = record['id'] as int;
-                                final credit = _parseDecimal(record['credit']); // Amount Pending = Credit value
-                                final purchaseDateRaw = record['purchase_date'];
-                                final purchaseDateFormatted = _formatDate(purchaseDateRaw);
-                                final photos = _creditPhotos[recordId] ?? <Map<String, dynamic>>[];
-                                final payments = _balancePayments[recordId] ?? [];
-                                final isAddingNewPayment = _addingNewPayment[recordId] == true;
-
-                                // Main row
-                                final List<DataRow> rows = [];
+                              rows: () {
+                                // First, generate all rows and calculate total
+                                final allRows = <DataRow>[];
+                                double totalOverallBalance = 0.0;
                                 
-                                // Calculate overall balance for main row (Amount Pending - sum of all payments)
-                                double totalPaid = 0;
-                                for (var payment in payments) {
-                                  totalPaid += _parseDecimal(payment['balance_paid']);
-                                }
-                                final mainOverallBalance = credit - totalPaid;
+                                final rowsFromData = _filteredCreditData.expand((record) {
+                                  final recordId = record['id'] as int;
+                                  final credit = _parseDecimal(record['credit']); // Amount Pending = Credit value
+                                  final purchaseDateRaw = record['purchase_date'];
+                                  final purchaseDateFormatted = _formatDate(purchaseDateRaw);
+                                  final photos = _creditPhotos[recordId] ?? <Map<String, dynamic>>[];
+                                  final payments = _balancePayments[recordId] ?? [];
+                                  final isAddingNewPayment = _addingNewPayment[recordId] == true;
+
+                                  // Main row
+                                  final List<DataRow> rows = [];
+                                  
+                                  // Calculate overall balance for main row (Amount Pending - sum of all payments)
+                                  double totalPaid = 0;
+                                  for (var payment in payments) {
+                                    totalPaid += _parseDecimal(payment['balance_paid']);
+                                  }
+                                  final mainOverallBalance = credit - totalPaid;
+                                  
+                                  // Add to total (only count main row's overall balance)
+                                  totalOverallBalance += mainOverallBalance;
                                 
                                 rows.add(DataRow(
+                                  color: WidgetStateProperty.all(Colors.blue.shade200),
                                   cells: [
                                     if (widget.selectedSector == null && _isAdmin)
                                       DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
@@ -2338,17 +2273,6 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                                   final newPaymentDate = _newPaymentDates[newKey];
                                   final newDetailsController = _newPaymentDetailsControllers[newKey] ?? TextEditingController();
                                   
-                                  // Calculate overall balance for new payment
-                                  double newOverallBalance;
-                                  final newBalancePaid = _parseDecimal(newPaymentController.text);
-                                  if (payments.isEmpty) {
-                                    newOverallBalance = credit - newBalancePaid;
-                                  } else {
-                                    final lastPayment = payments.last;
-                                    final lastOverallBalance = _parseDecimal(lastPayment['overall_balance']);
-                                    newOverallBalance = lastOverallBalance - newBalancePaid;
-                                  }
-                                  
                                   rows.add(DataRow(
                                     cells: [
                                       if (widget.selectedSector == null && _isAdmin)
@@ -2420,16 +2344,8 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                                           ),
                                         ),
                                       ),
-                                      // Overall Balance - calculated
-                                      DataCell(
-                                        Text(
-                                          '₹${newOverallBalance.toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: newOverallBalance > 0 ? Colors.red : Colors.green,
-                                          ),
-                                        ),
-                                      ),
+                                      // Overall Balance - empty (not displayed in new payment row)
+                                      const DataCell(SizedBox.shrink()),
                                       // Details - editable
                                       DataCell(
                                         SizedBox(
@@ -2476,7 +2392,56 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                                 }
                                 
                                 return rows;
-                              }).toList(),
+                              }).toList();
+                              
+                              // Add all data rows
+                              allRows.addAll(rowsFromData);
+                              
+                              // Add total row at the end
+                              if (_filteredCreditData.isNotEmpty) {
+                                allRows.add(DataRow(
+                                  color: WidgetStateProperty.all(Colors.blue.shade50),
+                                  cells: [
+                                    // Sector (if visible)
+                                    if (widget.selectedSector == null && _isAdmin)
+                                      const DataCell(Text('')),
+                                    // Item Name
+                                    const DataCell(Text('')),
+                                    // Shop Name
+                                    const DataCell(Text('')),
+                                    // Purchase Details
+                                    const DataCell(Text('')),
+                                    // Bill Image
+                                    const DataCell(Text('')),
+                                    // Amount Pending
+                                    const DataCell(Text('')),
+                                    // Credit Taken Date
+                                    const DataCell(Text('')),
+                                    // Balance Paid
+                                    const DataCell(Text('')),
+                                    // Balance Paid Date
+                                    const DataCell(Text('')),
+                                    // Overall Balance - Total
+                                    DataCell(
+                                      Text(
+                                        '₹${totalOverallBalance.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: totalOverallBalance > 0 ? Colors.red : Colors.green,
+                                        ),
+                                      ),
+                                    ),
+                                    // Details
+                                    const DataCell(Text('')),
+                                    // Action
+                                    const DataCell(Text('')),
+                                  ],
+                                ));
+                              }
+                              
+                              return allRows;
+                            }(),
                             ),
                           ),
                         ),

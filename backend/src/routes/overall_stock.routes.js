@@ -43,8 +43,8 @@ router.get('/', async (req, res) => {
 
     // Include all overall_stock columns in GROUP BY
     query += ` GROUP BY os.id, os.item_id, os.remaining_stock, os.new_stock, os.unit, 
-      os.remaining_stock_gram, os.remaining_stock_kg, os.remaining_stock_litre, os.remaining_stock_pieces,
-      os.new_stock_gram, os.new_stock_kg, os.new_stock_litre, os.new_stock_pieces,
+      os.remaining_stock_gram, os.remaining_stock_kg, os.remaining_stock_litre, os.remaining_stock_pieces, os.remaining_stock_boxes,
+      os.new_stock_gram, os.new_stock_kg, os.new_stock_litre, os.new_stock_pieces, os.new_stock_boxes,
       os.created_at, os.updated_at, os.new_stock_date,
       si.id, si.item_name, si.sector_code, si.vehicle_type, si.part_number, 
       s.code, s.name 
@@ -69,10 +69,12 @@ router.get('/', async (req, res) => {
         remaining_stock_kg: formatDecimal(row.remaining_stock_kg), // Format kg with decimals
         remaining_stock_litre: formatDecimal(row.remaining_stock_litre),
         remaining_stock_pieces: (row.remaining_stock_pieces ?? 0).toString(),
+        remaining_stock_boxes: (row.remaining_stock_boxes ?? 0).toString(),
         new_stock_gram: (row.new_stock_gram ?? 0).toString(),
         new_stock_kg: (row.new_stock_kg ?? 0).toString(),
         new_stock_litre: formatDecimal(row.new_stock_litre),
         new_stock_pieces: (row.new_stock_pieces ?? 0).toString(),
+        new_stock_boxes: (row.new_stock_boxes ?? 0).toString(),
       };
     });
     
@@ -132,10 +134,12 @@ router.put('/', async (req, res) => {
         remaining_stock_kg,
         remaining_stock_litre,
         remaining_stock_pieces,
+        remaining_stock_boxes,
         new_stock_gram,
         new_stock_kg,
         new_stock_litre,
         new_stock_pieces,
+        new_stock_boxes,
       } = update;
 
       // Get item_id - either from update or from existing record
@@ -158,10 +162,11 @@ router.put('/', async (req, res) => {
       const newGram = parseNumeric(new_stock_gram || '');
       const newKg = parseNumeric(new_stock_kg || '');
       const newLitre = parseNumeric(new_stock_litre || '');
-      const newPieces = parseNumeric(update.new_stock_pieces || '');
+      const newPieces = parseNumeric(new_stock_pieces || '');
+      const newBoxes = parseNumeric(new_stock_boxes || '');
       
       // If all new stock values are 0 or empty, skip this update
-      if (newGram === 0 && newKg === 0 && newLitre === 0 && newPieces === 0) {
+      if (newGram === 0 && newKg === 0 && newLitre === 0 && newPieces === 0 && newBoxes === 0) {
         continue;
       }
       
@@ -190,7 +195,12 @@ router.put('/', async (req, res) => {
             CASE WHEN quantity_taken LIKE '%/%' THEN
               CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
             ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_pieces
+          ELSE 0 END), 0) as total_pieces,
+          COALESCE(SUM(CASE WHEN unit = 'Boxes' THEN 
+            CASE WHEN quantity_taken LIKE '%/%' THEN
+              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
+            ELSE CAST(quantity_taken AS DECIMAL) END
+          ELSE 0 END), 0) as total_boxes
         FROM daily_stock 
         WHERE item_id = $1`,
         [finalItemId]
@@ -200,6 +210,7 @@ router.put('/', async (req, res) => {
       const totalTakenKg = parseNumeric(dailyStockQuery.rows[0]?.total_kg || '0');
       const totalTakenLitre = parseNumeric(dailyStockQuery.rows[0]?.total_litre || '0');
       const totalTakenPieces = parseNumeric(dailyStockQuery.rows[0]?.total_pieces || '0');
+      const totalTakenBoxes = parseNumeric(dailyStockQuery.rows[0]?.total_boxes || '0');
 
       // Convert everything to grams for unified calculation
       // 1 litre = 1000 gram (for ghee/liquids, assuming similar density to water)
@@ -222,6 +233,9 @@ router.put('/', async (req, res) => {
       // Calculate remaining pieces separately (pieces don't convert to gram/kg/litre)
       const remainingPieces = Math.max(0, newPieces - totalTakenPieces);
       
+      // Calculate remaining boxes separately (boxes don't convert to gram/kg/litre/pieces)
+      const remainingBoxes = Math.max(0, newBoxes - totalTakenBoxes);
+      
       // Example: 5 kg new stock - 250 gram taken = 4750 gram remaining
       // Display: 4750 gram, 4.75 kg, 4.75 litre
 
@@ -230,20 +244,22 @@ router.put('/', async (req, res) => {
       const result = await db.query(
         `INSERT INTO overall_stock (
           item_id, 
-          remaining_stock_gram, remaining_stock_kg, remaining_stock_litre, remaining_stock_pieces,
-          new_stock_gram, new_stock_kg, new_stock_litre, new_stock_pieces
+          remaining_stock_gram, remaining_stock_kg, remaining_stock_litre, remaining_stock_pieces, remaining_stock_boxes,
+          new_stock_gram, new_stock_kg, new_stock_litre, new_stock_pieces, new_stock_boxes
         ) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
          ON CONFLICT (item_id) 
          DO UPDATE SET 
            remaining_stock_gram = EXCLUDED.remaining_stock_gram,
            remaining_stock_kg = EXCLUDED.remaining_stock_kg,
            remaining_stock_litre = EXCLUDED.remaining_stock_litre,
            remaining_stock_pieces = EXCLUDED.remaining_stock_pieces,
+           remaining_stock_boxes = EXCLUDED.remaining_stock_boxes,
            new_stock_gram = EXCLUDED.new_stock_gram,
            new_stock_kg = EXCLUDED.new_stock_kg,
            new_stock_litre = EXCLUDED.new_stock_litre,
            new_stock_pieces = EXCLUDED.new_stock_pieces,
+           new_stock_boxes = EXCLUDED.new_stock_boxes,
            updated_at = CURRENT_TIMESTAMP
          RETURNING *`,
         [
@@ -252,10 +268,12 @@ router.put('/', async (req, res) => {
           remainingKg, // Store in kg with decimal (e.g., 4.75)
           remainingLitre, // Store in litre with decimal (e.g., 4.75)
           remainingPieces, // Store remaining pieces
+          remainingBoxes, // Store remaining boxes
           newGram,
           newKg,
           newLitre,
           newPieces,
+          newBoxes,
         ]
       );
       

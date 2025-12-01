@@ -454,39 +454,95 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                                           label: Text('Bulk Advance', style: TextStyle(fontWeight: FontWeight.bold)),
                                         ),
                                     ],
-                                    rows: _advanceDetails.map((detail) {
-                                      final bulkAdvance = (detail['bulk_advance'] as num?)?.toDouble() ?? 0.0;
+                                    rows: () {
+                                      // Calculate totals
+                                      double totalOutstandingAdvance = 0.0;
+                                      double totalBulkAdvance = 0.0;
                                       final showBulkColumn = _advanceDetails.any((d) => ((d['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01);
-                                      return DataRow(
+                                      
+                                      // Generate data rows and calculate totals
+                                      final dataRows = _advanceDetails.map((detail) {
+                                        final outstandingAdvance = (detail['outstanding_advance'] as num?)?.toDouble() ?? 0.0;
+                                        final bulkAdvance = (detail['bulk_advance'] as num?)?.toDouble() ?? 0.0;
+                                        
+                                        // Add to totals
+                                        totalOutstandingAdvance += outstandingAdvance;
+                                        totalBulkAdvance += bulkAdvance;
+                                        
+                                        return DataRow(
+                                          cells: [
+                                            if (widget.selectedSector == null && widget.isAdmin)
+                                              DataCell(Text(_getSectorName(detail['sector_code']?.toString()))),
+                                            DataCell(Text(detail['employee_name']?.toString() ?? 'N/A')),
+                                            DataCell(
+                                              Text(
+                                                '₹${outstandingAdvance.toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.red.shade700,
+                                                ),
+                                              ),
+                                            ),
+                                            // Only show Bulk Advance cell if column is shown
+                                            if (showBulkColumn)
+                                              DataCell(
+                                                Text(
+                                                  bulkAdvance > 0.01
+                                                      ? '₹${bulkAdvance.toStringAsFixed(2)}'
+                                                      : '₹0.00',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: bulkAdvance > 0.01 ? Colors.blue.shade700 : Colors.grey,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        );
+                                      }).toList();
+                                      
+                                      // Create total row
+                                      final totalRow = DataRow(
+                                        color: WidgetStateProperty.all(Colors.blue.shade50),
                                         cells: [
                                           if (widget.selectedSector == null && widget.isAdmin)
-                                            DataCell(Text(_getSectorName(detail['sector_code']?.toString()))),
-                                          DataCell(Text(detail['employee_name']?.toString() ?? 'N/A')),
-                                          DataCell(
+                                            const DataCell(Text('')),
+                                          const DataCell(
                                             Text(
-                                              '₹${(detail['outstanding_advance'] as num).toStringAsFixed(2)}',
+                                              'TOTAL',
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Text(
+                                              '₹${totalOutstandingAdvance.toStringAsFixed(2)}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
                                                 color: Colors.red.shade700,
                                               ),
                                             ),
                                           ),
-                                          // Only show Bulk Advance cell if column is shown
+                                          // Only show Bulk Advance total if column is shown
                                           if (showBulkColumn)
                                             DataCell(
                                               Text(
-                                                bulkAdvance > 0.01
-                                                    ? '₹${bulkAdvance.toStringAsFixed(2)}'
-                                                    : '₹0.00',
+                                                '₹${totalBulkAdvance.toStringAsFixed(2)}',
                                                 style: TextStyle(
                                                   fontWeight: FontWeight.bold,
-                                                  color: bulkAdvance > 0.01 ? Colors.blue.shade700 : Colors.grey,
+                                                  fontSize: 14,
+                                                  color: Colors.blue.shade700,
                                                 ),
                                               ),
                                             ),
                                         ],
                                       );
-                                    }).toList(),
+                                      
+                                      // Combine data rows and total row
+                                      return [...dataRows, totalRow];
+                                    }(),
                                   ),
                                 ),
                               ),

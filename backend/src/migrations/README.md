@@ -10,11 +10,11 @@ This directory contains the consolidated database migrations for the Central360 
 **Purpose**: Complete database schema with all tables in their final state.
 
 **Includes**:
-- All 15 tables (sectors, employees, attendance, salary_expenses, daily_production, products, daily_expenses, maintenance_issues, mahal_bookings, catering_details, expense_details, credit_details, vehicle_licenses, driver_licenses, engine_oil_services)
-- All columns and relationships
+- All 21 tables (sectors, employees, attendance, salary_expenses, daily_production, products, daily_expenses, maintenance_issues, mahal_bookings, catering_details, expense_details, credit_details, vehicle_licenses, driver_licenses, engine_oil_services, stock_items, daily_stock, overall_stock, sales_details, sales_balance_payments, company_purchase_details, company_purchase_balance_payments, maintenance_issue_photos, company_purchase_photos)
+- All columns and relationships including latest additions (boxes columns, unit columns, etc.)
 - All indexes for performance optimization
 - All constraints and foreign keys
-- Consolidates migrations 001-031
+- Consolidates migrations 001-047
 
 **Usage**: Run this file to create a fresh database with all tables.
 
@@ -26,6 +26,16 @@ This directory contains the consolidated database migrations for the Central360 
 - Any other required initial data
 
 **Usage**: Run after `001_complete_schema.sql` to populate default data.
+
+### 3. `003_consolidated_incremental_updates.sql`
+**Purpose**: Consolidated incremental updates for existing databases.
+
+**Includes**:
+- All changes from migrations 003-047
+- Safe to run on existing databases (uses IF NOT EXISTS checks)
+- Updates unit constraints, adds new tables and columns
+
+**Usage**: Run this file if you have an existing database that needs to be updated to the latest schema.
 
 ## Migration Script
 
@@ -42,7 +52,7 @@ node src/migrations/run_migration.js 001_complete_schema.sql
 
 ## Archived Migrations
 
-All historical migration files (001-031) have been archived in the `archive/` directory for reference. These are no longer needed for new installations but are kept for historical tracking.
+All historical migration files (001-031, and 003-047) have been archived in the `archive/` directory for reference. These are no longer needed for new installations but are kept for historical tracking.
 
 See `archive/README.md` for more details.
 
@@ -63,23 +73,28 @@ That's it! Your database is now set up with all tables, indexes, and default dat
 ## For Existing Databases
 
 If you have an existing database:
-- Your database should already be up to date
-- Individual migrations have already been applied
-- No action needed
+- Run `003_consolidated_incremental_updates.sql` to apply all incremental updates
+- This file is safe to run multiple times (uses IF NOT EXISTS checks)
+- It will update your database to match the latest schema
 
 ## Schema Changes
 
-All schema changes are now consolidated into `001_complete_schema.sql`. The file includes:
+All schema changes are now consolidated into:
+- `001_complete_schema.sql` - Complete schema for new installations
+- `003_consolidated_incremental_updates.sql` - Incremental updates for existing databases
+
+Both files include:
 - Table definitions
-- Column definitions with all recent additions
+- Column definitions with all recent additions (including boxes columns, unit columns, etc.)
 - Indexes for query performance
 - Foreign key relationships
-- Check constraints
+- Check constraints (including Boxes in unit constraints)
 
 ## Maintenance
 
 When adding new features:
 1. Update `001_complete_schema.sql` with new tables/columns
-2. Update this README if needed
-3. Document the changes in commit messages
+2. Update `003_consolidated_incremental_updates.sql` with incremental changes
+3. Update this README if needed
+4. Document the changes in commit messages
 

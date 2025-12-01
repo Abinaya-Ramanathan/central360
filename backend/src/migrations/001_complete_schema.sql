@@ -2,8 +2,8 @@
 -- Central360 Complete Database Schema
 -- ============================================
 -- This file contains all tables in their final state
--- Consolidates migrations 001-031 into a single schema
--- Last updated: Includes all features through migration 031
+-- Consolidates migrations 001-047 into a single schema
+-- Last updated: Includes all features through migration 047
 -- ============================================
 
 -- ============================================
@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS attendance (
   outstanding_advance DECIMAL(10, 2) DEFAULT 0,
   advance_taken DECIMAL(10, 2) DEFAULT 0,
   advance_paid DECIMAL(10, 2) DEFAULT 0,
+  bulk_advance_taken DECIMAL(10, 2) DEFAULT 0, -- Added in migration 036
+  bulk_advance_paid DECIMAL(10, 2) DEFAULT 0, -- Added in migration 036
+  bulk_advance DECIMAL(10, 2) DEFAULT 0, -- Added in migration 036
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(employee_id, date)
@@ -81,12 +84,15 @@ CREATE TABLE IF NOT EXISTS salary_expenses (
 CREATE TABLE IF NOT EXISTS daily_production (
   id SERIAL PRIMARY KEY,
   product_name VARCHAR(255) NOT NULL,
+  sector_code VARCHAR(50) REFERENCES sectors(code) ON DELETE CASCADE, -- Added in migration 042
   morning_production INTEGER NOT NULL DEFAULT 0,
   afternoon_production INTEGER NOT NULL DEFAULT 0,
   evening_production INTEGER NOT NULL DEFAULT 0,
+  unit VARCHAR(20) CHECK (unit IN ('gram', 'kg', 'Litre', 'pieces', 'Boxes') OR unit IS NULL), -- Added in migration 043, updated in 045, 046
   production_date DATE NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(product_name, sector_code, production_date) -- Updated in migration 042
 );
 
 -- ============================================
@@ -125,6 +131,7 @@ CREATE TABLE IF NOT EXISTS maintenance_issues (
   date_created DATE,
   status VARCHAR(20) DEFAULT 'Not resolved' CHECK (status IN ('Resolved', 'Not resolved')),
   date_resolved DATE,
+  image_url VARCHAR(500), -- Added in migration 032 for backward compatibility
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -336,6 +343,7 @@ CREATE TABLE IF NOT EXISTS daily_stock (
   item_id INTEGER NOT NULL REFERENCES stock_items(id) ON DELETE CASCADE,
   quantity_taken VARCHAR(255) DEFAULT '0',
   reason TEXT,
+  unit VARCHAR(20) CHECK (unit IN ('gram', 'kg', 'Litre', 'pieces', 'Boxes') OR unit IS NULL), -- Added in migration 043, updated in 045, 046
   stock_date DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -353,10 +361,142 @@ CREATE TABLE IF NOT EXISTS overall_stock (
   remaining_stock DECIMAL(10, 2) DEFAULT 0,
   new_stock DECIMAL(10, 2) DEFAULT 0,
   new_stock_date DATE,
+  unit VARCHAR(20) CHECK (unit IN ('gram', 'kg', 'Litre', 'pieces', 'Boxes') OR unit IS NULL), -- Added in migration 043, updated in 045, 046
+  -- Unit-specific columns for remaining stock
+  remaining_stock_gram DECIMAL(10, 2) DEFAULT 0, -- Added in migration 044
+  remaining_stock_kg DECIMAL(10, 2) DEFAULT 0, -- Added in migration 044
+  remaining_stock_litre DECIMAL(10, 2) DEFAULT 0, -- Added in migration 044
+  remaining_stock_pieces DECIMAL(10, 2) DEFAULT 0, -- Added in migration 045
+  remaining_stock_boxes DECIMAL(10, 2) DEFAULT 0, -- Added in migration 047
+  -- Unit-specific columns for new stock
+  new_stock_gram DECIMAL(10, 2) DEFAULT 0, -- Added in migration 044
+  new_stock_kg DECIMAL(10, 2) DEFAULT 0, -- Added in migration 044
+  new_stock_litre DECIMAL(10, 2) DEFAULT 0, -- Added in migration 044
+  new_stock_pieces DECIMAL(10, 2) DEFAULT 0, -- Added in migration 045
+  new_stock_boxes DECIMAL(10, 2) DEFAULT 0, -- Added in migration 047
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(item_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_overall_stock_item ON overall_stock(item_id);
+
+-- ============================================
+-- 16. SALES DETAILS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS sales_details (
+  id SERIAL PRIMARY KEY,
+  sector_code VARCHAR(50) NOT NULL REFERENCES sectors(code) ON DELETE RESTRICT,
+  name VARCHAR(255) NOT NULL,
+  contact_number VARCHAR(50),
+  address TEXT,
+  product_name VARCHAR(255) NOT NULL,
+  quantity VARCHAR(255) NOT NULL,
+  amount_received DECIMAL(10, 2) DEFAULT 0,
+  credit_amount DECIMAL(10, 2) DEFAULT 0,
+  amount_pending DECIMAL(10, 2) DEFAULT 0,
+  balance_paid DECIMAL(10, 2) DEFAULT 0, -- Added in migration 034
+  balance_paid_date DATE, -- Added in migration 035
+  details TEXT, -- Added in migration 041
+  sale_date DATE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_details_sector ON sales_details(sector_code);
+CREATE INDEX IF NOT EXISTS idx_sales_details_date ON sales_details(sale_date);
+CREATE INDEX IF NOT EXISTS idx_sales_details_name ON sales_details(name);
+CREATE INDEX IF NOT EXISTS idx_sales_details_credit ON sales_details(credit_amount) WHERE credit_amount > 0;
+
+-- ============================================
+-- 17. SALES BALANCE PAYMENTS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS sales_balance_payments (
+  id SERIAL PRIMARY KEY,
+  sale_id INTEGER NOT NULL REFERENCES sales_details(id) ON DELETE CASCADE,
+  balance_paid DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  balance_paid_date DATE,
+  details TEXT,
+  overall_balance DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_balance_payments_sale ON sales_balance_payments(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sales_balance_payments_date ON sales_balance_payments(balance_paid_date);
+
+-- ============================================
+-- 18. COMPANY PURCHASE DETAILS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS company_purchase_details (
+  id SERIAL PRIMARY KEY,
+  sector_code VARCHAR(50) NOT NULL REFERENCES sectors(code) ON DELETE RESTRICT,
+  name VARCHAR(255),
+  contact_number VARCHAR(50),
+  address TEXT,
+  product_name VARCHAR(255),
+  quantity VARCHAR(255),
+  amount_received DECIMAL(10, 2) DEFAULT 0,
+  credit_amount DECIMAL(10, 2) DEFAULT 0,
+  amount_pending DECIMAL(10, 2) DEFAULT 0,
+  balance_paid DECIMAL(10, 2) DEFAULT 0,
+  balance_paid_date DATE,
+  purchase_date DATE,
+  -- Additional columns from migration 038
+  item_name VARCHAR(255),
+  shop_name VARCHAR(255),
+  purchase_details TEXT,
+  purchase_amount DECIMAL(10, 2) DEFAULT 0,
+  amount_paid DECIMAL(10, 2) DEFAULT 0,
+  credit DECIMAL(10, 2) DEFAULT 0,
+  details TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_company_purchase_details_sector ON company_purchase_details(sector_code);
+CREATE INDEX IF NOT EXISTS idx_company_purchase_details_date ON company_purchase_details(purchase_date);
+CREATE INDEX IF NOT EXISTS idx_company_purchase_details_name ON company_purchase_details(name);
+CREATE INDEX IF NOT EXISTS idx_company_purchase_details_credit ON company_purchase_details(credit_amount) WHERE credit_amount > 0;
+
+-- ============================================
+-- 19. COMPANY PURCHASE BALANCE PAYMENTS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS company_purchase_balance_payments (
+  id SERIAL PRIMARY KEY,
+  purchase_id INTEGER NOT NULL REFERENCES company_purchase_details(id) ON DELETE CASCADE,
+  balance_paid DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  balance_paid_date DATE,
+  details TEXT,
+  overall_balance DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_balance_payments_purchase ON company_purchase_balance_payments(purchase_id);
+CREATE INDEX IF NOT EXISTS idx_balance_payments_date ON company_purchase_balance_payments(balance_paid_date);
+
+-- ============================================
+-- 20. MAINTENANCE ISSUE PHOTOS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS maintenance_issue_photos (
+  id SERIAL PRIMARY KEY,
+  issue_id INTEGER NOT NULL REFERENCES maintenance_issues(id) ON DELETE CASCADE,
+  image_url VARCHAR(500) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_issue_photos_issue ON maintenance_issue_photos(issue_id);
+
+-- ============================================
+-- 21. COMPANY PURCHASE PHOTOS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS company_purchase_photos (
+  id SERIAL PRIMARY KEY,
+  purchase_id INTEGER NOT NULL REFERENCES company_purchase_details(id) ON DELETE CASCADE,
+  image_url VARCHAR(500) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_company_purchase_photos_purchase ON company_purchase_photos(purchase_id);
 

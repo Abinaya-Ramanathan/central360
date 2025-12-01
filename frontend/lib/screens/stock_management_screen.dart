@@ -52,10 +52,12 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   final Map<String, TextEditingController> _overallRemainingStockKgControllers = {};
   final Map<String, TextEditingController> _overallRemainingStockLitreControllers = {};
   final Map<String, TextEditingController> _overallRemainingStockPiecesControllers = {};
+  final Map<String, TextEditingController> _overallRemainingStockBoxesControllers = {};
   final Map<String, TextEditingController> _overallNewStockGramControllers = {};
   final Map<String, TextEditingController> _overallNewStockKgControllers = {};
   final Map<String, TextEditingController> _overallNewStockLitreControllers = {};
   final Map<String, TextEditingController> _overallNewStockPiecesControllers = {};
+  final Map<String, TextEditingController> _overallNewStockBoxesControllers = {};
 
   final List<String> _months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -107,7 +109,13 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     for (var controller in _overallRemainingStockPiecesControllers.values) {
       controller.dispose();
     }
+    for (var controller in _overallRemainingStockBoxesControllers.values) {
+      controller.dispose();
+    }
     for (var controller in _overallNewStockPiecesControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _overallNewStockBoxesControllers.values) {
       controller.dispose();
     }
     super.dispose();
@@ -255,7 +263,13 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         for (var controller in _overallRemainingStockPiecesControllers.values) {
           controller.dispose();
         }
+        for (var controller in _overallRemainingStockBoxesControllers.values) {
+          controller.dispose();
+        }
         for (var controller in _overallNewStockPiecesControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _overallNewStockBoxesControllers.values) {
           controller.dispose();
         }
         
@@ -266,10 +280,12 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         _overallRemainingStockKgControllers.clear();
         _overallRemainingStockLitreControllers.clear();
         _overallRemainingStockPiecesControllers.clear();
+        _overallRemainingStockBoxesControllers.clear();
         _overallNewStockGramControllers.clear();
         _overallNewStockKgControllers.clear();
         _overallNewStockLitreControllers.clear();
         _overallNewStockPiecesControllers.clear();
+        _overallNewStockBoxesControllers.clear();
         
         final existingItemIds = stock.map((s) => s['item_id'] as int).toSet();
         final missingItems = _stockItems.where((item) => !existingItemIds.contains(item['id'] as int)).toList();
@@ -290,10 +306,12 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             'remaining_stock_kg': '0',
             'remaining_stock_litre': '0',
             'remaining_stock_pieces': '0',
+            'remaining_stock_boxes': '0',
             'new_stock_gram': '0',
             'new_stock_kg': '0',
             'new_stock_litre': '0',
             'new_stock_pieces': '0',
+            'new_stock_boxes': '0',
           });
         }
         
@@ -332,8 +350,14 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             _overallRemainingStockPiecesControllers[key] = TextEditingController(
               text: item['remaining_stock_pieces']?.toString() ?? '',
             );
+            _overallRemainingStockBoxesControllers[key] = TextEditingController(
+              text: item['remaining_stock_boxes']?.toString() ?? '',
+            );
             _overallNewStockPiecesControllers[key] = TextEditingController(
               text: item['new_stock_pieces']?.toString() ?? '',
+            );
+            _overallNewStockBoxesControllers[key] = TextEditingController(
+              text: item['new_stock_boxes']?.toString() ?? '',
             );
           }
         });
@@ -467,16 +491,18 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         final newKgController = _overallNewStockKgControllers[key];
         final newLitreController = _overallNewStockLitreControllers[key];
         final newPiecesController = _overallNewStockPiecesControllers[key];
+        final newBoxesController = _overallNewStockBoxesControllers[key];
         
         // Get values (empty string if controller doesn't exist or is empty)
         final newGramValue = newGramController?.text.trim() ?? '';
         final newKgValue = newKgController?.text.trim() ?? '';
         final newLitreValue = newLitreController?.text.trim() ?? '';
         final newPiecesValue = newPiecesController?.text.trim() ?? '';
+        final newBoxesValue = newBoxesController?.text.trim() ?? '';
         
         // Only add update if at least one column has a non-empty value
         // You don't need to fill all columns - just fill the ones you need!
-        if (newGramValue.isNotEmpty || newKgValue.isNotEmpty || newLitreValue.isNotEmpty || newPiecesValue.isNotEmpty) {
+        if (newGramValue.isNotEmpty || newKgValue.isNotEmpty || newLitreValue.isNotEmpty || newPiecesValue.isNotEmpty || newBoxesValue.isNotEmpty) {
           updates.add({
             'id': id == -1 ? null : id,
             'item_id': itemId,
@@ -484,10 +510,12 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             'remaining_stock_kg': '', // Will be auto-calculated
             'remaining_stock_litre': '', // Will be auto-calculated
             'remaining_stock_pieces': '', // Will be auto-calculated
+            'remaining_stock_boxes': '', // Will be auto-calculated
             'new_stock_gram': newGramValue,
             'new_stock_kg': newKgValue,
             'new_stock_litre': newLitreValue,
             'new_stock_pieces': newPiecesValue,
+            'new_stock_boxes': newBoxesValue,
           });
         }
       }
@@ -969,6 +997,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                                   DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
                                                   DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
                                                   DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                  DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 11, color: Colors.black))),
                                                 ],
                                                 onChanged: (value) {
                                                   setState(() {
@@ -1147,6 +1176,16 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                   label: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
+                                      color: Colors.blue.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('Remaining Stock\nin Boxes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
                                       color: Colors.green.shade100,
                                       borderRadius: BorderRadius.circular(4),
                                     ),
@@ -1181,6 +1220,16 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: const Text('New Stock\nin pieces', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('New Stock\nin Boxes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                                   ),
                                 ),
                               ],
@@ -1241,6 +1290,17 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                         child: Text(
                                           record['remaining_stock_pieces']?.toString() ?? '0',
+                                          style: const TextStyle(fontWeight: FontWeight.w500),
+                                        ),
+                                      ),
+                                    ),
+                                    // Remaining Stock in Boxes (read-only, auto-calculated)
+                                    DataCell(
+                                      Container(
+                                        color: Colors.blue.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: Text(
+                                          record['remaining_stock_boxes']?.toString() ?? '0',
                                           style: const TextStyle(fontWeight: FontWeight.w500),
                                         ),
                                       ),
@@ -1339,6 +1399,30 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                                 ),
                                               )
                                             : Text(record['new_stock_pieces']?.toString() ?? '0'),
+                                      ),
+                                    ),
+                                    // New Stock in Boxes
+                                    DataCell(
+                                      Container(
+                                        color: Colors.green.shade50,
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: _isEditModeOverall
+                                            ? SizedBox(
+                                                width: 90,
+                                                child: TextField(
+                                                  controller: _overallNewStockBoxesControllers[key],
+                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                  ],
+                                                  decoration: const InputDecoration(
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                  ),
+                                                ),
+                                              )
+                                            : Text(record['new_stock_boxes']?.toString() ?? '0'),
                                       ),
                                     ),
                                   ],

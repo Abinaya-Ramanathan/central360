@@ -1071,6 +1071,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                                   final isEditMode = _editMode[index] == true;
 
                                   return DataRow(
+                                    color: WidgetStateProperty.all(Colors.blue.shade200),
                                     cells: [
                                       if (widget.selectedSector == null && _isAdmin)
                                         DataCell(Text(_getSectorName(record['sector_code']?.toString()))),

@@ -30,7 +30,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   bool _isAdmin = false;
   
   // Sales Details Tab State
-  int? _selectedMonth;
   DateTime? _selectedDate;
   List<Map<String, dynamic>> _salesData = [];
   bool _isLoadingSales = false;
@@ -60,7 +59,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _isAdmin = AuthService.isAdmin;
-    _selectedMonth = DateTime.now().month;
     _selectedDate = DateTime.now();
     _loadSectors();
     _loadSalesData();
@@ -120,40 +118,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     return sector.name;
   }
 
-  Future<void> _selectMonth() async {
-    final months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    final selected = await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Month'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: 12,
-            itemBuilder: (context, index) {
-              return ListTile(
-                title: Text(months[index]),
-                onTap: () => Navigator.pop(context, index + 1),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-    
-    if (selected != null) {
-      setState(() {
-        _selectedMonth = selected;
-      });
-      _loadSalesData();
-    }
-  }
-
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -171,20 +135,16 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
 
   Future<void> _loadSalesData() async {
     if (widget.selectedSector == null && !_isAdmin) return;
-    if (_selectedMonth == null || _selectedDate == null) return;
+    if (_selectedDate == null) return;
 
     setState(() => _isLoadingSales = true);
     try {
-      final monthStr = _selectedMonth.toString().padLeft(2, '0');
-      final year = _selectedDate!.year;
-      final monthParam = '$year-$monthStr';
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
 
       
       final sales = await ApiService.getSalesDetails(
         sector: widget.selectedSector,
         date: dateStr, // Filter by exact date - only show records from this date
-        month: monthParam,
       );
       
 
@@ -1202,45 +1162,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   Widget _buildSalesDetailsTab() {
     return Column(
       children: [
-        // Month and Date Selection
+        // Date Selection
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.grey.shade100,
           child: Row(
             children: [
-              Expanded(
-                child: InkWell(
-                  onTap: _selectMonth,
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Select Month',
-                      prefixIcon: const Icon(Icons.calendar_month),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      _selectedMonth != null
-                          ? [
-                              'January',
-                              'February',
-                              'March',
-                              'April',
-                              'May',
-                              'June',
-                              'July',
-                              'August',
-                              'September',
-                              'October',
-                              'November',
-                              'December'
-                            ][_selectedMonth! - 1]
-                          : 'Select Month',
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
               Expanded(
                 child: InkWell(
                   onTap: _selectDate,
@@ -1654,25 +1581,39 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 const DataColumn(label: Text('Details', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
-                              rows: _filteredCreditData.expand((record) {
-                                final recordId = record['id'] as int;
-                                final amountPending = _parseDecimal(record['amount_pending']);
-                                final saleDateRaw = record['sale_date'];
-                                final saleDateFormatted = _formatDate(saleDateRaw);
-                                final payments = _balancePayments[recordId] ?? [];
-                                final isAddingNewPayment = _addingNewPayment[recordId] == true;
-
-                                // Main row
-                                final List<DataRow> rows = [];
+                              rows: () {
+                                // First, generate all rows and calculate totals
+                                final allRows = <DataRow>[];
+                                double totalOverallBalance = 0.0;
                                 
-                                // Calculate overall balance for main row (Amount Pending - sum of all payments)
-                                double totalPaid = 0;
-                                for (var payment in payments) {
-                                  totalPaid += _parseDecimal(payment['balance_paid']);
-                                }
-                                final mainOverallBalance = amountPending - totalPaid;
+                                final rowsFromData = _filteredCreditData.expand((record) {
+                                  final recordId = record['id'] as int;
+                                  final amountPending = _parseDecimal(record['amount_pending']);
+                                  final saleDateRaw = record['sale_date'];
+                                  final saleDateFormatted = _formatDate(saleDateRaw);
+                                  final payments = _balancePayments[recordId] ?? [];
+                                  final isAddingNewPayment = _addingNewPayment[recordId] == true;
+
+                                  // Main row
+                                  final List<DataRow> rows = [];
+                                  
+                                  // Calculate overall balance for main row (Amount Pending - sum of all payments)
+                                  double totalPaid = 0;
+                                  for (var payment in payments) {
+                                    totalPaid += _parseDecimal(payment['balance_paid']);
+                                  }
+                                  double mainOverallBalance = amountPending - totalPaid;
+                                  
+                                  // If in edit mode, calculate based on controller value
+                                  if (_editModeCredit[recordId] == true && _balancePaidControllers.containsKey(recordId)) {
+                                    mainOverallBalance = amountPending - _parseDecimal(_balancePaidControllers[recordId]!.text);
+                                  }
+                                  
+                                  // Add to total overall balance (sum of all overall balances across all records)
+                                  totalOverallBalance += mainOverallBalance;
                                 
                                 rows.add(DataRow(
+                                  color: WidgetStateProperty.all(Colors.blue.shade200),
                                   cells: [
                                     if (widget.selectedSector == null && _isAdmin)
                                       DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
@@ -2070,17 +2011,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                   final newPaymentDate = _newPaymentDates[newKey];
                                   final newDetailsController = _newPaymentDetailsControllers[newKey] ?? TextEditingController();
                                   
-                                  // Calculate overall balance for new payment
-                                  double newOverallBalance;
-                                  final newBalancePaid = _parseDecimal(newPaymentController.text);
-                                  if (payments.isEmpty) {
-                                    newOverallBalance = amountPending - newBalancePaid;
-                                  } else {
-                                    final lastPayment = payments.last;
-                                    final lastOverallBalance = _parseDecimal(lastPayment['overall_balance']);
-                                    newOverallBalance = lastOverallBalance - newBalancePaid;
-                                  }
-                                  
                                   rows.add(DataRow(
                                     cells: [
                                       if (widget.selectedSector == null && _isAdmin)
@@ -2153,16 +2083,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                           ),
                                         ),
                                       ),
-                                      // Overall Balance - calculated
-                                      DataCell(
-                                        Text(
-                                          '₹${newOverallBalance.toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: newOverallBalance > 0 ? Colors.red : Colors.green,
-                                          ),
-                                        ),
-                                      ),
+                                      // Overall Balance - empty (not displayed in new payment row)
+                                      const DataCell(SizedBox.shrink()),
                                       // Details - editable
                                       DataCell(
                                         SizedBox(
@@ -2208,8 +2130,67 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                   }
                                 }
                                 
-                                return rows;
-                              }).toList(),
+                                  return rows;
+                                }).toList();
+                                
+                                // Add all data rows
+                                allRows.addAll(rowsFromData);
+                                
+                                // Add total row at the end
+                                if (_filteredCreditData.isNotEmpty) {
+                                  allRows.add(DataRow(
+                                    color: WidgetStateProperty.all(Colors.blue.shade50),
+                                    cells: [
+                                      // Sector (if visible)
+                                      if (widget.selectedSector == null && _isAdmin)
+                                        const DataCell(Text('')),
+                                      // Name
+                                      const DataCell(
+                                        Text(
+                                          'TOTAL',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      // Contact Number - empty
+                                      const DataCell(Text('')),
+                                      // Address - empty
+                                      const DataCell(Text('')),
+                                      // Product Name - empty
+                                      const DataCell(Text('')),
+                                      // Quantity - empty
+                                      const DataCell(Text('')),
+                                      // Amount Pending - empty
+                                      const DataCell(Text('')),
+                                      // Credit Taken Date - empty
+                                      const DataCell(Text('')),
+                                      // Balance Paid - empty
+                                      const DataCell(Text('')),
+                                      // Balance Paid Date - empty
+                                      const DataCell(Text('')),
+                                      // Overall Balance - Total
+                                      DataCell(
+                                        Text(
+                                          '₹${totalOverallBalance.toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: totalOverallBalance > 0 ? Colors.red : Colors.green,
+                                          ),
+                                        ),
+                                      ),
+                                      // Details - empty
+                                      const DataCell(Text('')),
+                                      // Action - empty
+                                      const DataCell(Text('')),
+                                    ],
+                                  ));
+                                }
+                                
+                                return allRows;
+                              }(),
                             ),
                           ),
                         ),

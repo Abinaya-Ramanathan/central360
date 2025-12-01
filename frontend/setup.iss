@@ -1,7 +1,7 @@
 [Setup]
 ; App information
 AppName=Company360
-AppVersion=1.0.11
+AppVersion=1.0.12
 AppPublisher=Company360
 AppPublisherURL=
 AppSupportURL=
@@ -20,7 +20,7 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 UninstallDisplayIcon={app}\company360.exe
-VersionInfoVersion=1.0.11.12
+VersionInfoVersion=1.0.12.13
 VersionInfoCompany=Company360
 VersionInfoDescription=Company360 - Comprehensive Business Management Application
 VersionInfoCopyright=Copyright (C) 2024 Company360

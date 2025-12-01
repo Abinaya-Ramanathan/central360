@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'employee_details_screen.dart';
-import 'daily_expense_without_credit_screen.dart';
 import 'maintenance_issue_screen.dart';
 import 'mahal_booking_screen.dart';
 import 'sales_credit_details_screen.dart';
@@ -366,38 +365,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.green.shade700,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Daily Report Details - available for all users
-                              // Daily Expense without Credit Details
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => DailyExpenseWithoutCreditScreen(
-                                          username: widget.username,
-                                          selectedSector: _selectedSector,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.receipt_long),
-                                  label: const Text(
-                                    'Daily Expense without Credit Details',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.purple.shade700,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),

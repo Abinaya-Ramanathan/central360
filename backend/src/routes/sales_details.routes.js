@@ -109,6 +109,7 @@ router.post('/', async (req, res) => {
       balance_paid,
       balance_paid_date,
       sale_date,
+      details,
     } = req.body;
 
     if (!sector_code || !name || !product_name || !quantity || !sale_date) {

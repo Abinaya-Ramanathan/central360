@@ -20,7 +20,9 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
   int? _selectedMonth;
   List<DateTime> _selectedDates = [];
   List<Employee> _employees = [];
-  Map<String, int> _presentDaysCount = {}; // Map of employee_id to present days count
+  Map<String, double> _presentDaysCount = {}; // Map of employee_id to present days count (supports 0.5 for halfday)
+  List<Map<String, dynamic>> _rentVehicles = [];
+  Map<int, double> _rentVehiclePresentDaysCount = {}; // Map of vehicle_id to present days count (supports 0.5 for halfday)
   bool _isLoading = false;
 
   @override
@@ -29,9 +31,54 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
     _selectedMonth = DateTime.now().month;
     if (widget.selectedSector != null || widget.isAdmin) {
       _loadEmployees();
+      _loadRentVehicles();
     }
   }
 
+  @override
+  void didUpdateWidget(PresentDaysCountTabContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload employees and vehicles when sector changes
+    if (widget.selectedSector != oldWidget.selectedSector || widget.isAdmin != oldWidget.isAdmin) {
+      if (widget.selectedSector != null || widget.isAdmin) {
+        _loadEmployees();
+        _loadRentVehicles();
+      } else {
+        // Clear data if no sector selected
+        setState(() {
+          _employees = [];
+          _rentVehicles = [];
+          _presentDaysCount = {};
+          _rentVehiclePresentDaysCount = {};
+        });
+      }
+    }
+  }
+
+
+  Future<void> _loadRentVehicles() async {
+    try {
+      List<Map<String, dynamic>> vehicles;
+      if (widget.selectedSector == null && widget.isAdmin) {
+        vehicles = await ApiService.getRentVehicles();
+      } else if (widget.selectedSector != null) {
+        vehicles = await ApiService.getRentVehicles(sector: widget.selectedSector);
+      } else {
+        vehicles = [];
+      }
+
+      if (mounted) {
+        setState(() {
+          _rentVehicles = vehicles;
+          _rentVehiclePresentDaysCount = {for (var vehicle in vehicles) vehicle['id'] as int: 0};
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        // Silently fail
+      }
+    }
+  }
 
   Future<void> _loadEmployees() async {
     setState(() => _isLoading = true);
@@ -101,7 +148,8 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
       setState(() {
         _selectedMonth = picked;
         _selectedDates = []; // Clear selected dates when month changes
-        _presentDaysCount = {for (var emp in _employees) emp.id: 0}; // Reset counts
+        _presentDaysCount = {for (var emp in _employees) emp.id: 0.0}; // Reset counts
+        _rentVehiclePresentDaysCount = {for (var vehicle in _rentVehicles) vehicle['id'] as int: 0.0}; // Reset rent vehicle counts
       });
     }
   }
@@ -145,32 +193,86 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
   }
 
   Future<void> _calculatePresentDaysCount() async {
-    if (_selectedDates.isEmpty || _employees.isEmpty) {
+    if (_selectedDates.isEmpty) {
+      return;
+    }
+
+    // Ensure employees and vehicles are loaded before calculating
+    if (_employees.isEmpty && (widget.selectedSector != null || widget.isAdmin)) {
+      await _loadEmployees();
+    }
+    if (_rentVehicles.isEmpty && (widget.selectedSector != null || widget.isAdmin)) {
+      await _loadRentVehicles();
+    }
+
+    if (_employees.isEmpty && _rentVehicles.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No employees or vehicles found for the selected sector'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
       return;
     }
 
     setState(() => _isLoading = true);
     try {
       // Initialize all counts to 0
-      _presentDaysCount = {for (var emp in _employees) emp.id: 0};
+      _presentDaysCount = {for (var emp in _employees) emp.id: 0.0};
+      _rentVehiclePresentDaysCount = {for (var vehicle in _rentVehicles) vehicle['id'] as int: 0.0};
 
       // Query attendance for each selected date
       for (var date in _selectedDates) {
         final dateStr = date.toIso8601String().split('T')[0];
         
         try {
+          // Get employee attendance
           final attendanceRecords = await ApiService.getAttendance(
             sector: widget.selectedSector,
             date: dateStr,
           );
 
-          // Count "present" status for each employee
+          // Count status for each employee (Present=1, Absent=0, Halfday=0.5)
           for (var record in attendanceRecords) {
             final empId = record['employee_id']?.toString();
             final status = record['status']?.toString().toLowerCase();
             
-            if (empId != null && status == 'present') {
-              _presentDaysCount[empId] = (_presentDaysCount[empId] ?? 0) + 1;
+            if (empId != null && status != null) {
+              double count = 0.0;
+              if (status == 'present') {
+                count = 1.0;
+              } else if (status == 'halfday') {
+                count = 0.5;
+              } else if (status == 'absent') {
+                count = 0.0;
+              }
+              _presentDaysCount[empId] = (_presentDaysCount[empId] ?? 0.0) + count;
+            }
+          }
+
+          // Get rent vehicle attendance
+          final rentVehicleAttendance = await ApiService.getRentVehicleAttendance(
+            sector: widget.selectedSector,
+            date: dateStr,
+          );
+
+          // Count status for each rent vehicle (Present=1, Absent=0, Halfday=0.5)
+          for (var record in rentVehicleAttendance) {
+            final vehicleId = record['vehicle_id'] as int?;
+            final status = record['status']?.toString().toLowerCase();
+            
+            if (vehicleId != null && status != null) {
+              double count = 0.0;
+              if (status == 'present') {
+                count = 1.0;
+              } else if (status == 'halfday') {
+                count = 0.5;
+              } else if (status == 'absent') {
+                count = 0.0;
+              }
+              _rentVehiclePresentDaysCount[vehicleId] = (_rentVehiclePresentDaysCount[vehicleId] ?? 0.0) + count;
             }
           }
         } catch (e) {
@@ -274,10 +376,10 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _employees.isEmpty
+              : (_employees.isEmpty && _rentVehicles.isEmpty)
                   ? const Center(
                       child: Text(
-                        'No employees in selected sector',
+                        'No employees or rent vehicles in selected sector',
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
@@ -286,35 +388,79 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                       child: SingleChildScrollView(
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          child: Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: DataTable(
-                              headingRowColor: WidgetStateProperty.all(Colors.green.shade100),
-                              columns: const [
-                                DataColumn(label: Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Employees Table
+                              if (_employees.isNotEmpty)
+                                Card(
+                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: DataTable(
+                                    headingRowColor: WidgetStateProperty.all(Colors.green.shade100),
+                                    columns: const [
+                                      DataColumn(label: Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                      DataColumn(label: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    ],
+                                    rows: _employees.map((employee) {
+                                      final presentDays = _presentDaysCount[employee.id] ?? 0;
+                                      return DataRow(
+                                        cells: [
+                                          DataCell(Text(employee.name)),
+                                          DataCell(
+                                            Text(
+                                              presentDays.toString(),
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: presentDays > 0 ? Colors.green.shade700 : Colors.grey,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              // Rent Vehicles Table
+                              if (_rentVehicles.isNotEmpty) ...[
+                                const SizedBox(height: 16),
+                                Card(
+                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: DataTable(
+                                    headingRowColor: WidgetStateProperty.all(Colors.teal.shade100),
+                                    columns: const [
+                                      DataColumn(label: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                      DataColumn(label: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    ],
+                                    rows: _rentVehicles.map((vehicle) {
+                                      final vehicleId = vehicle['id'] as int;
+                                      final presentDays = _rentVehiclePresentDaysCount[vehicleId] ?? 0.0;
+                                      return DataRow(
+                                        cells: [
+                                          DataCell(Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
+                                          DataCell(
+                                            Text(
+                                              presentDays == presentDays.toInt() 
+                                                  ? presentDays.toInt().toString()
+                                                  : presentDays.toStringAsFixed(1),
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: presentDays > 0 ? Colors.teal.shade700 : Colors.grey,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
                               ],
-                              rows: _employees.map((employee) {
-                                final presentDays = _presentDaysCount[employee.id] ?? 0;
-                                return DataRow(
-                                  cells: [
-                                    DataCell(Text(employee.name)),
-                                    DataCell(
-                                      Text(
-                                        presentDays.toString(),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: presentDays > 0 ? Colors.green.shade700 : Colors.grey,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
+                            ],
                           ),
                         ),
                       ),

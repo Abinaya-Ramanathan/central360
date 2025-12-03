@@ -25,10 +25,8 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
   final _clientPhone2Controller = TextEditingController();
   final _clientAddressController = TextEditingController();
   final _eventTimingController = TextEditingController();
-  final _advanceReceivedController = TextEditingController();
-  final _quotedAmountController = TextEditingController();
-  final _amountReceivedController = TextEditingController();
   final _eventDateController = TextEditingController();
+  final _detailsController = TextEditingController();
 
   String? _selectedMahalDetail;
   String? _selectedFoodService;
@@ -60,10 +58,8 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
       _clientPhone1Controller.text = widget.booking!.clientPhone1 ?? '';
       _clientPhone2Controller.text = widget.booking!.clientPhone2 ?? '';
       _clientAddressController.text = widget.booking!.clientAddress ?? '';
-      _advanceReceivedController.text = widget.booking!.advanceReceived?.toString() ?? '';
-      _quotedAmountController.text = widget.booking!.quotedAmount?.toString() ?? '';
-      _amountReceivedController.text = widget.booking!.amountReceived?.toString() ?? '';
       _selectedOrderStatus = widget.booking!.orderStatus ?? 'open';
+      _detailsController.text = widget.booking!.details ?? '';
     } else {
       _selectedOrderStatus = 'open';
     }
@@ -77,10 +73,8 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
     _clientPhone2Controller.dispose();
     _clientAddressController.dispose();
     _eventTimingController.dispose();
-    _advanceReceivedController.dispose();
-    _quotedAmountController.dispose();
-    _amountReceivedController.dispose();
     _eventDateController.dispose();
+    _detailsController.dispose();
     super.dispose();
   }
 
@@ -158,16 +152,10 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
             ? null
             : _clientAddressController.text.trim(),
         foodService: _selectedFoodService,
-        advanceReceived: _advanceReceivedController.text.trim().isEmpty
-            ? null
-            : double.tryParse(_advanceReceivedController.text.trim()),
-        quotedAmount: _quotedAmountController.text.trim().isEmpty
-            ? null
-            : double.tryParse(_quotedAmountController.text.trim()),
-        amountReceived: _amountReceivedController.text.trim().isEmpty
-            ? null
-            : double.tryParse(_amountReceivedController.text.trim()),
         orderStatus: _selectedOrderStatus,
+        details: _detailsController.text.trim().isEmpty
+            ? null
+            : _detailsController.text.trim(),
       );
 
       if (widget.booking != null) {
@@ -437,13 +425,13 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                   },
                 ),
                 const SizedBox(height: 16),
-                // Advance Received
+                // Details
                 TextFormField(
-                  controller: _advanceReceivedController,
+                  controller: _detailsController,
                   decoration: InputDecoration(
-                    labelText: 'Advance Received',
-                    hintText: 'Enter amount',
-                    prefixIcon: const Icon(Icons.payment, color: Colors.purple),
+                    labelText: 'Details',
+                    hintText: 'Enter additional details',
+                    prefixIcon: const Icon(Icons.note, color: Colors.purple),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -452,50 +440,14 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                       borderSide: const BorderSide(color: Colors.purple, width: 2),
                     ),
                   ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                // Quoted Amount
-                TextFormField(
-                  controller: _quotedAmountController,
-                  decoration: InputDecoration(
-                    labelText: 'Quoted Amount',
-                    hintText: 'Enter amount',
-                    prefixIcon: const Icon(Icons.attach_money, color: Colors.purple),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.purple, width: 2),
-                    ),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                // Amount Received
-                TextFormField(
-                  controller: _amountReceivedController,
-                  decoration: InputDecoration(
-                    labelText: 'Amount Received',
-                    hintText: 'Enter amount',
-                    prefixIcon: const Icon(Icons.money, color: Colors.purple),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.purple, width: 2),
-                    ),
-                  ),
-                  keyboardType: TextInputType.number,
+                  maxLines: 3,
                 ),
                 const SizedBox(height: 16),
                 // Order Status Dropdown
                 DropdownButtonFormField<String>(
                   initialValue: _selectedOrderStatus,
                   decoration: InputDecoration(
-                    labelText: 'Order Status',
+                    labelText: 'Settlement Status',
                     prefixIcon: const Icon(Icons.assignment, color: Colors.purple),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),

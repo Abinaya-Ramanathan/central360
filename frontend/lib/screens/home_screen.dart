@@ -15,6 +15,7 @@ import 'login_screen.dart';
 import 'update_dialog.dart';
 import '../services/update_service.dart';
 import 'new_entry_screen.dart';
+import 'ingredients_details_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -567,6 +568,39 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                               ],
+                              // Ingredients Details - visible for admin when sector is SSC or All Sectors
+                              if (_isAdmin && (_selectedSector == 'SSC' || _selectedSector == null)) ...[
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => IngredientsDetailsScreen(
+                                            username: widget.username,
+                                            isMainAdmin: _isMainAdmin,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.restaurant_menu),
+                                    label: const Text(
+                                      'Ingredients Details',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.brown.shade700,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -582,5 +616,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
 }

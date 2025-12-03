@@ -26,7 +26,6 @@ class StockManagementScreen extends StatefulWidget {
 }
 
 class _StockManagementScreenState extends State<StockManagementScreen> with SingleTickerProviderStateMixin {
-  int? _selectedMonth;
   DateTime? _selectedDate;
   late TabController _tabController;
   List<Map<String, dynamic>> _stockItems = [];
@@ -59,16 +58,11 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   final Map<String, TextEditingController> _overallNewStockPiecesControllers = {};
   final Map<String, TextEditingController> _overallNewStockBoxesControllers = {};
 
-  final List<String> _months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _selectedMonth = DateTime.now().month;
     _selectedDate = DateTime.now();
     final usernameLower = widget.username.toLowerCase();
     _isAdmin = usernameLower == 'admin' || usernameLower == 'abinaya' || usernameLower == 'srisurya';
@@ -163,13 +157,13 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   }
 
   Future<void> _loadDailyStock() async {
-    if (_selectedMonth == null || _selectedDate == null) return;
+    if (_selectedDate == null) return;
     
     setState(() => _isLoading = true);
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
       final stock = await ApiService.getDailyStock(
-        month: _selectedMonth,
+        month: _selectedDate!.month,
         date: dateStr,
         sector: widget.selectedSector,
       );
@@ -375,40 +369,6 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     }
   }
 
-  Future<void> _selectMonth() async {
-    final int? picked = await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Month'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _months.length,
-            itemBuilder: (context, index) {
-              final monthNumber = index + 1;
-              final isSelected = monthNumber == _selectedMonth;
-              return ListTile(
-                title: Text(_months[index]),
-                selected: isSelected,
-                onTap: () => Navigator.pop(context, monthNumber),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-
-    if (picked != null && mounted) {
-      setState(() {
-        _selectedMonth = picked;
-      });
-      // Only load daily stock if we're on the Daily Stock tab (index 1)
-      if (_tabController.index == 1) {
-      _loadDailyStock();
-      }
-    }
-  }
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -777,63 +737,35 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           // Production Tab
           Column(
             children: [
-              // Month and Date Selection
+              // Date Selection
               Container(
                 padding: const EdgeInsets.all(16.0),
                 color: Colors.grey.shade100,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: _selectMonth,
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Select Month',
-                            prefixIcon: const Icon(Icons.calendar_month),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            _selectedMonth != null ? _months[_selectedMonth! - 1] : 'Select Month',
-                            style: TextStyle(
-                              color: _selectedMonth != null ? Colors.black : Colors.grey,
-                            ),
-                          ),
-                        ),
+                child: InkWell(
+                  onTap: _selectDate,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Select Date',
+                      prefixIcon: const Icon(Icons.calendar_today),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: InkWell(
-                        onTap: _selectDate,
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Select Date',
-                            prefixIcon: const Icon(Icons.calendar_today),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            _selectedDate != null
-                                ? _selectedDate!.toIso8601String().split('T')[0]
-                                : 'Select Date',
-                            style: TextStyle(
-                              color: _selectedDate != null ? Colors.black : Colors.grey,
-                            ),
-                          ),
-                        ),
+                    child: Text(
+                      _selectedDate != null
+                          ? _selectedDate!.toIso8601String().split('T')[0]
+                          : 'Select Date',
+                      style: TextStyle(
+                        color: _selectedDate != null ? Colors.black : Colors.grey,
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
               // Production Tab Content
               Expanded(
                 child: ProductionTabContent(
                   selectedSector: widget.selectedSector,
-                  selectedMonth: _selectedMonth,
                   selectedDate: _selectedDate,
                   isAdmin: _isAdmin,
                 ),
@@ -843,40 +775,31 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           // Daily Stock Tab
           Column(
             children: [
-              // Month and Date Selection
+              // Date Selection
               Container(
                 padding: const EdgeInsets.all(16),
                 color: Colors.grey.shade100,
                 child: Column(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _selectMonth,
-                            icon: const Icon(Icons.calendar_month),
-                            label: Text(_selectedMonth != null ? _months[_selectedMonth! - 1] : 'Select Month'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black87,
-                            ),
+                    InkWell(
+                      onTap: _selectDate,
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Select Date',
+                          prefixIcon: const Icon(Icons.calendar_today),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _selectDate,
-                            icon: const Icon(Icons.date_range),
-                            label: Text(_selectedDate != null
-                                ? DateFormat('dd/MM/yyyy').format(_selectedDate!)
-                                : 'Select Date'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black87,
-                            ),
+                        child: Text(
+                          _selectedDate != null
+                              ? DateFormat('dd/MM/yyyy').format(_selectedDate!)
+                              : 'Select Date',
+                          style: TextStyle(
+                            color: _selectedDate != null ? Colors.black : Colors.grey,
                           ),
                         ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     // Search Bar

@@ -34,6 +34,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _creditDateSortAscending = true; // true = ascending (oldest first), false = descending (newest first)
   bool _sectorSortAscending = true; // Sort direction for Sector column
+  bool _isGeneratingPDF = false;
 
   @override
   void initState() {
@@ -653,170 +654,74 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
     }
   }
 
-  Future<void> _showStatementDialog() async {
-    DateTime? fromDate;
-    DateTime? toDate;
 
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Generate Statement'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Custom:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: fromDate ?? DateTime.now(),
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => fromDate = picked);
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'From Date *',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(fromDate != null ? fromDate!.toIso8601String().split('T')[0] : 'Select Date'),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: toDate ?? DateTime.now(),
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => toDate = picked);
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'To Date *',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(toDate != null ? toDate!.toIso8601String().split('T')[0] : 'Select Date'),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text('Get it As:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 12),
-                const Text('Pdf', style: TextStyle(fontSize: 14)),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context, null);
-              },
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (fromDate == null || toDate == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please select From and To dates'), backgroundColor: Colors.red),
-                  );
-                  return;
-                }
-                Navigator.pop(context, {
-                  'fromDate': fromDate,
-                  'toDate': toDate,
-                });
-              },
-              child: const Text('Generate'),
-            ),
-          ],
+  Future<void> _downloadCurrentPageData() async {
+    if (_filteredCreditData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No data available to download'),
+          backgroundColor: Colors.orange,
         ),
-      ),
-    );
-
-    if (result != null && result['fromDate'] != null && result['toDate'] != null) {
-      await _generateStatement(
-        result['fromDate'] as DateTime,
-        result['toDate'] as DateTime,
       );
+      return;
     }
-  }
 
-  Future<void> _generateStatement(DateTime fromDate, DateTime toDate) async {
+    setState(() => _isGeneratingPDF = true);
+
     try {
-      setState(() => _isLoading = true);
-      // Filter credit data by date range
-      final filteredData = _creditData.where((record) {
-        final creditDateStr = _formatDate(record['credit_date']);
-        if (creditDateStr == 'N/A') return false;
-        try {
-          final creditDate = DateTime.parse(creditDateStr);
-          return creditDate.isAfter(fromDate.subtract(const Duration(days: 1))) && 
-                 creditDate.isBefore(toDate.add(const Duration(days: 1)));
-        } catch (e) {
-          return false;
-        }
-      }).toList();
-
-      setState(() => _isLoading = false);
-
-      if (filteredData.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No data found for the selected date range'), backgroundColor: Colors.orange),
-        );
-        return;
-      }
-
-      final sectorName = widget.selectedSector != null 
-          ? _getSectorName(widget.selectedSector)
-          : 'All Sectors';
-
-      // Convert sectors list to maps for PDF generation
-      final sectorsList = _sectors.map((s) => {'code': s.code, 'name': s.name}).toList();
+      // Get date range from current filtered data
+      DateTime? minDate;
+      DateTime? maxDate;
       
-      try {
-        await PdfGenerator.generateAndDownloadCreditPDF(
-          creditData: filteredData,
-          sectorName: sectorName,
-          showSectorColumn: widget.selectedSector == null && _isAdmin,
-          sectors: sectorsList,
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('PDF downloaded successfully'), backgroundColor: Colors.green),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error downloading PDF: $e'), backgroundColor: Colors.red),
-          );
-        }
-        rethrow;
+      for (var record in _filteredCreditData) {
+        try {
+          final creditDateStr = _formatDate(record['credit_date']);
+          if (creditDateStr == 'N/A') continue;
+          final creditDate = DateTime.parse(record['credit_date']);
+          if (minDate == null || creditDate.isBefore(minDate)) {
+            minDate = creditDate;
+          }
+          if (maxDate == null || creditDate.isAfter(maxDate)) {
+            maxDate = creditDate;
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+          // Skip invalid dates
+        }
+      }
+
+      final fromDate = minDate ?? DateTime.now();
+      final toDate = maxDate ?? DateTime.now();
+
+      await PdfGenerator.generateCreditDetailsPDF(
+        creditData: _filteredCreditData,
+        fromDate: fromDate,
+        toDate: toDate,
+      );
+
       if (mounted) {
-        final errorMsg = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error generating statement: $errorMsg'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('PDF saved successfully to Downloads folder'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingPDF = false);
     }
   }
-
+  }
 
   Future<void> _saveNewCredit({
     required String name,
@@ -966,29 +871,97 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
       ),
       body: Column(
         children: [
-          // Search Bar
+          // Search Bar, Download Button and Notes
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Search by Item Name or Shop Name',
-                hintText: 'Enter item name or shop name to search',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterCreditData('');
+            child: Row(
+              children: [
+                // Search Bar
+                Expanded(
+                  flex: 2,
+                  child: StatefulBuilder(
+                    builder: (context, setState) {
+                      return TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          labelText: 'Search by Item Name or Shop Name',
+                          hintText: 'Enter item name or shop name to search',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _filterCreditData('');
+                                    setState(() {}); // Update UI to hide clear button
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onChanged: (value) {
+                          _filterCreditData(value);
+                          setState(() {}); // Update UI to show/hide clear button
                         },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                      );
+                    },
+                  ),
                 ),
-              ),
-              onChanged: _filterCreditData,
+                const SizedBox(width: 12),
+                // Download Button
+                SizedBox(
+                  width: 200,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _isGeneratingPDF ? null : _downloadCurrentPageData,
+                    icon: _isGeneratingPDF
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.download),
+                    label: Text(_isGeneratingPDF ? 'Generating...' : 'Download Current Page Data'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Notes Section (Compact)
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue.shade700, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Downloads only searched/filtered data currently displayed on the page.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.blue.shade900,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           // Table
@@ -1333,12 +1306,10 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                         ),
                       ),
           ),
-          // Add Credit Details and Statement Buttons
+          // Add Credit Details Button
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                SizedBox(
+            child: SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton.icon(
@@ -1352,25 +1323,6 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                     ),
                   ),
                 ),
-                if (_isAdmin) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _showStatementDialog,
-                      icon: const Icon(Icons.description),
-                      label: const Text('Statement', style: TextStyle(fontSize: 16)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal.shade700,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
           ),
         ],
       ),

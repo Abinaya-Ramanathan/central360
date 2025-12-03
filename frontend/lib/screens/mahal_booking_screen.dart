@@ -30,20 +30,50 @@ class MahalBookingScreen extends StatefulWidget {
   State<MahalBookingScreen> createState() => _MahalBookingScreenState();
 }
 
-class _MahalBookingScreenState extends State<MahalBookingScreen> {
+class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   List<MahalBooking> _eventDetails = [];
   List<CateringDetails> _cateringDetails = [];
   List<ExpenseDetails> _expenseDetails = [];
+  List<Map<String, dynamic>> _mahalVessels = [];
   List<Sector> _sectors = [];
   String? _selectedBookingId; // For linking tables
   bool _isLoading = false;
   bool _sortByDateDesc = true; // true for descending (newest first), false for ascending
+  
+  // Search controllers
+  final TextEditingController _mahalDetailSearchController = TextEditingController();
+  final TextEditingController _clientNameSearchController = TextEditingController();
+  final TextEditingController _orderStatusSearchController = TextEditingController();
+  final TextEditingController _vesselMahalDetailSearchController = TextEditingController();
+  
+  // Mahal Vessels state
+  final Map<int, bool> _editModeVessels = {};
+  final Map<int, Map<String, dynamic>> _vesselControllers = {};
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
     _loadSectors();
     _loadAllData();
+  }
+  
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _mahalDetailSearchController.dispose();
+    _clientNameSearchController.dispose();
+    _orderStatusSearchController.dispose();
+    _vesselMahalDetailSearchController.dispose();
+    for (var controllers in _vesselControllers.values) {
+      for (var controller in controllers.values) {
+        if (controller is TextEditingController) {
+          controller.dispose();
+        }
+      }
+    }
+    super.dispose();
   }
 
   Future<void> _loadSectors() async {
@@ -74,12 +104,14 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
       final eventDetails = await ApiService.getMahalBookings(sector: widget.selectedSector);
       final cateringDetails = await ApiService.getCateringDetails(bookingId: _selectedBookingId);
       final expenseDetails = await ApiService.getExpenseDetails(bookingId: _selectedBookingId);
+      final mahalVessels = await ApiService.getMahalVessels();
 
       if (mounted) {
         setState(() {
           _eventDetails = eventDetails;
           _cateringDetails = cateringDetails;
           _expenseDetails = expenseDetails;
+          _mahalVessels = mahalVessels;
         });
         // Check for expiring event dates and send notifications
         _checkEventDatesAndNotify();
@@ -123,14 +155,16 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
           title: const Text('Mahal Booking and Catering Order'),
           backgroundColor: Colors.purple.shade700,
           foregroundColor: Colors.white,
-          bottom: const TabBar(
+          bottom: TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
             indicatorColor: Colors.orange,
-            tabs: [
+            controller: _tabController,
+            tabs: const [
               Tab(text: 'Event Details'),
               Tab(text: 'Catering Details'),
               Tab(text: 'Expense Details'),
+              Tab(text: 'Mahal Vessels Details'),
             ],
           ),
           actions: [
@@ -205,10 +239,12 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
         body: _isLoading && _eventDetails.isEmpty
             ? const Center(child: CircularProgressIndicator())
             : TabBarView(
+                controller: _tabController,
                 children: [
                   _buildEventDetailsTab(),
                   _buildCateringDetailsTab(),
                   _buildExpenseDetailsTab(),
+                  _buildMahalVesselsTab(),
                 ],
               ),
       ),
@@ -220,11 +256,84 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
         ? _eventDetails.where((e) => e.bookingId == _selectedBookingId).toList()
         : List.from(_eventDetails);
     
+    // Apply search filters
+    final mahalDetailSearch = _mahalDetailSearchController.text.toLowerCase();
+    final clientNameSearch = _clientNameSearchController.text.toLowerCase();
+    final orderStatusSearch = _orderStatusSearchController.text.toLowerCase();
+    
+    if (mahalDetailSearch.isNotEmpty) {
+      filteredEvents = filteredEvents.where((e) => 
+        e.mahalDetail.toLowerCase().contains(mahalDetailSearch)
+      ).toList();
+    }
+    
+    if (clientNameSearch.isNotEmpty) {
+      filteredEvents = filteredEvents.where((e) => 
+        e.clientName.toLowerCase().contains(clientNameSearch)
+      ).toList();
+    }
+    
+    if (orderStatusSearch.isNotEmpty) {
+      filteredEvents = filteredEvents.where((e) => 
+        (e.orderStatus ?? 'open').toLowerCase().contains(orderStatusSearch)
+      ).toList();
+    }
+    
     // Sort by Event Date (newest first)
     filteredEvents.sort((a, b) => b.eventDate.compareTo(a.eventDate));
 
     return Column(
       children: [
+        // Search fields
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          color: Colors.grey.shade100,
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _mahalDetailSearchController,
+                  decoration: InputDecoration(
+                    labelText: 'Search Mahal Detail',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _clientNameSearchController,
+                  decoration: InputDecoration(
+                    labelText: 'Search Client Name',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _orderStatusSearchController,
+                  decoration: InputDecoration(
+                    labelText: 'Search Settlement Status',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          ),
+        ),
         Expanded(
           child: filteredEvents.isEmpty
               ? Center(child: Text('No event details found', style: TextStyle(color: Colors.grey.shade600)))
@@ -261,10 +370,8 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
                         const DataColumn(label: Text('Client Phone 2')),
                         const DataColumn(label: Text('Client Address')),
                         const DataColumn(label: Text('Food Service')),
-                        const DataColumn(label: Text('Advance Received')),
-                        const DataColumn(label: Text('Quoted Amount')),
-                        const DataColumn(label: Text('Amount Received')),
-                        const DataColumn(label: Text('Order Status')),
+                        const DataColumn(label: Text('Settlement Status')),
+                        const DataColumn(label: Text('Details')),
                         const DataColumn(label: Text('Action')),
                       ],
                       rows: (filteredEvents..sort((a, b) {
@@ -290,10 +397,19 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
                             DataCell(Text(event.clientPhone2 ?? 'N/A', style: const TextStyle(color: Colors.black87))),
                             DataCell(SizedBox(width: 150, child: Text(event.clientAddress ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87)))),
                             DataCell(Text(event.foodService ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.advanceReceived?.toStringAsFixed(2) ?? '0.00', style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.quotedAmount?.toStringAsFixed(2) ?? '0.00', style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.amountReceived?.toStringAsFixed(2) ?? '0.00', style: const TextStyle(color: Colors.black87))),
                             DataCell(Text(event.orderStatus?.toUpperCase() ?? 'OPEN', style: const TextStyle(color: Colors.black87))),
+                            // Details - read-only
+                            DataCell(
+                              SizedBox(
+                                width: 200,
+                                child: Text(
+                                  event.details ?? '',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.black87),
+                                ),
+                              ),
+                            ),
                             DataCell(
                               Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -525,10 +641,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
               _buildViewField('Client Phone 2', event.clientPhone2 ?? 'N/A'),
               _buildViewField('Client Address', event.clientAddress ?? 'N/A'),
               _buildViewField('Food Service', event.foodService ?? 'N/A'),
-              _buildViewField('Advance Received', event.advanceReceived?.toStringAsFixed(2) ?? '0.00'),
-              _buildViewField('Quoted Amount', event.quotedAmount?.toStringAsFixed(2) ?? '0.00'),
-              _buildViewField('Amount Received', event.amountReceived?.toStringAsFixed(2) ?? '0.00'),
-              _buildViewField('Order Status', event.orderStatus?.toUpperCase() ?? 'OPEN'),
+              _buildViewField('Settlement Status', event.orderStatus?.toUpperCase() ?? 'OPEN'),
             ],
           ),
         ),
@@ -795,6 +908,457 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> {
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
       }
+    }
+  }
+
+  Widget _buildMahalVesselsTab() {
+    // Apply search filter
+    final mahalDetailSearch = _vesselMahalDetailSearchController.text.toLowerCase();
+    List<Map<String, dynamic>> filteredVessels = List.from(_mahalVessels);
+    
+    if (mahalDetailSearch.isNotEmpty) {
+      filteredVessels = filteredVessels.where((vessel) => 
+        (vessel['mahal_detail'] as String).toLowerCase().contains(mahalDetailSearch)
+      ).toList();
+    }
+    
+    return Column(
+      children: [
+        // Search field
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          color: Colors.grey.shade100,
+          child: TextField(
+            controller: _vesselMahalDetailSearchController,
+            decoration: InputDecoration(
+              labelText: 'Search Mahal Detail',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+        Expanded(
+          child: filteredVessels.isEmpty
+              ? Center(
+                  child: Text(
+                    _mahalVessels.isEmpty ? 'No mahal vessels found' : 'No matching vessels found',
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                  ),
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    child: DataTable(
+                      headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                      dataTextStyle: const TextStyle(color: Colors.black87),
+                      columns: const [
+                        DataColumn(label: Text('Mahal Detail')),
+                        DataColumn(label: Text('Item Name')),
+                        DataColumn(label: Text('Count')),
+                        DataColumn(label: Text('Action')),
+                      ],
+                      rows: filteredVessels.map((vessel) {
+                        final id = vessel['id'] as int;
+                        final isEditing = _editModeVessels[id] == true;
+                        final controllers = _vesselControllers[id] ?? {};
+                        
+                        return DataRow(
+                          cells: [
+                            // Mahal Detail
+                            DataCell(
+                              isEditing
+                                  ? DropdownButtonFormField<String>(
+                                      value: controllers['mahal_detail'] as String? ?? vessel['mahal_detail'] as String,
+                                      decoration: const InputDecoration(
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
+                                        DropdownMenuItem(value: 'Thirukampuliyur Minihall', child: Text('Thirukampuliyur Minihall')),
+                                        DropdownMenuItem(value: 'Thirukampuliyur Big Hall', child: Text('Thirukampuliyur Big Hall')),
+                                      ],
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          setState(() {
+                                            if (!_vesselControllers.containsKey(id)) {
+                                              _vesselControllers[id] = {};
+                                            }
+                                            _vesselControllers[id]!['mahal_detail'] = value;
+                                          });
+                                        }
+                                      },
+                                    )
+                                  : Text(vessel['mahal_detail'] as String),
+                            ),
+                            // Item Name
+                            DataCell(
+                              isEditing
+                                  ? SizedBox(
+                                      width: 200,
+                                      child: TextFormField(
+                                        controller: controllers['item_name'] as TextEditingController?,
+                                        decoration: const InputDecoration(
+                                          border: OutlineInputBorder(),
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    )
+                                  : Text(vessel['item_name'] as String),
+                            ),
+                            // Count
+                            DataCell(
+                              isEditing
+                                  ? SizedBox(
+                                      width: 100,
+                                      child: TextFormField(
+                                        controller: controllers['count'] as TextEditingController?,
+                                        decoration: const InputDecoration(
+                                          border: OutlineInputBorder(),
+                                          isDense: true,
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                      ),
+                                    )
+                                  : Text(vessel['count'].toString()),
+                            ),
+                            // Action
+                            DataCell(
+                              isEditing
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.save, color: Colors.green, size: 20),
+                                          tooltip: 'Save',
+                                          onPressed: () => _saveVessel(id),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
+                                          tooltip: 'Cancel',
+                                          onPressed: () => _cancelEditVessel(id),
+                                        ),
+                                      ],
+                                    )
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                          tooltip: 'Edit',
+                                          onPressed: () => _toggleEditVessel(id),
+                                        ),
+                                        if (AuthService.isMainAdmin)
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                            tooltip: 'Delete',
+                                            onPressed: () => _deleteVessel(id),
+                                          ),
+                                      ],
+                                    ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: _addMahalVessel,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Mahal Items', style: TextStyle(fontSize: 16)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _toggleEditVessel(int id) {
+    setState(() {
+      if (_editModeVessels[id] == true) {
+        _cancelEditVessel(id);
+      } else {
+        _editModeVessels[id] = true;
+        final vessel = _mahalVessels.firstWhere((v) => v['id'] == id);
+        _vesselControllers[id] = {
+          'item_name': TextEditingController(text: vessel['item_name'] as String),
+          'count': TextEditingController(text: vessel['count'].toString()),
+          'mahal_detail': vessel['mahal_detail'] as String,
+        };
+      }
+    });
+  }
+
+  void _cancelEditVessel(int id) {
+    setState(() {
+      _editModeVessels[id] = false;
+      if (_vesselControllers.containsKey(id)) {
+        for (var controller in _vesselControllers[id]!.values) {
+          if (controller is TextEditingController) {
+            controller.dispose();
+          }
+        }
+        _vesselControllers.remove(id);
+      }
+    });
+  }
+
+  Future<void> _saveVessel(int id) async {
+    try {
+      final controllers = _vesselControllers[id];
+      if (controllers == null) return;
+
+      final mahalDetail = controllers['mahal_detail'] as String? ?? 
+          _mahalVessels.firstWhere((v) => v['id'] == id)['mahal_detail'] as String;
+      final itemName = (controllers['item_name'] as TextEditingController?)?.text ?? '';
+      final count = int.tryParse((controllers['count'] as TextEditingController?)?.text ?? '0') ?? 0;
+
+      if (itemName.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Item name is required'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      await ApiService.updateMahalVessel(
+        id: id,
+        mahalDetail: mahalDetail,
+        itemName: itemName,
+        count: count,
+      );
+
+      _cancelEditVessel(id);
+      await _loadAllData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vessel updated successfully'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating vessel: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteVessel(int id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete'),
+        content: const Text('Are you sure you want to delete this vessel?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await ApiService.deleteMahalVessel(id);
+        await _loadAllData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Vessel deleted successfully'), backgroundColor: Colors.green),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting vessel: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _addMahalVessel() async {
+    final itemNameController = TextEditingController();
+    final countController = TextEditingController(text: '1');
+    String selectedMahalDetail = 'Thanthondrimalai Mini hall';
+    final List<Map<String, dynamic>> itemsToAdd = [];
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add Mahal Items'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedMahalDetail,
+                  decoration: const InputDecoration(
+                    labelText: 'Mahal Details *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
+                    DropdownMenuItem(value: 'Thirukampuliyur Minihall', child: Text('Thirukampuliyur Minihall')),
+                    DropdownMenuItem(value: 'Thirukampuliyur Big Hall', child: Text('Thirukampuliyur Big Hall')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() {
+                        selectedMahalDetail = value;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: itemNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Item Name *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: countController,
+                  decoration: const InputDecoration(
+                    labelText: 'Count *',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    if (itemNameController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Item name is required')),
+                      );
+                      return;
+                    }
+                    final count = int.tryParse(countController.text) ?? 1;
+                    setDialogState(() {
+                      itemsToAdd.add({
+                        'mahal_detail': selectedMahalDetail,
+                        'item_name': itemNameController.text.trim(),
+                        'count': count,
+                      });
+                      itemNameController.clear();
+                      countController.text = '1';
+                    });
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add More Items'),
+                ),
+                if (itemsToAdd.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text('Items to be added:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  ...itemsToAdd.map((item) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text('${item['item_name']} (${item['count']})')),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                              onPressed: () {
+                                setDialogState(() {
+                                  itemsToAdd.remove(item);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                itemNameController.dispose();
+                countController.dispose();
+                Navigator.pop(context, false);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (itemNameController.text.trim().isEmpty && itemsToAdd.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please add at least one item')),
+                  );
+                  return;
+                }
+                
+                // Add current item if filled
+                if (itemNameController.text.trim().isNotEmpty) {
+                  final count = int.tryParse(countController.text) ?? 1;
+                  itemsToAdd.add({
+                    'mahal_detail': selectedMahalDetail,
+                    'item_name': itemNameController.text.trim(),
+                    'count': count,
+                  });
+                }
+                
+                itemNameController.dispose();
+                countController.dispose();
+                Navigator.pop(context, true);
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true && itemsToAdd.isNotEmpty) {
+      try {
+        for (var item in itemsToAdd) {
+          await ApiService.createMahalVessel(
+            mahalDetail: item['mahal_detail'] as String,
+            itemName: item['item_name'] as String,
+            count: item['count'] as int,
+          );
+        }
+        await _loadAllData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${itemsToAdd.length} item(s) added successfully'), backgroundColor: Colors.green),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error adding items: $e'), backgroundColor: Colors.red),
+        );
+        }
+      }
+    } else {
+      itemNameController.dispose();
+      countController.dispose();
     }
   }
 }

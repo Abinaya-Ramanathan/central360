@@ -7,16 +7,20 @@ import '../utils/format_utils.dart';
 
 class AttendanceTabContent extends StatefulWidget {
   final String? selectedSector;
-  final int? selectedMonth;
   final DateTime? selectedDate;
   final bool isAdmin;
+  final bool isEditMode;
+  final ValueChanged<bool>? onEditModeChanged;
+  final ValueChanged<Future<bool> Function()>? onSaveMethodReady;
 
   const AttendanceTabContent({
     super.key,
     this.selectedSector,
-    this.selectedMonth,
     this.selectedDate,
     this.isAdmin = false,
+    this.isEditMode = false,
+    this.onEditModeChanged,
+    this.onSaveMethodReady,
   });
 
   @override
@@ -26,7 +30,6 @@ class AttendanceTabContent extends StatefulWidget {
 class _AttendanceTabContentState extends State<AttendanceTabContent> {
   List<Employee> _employees = [];
   List<Sector> _sectors = [];
-  bool _isEditMode = false;
   bool _isLoading = false;
   bool _sortAscending = true; // Sort direction for Sector column
   final Map<String, Map<String, dynamic>> _attendanceData = {};
@@ -35,20 +38,24 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
   void initState() {
     super.initState();
     _loadSectors();
-    if (widget.selectedMonth != null && widget.selectedDate != null) {
+    if (widget.selectedDate != null) {
       if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
         _loadData();
       }
     }
+    // Register save method with parent
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.onSaveMethodReady != null) {
+        widget.onSaveMethodReady!(saveAttendance);
+      }
+    });
   }
 
   @override
   void didUpdateWidget(AttendanceTabContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((widget.selectedMonth != oldWidget.selectedMonth ||
-            widget.selectedDate != oldWidget.selectedDate ||
+    if ((widget.selectedDate != oldWidget.selectedDate ||
             widget.selectedSector != oldWidget.selectedSector) &&
-        widget.selectedMonth != null &&
         widget.selectedDate != null) {
       if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
         _loadData();
@@ -275,8 +282,8 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
     setState(() {});
   }
 
-  Future<void> _saveAttendance() async {
-    if (widget.selectedDate == null) return;
+  Future<bool> saveAttendance() async {
+    if (widget.selectedDate == null) return false;
 
     final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
 
@@ -336,38 +343,31 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
           );
         }
         setState(() => _isLoading = false);
-        return;
+        return false;
       }
 
       await ApiService.bulkSaveAttendance(attendanceRecords);
-      setState(() => _isEditMode = false);
       // Reload data to reflect saved changes
       await _loadData();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Attendance saved successfully for ${attendanceRecords.length} employee(s)'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      setState(() => _isLoading = false);
+      return true;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving attendance: $e'), backgroundColor: Colors.red),
         );
       }
-    } finally {
       setState(() => _isLoading = false);
+      return false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.selectedMonth == null || widget.selectedDate == null) {
+    if (widget.selectedDate == null) {
       return const Center(
         child: Text(
-          'Please select month and date',
+          'Please select date',
           style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       );
@@ -452,7 +452,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                       DataCell(Text(_getSectorName(employee.sector))),
                                     DataCell(Text(employee.name)),
                                     DataCell(
-                                      _isEditMode
+                                      widget.isEditMode
                                           ? DropdownButton<String>(
                                               value: data['status'],
                                               hint: const Text('Select Status'),
@@ -486,7 +486,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                       ),
                                     ),
                                     DataCell(
-                                      _isEditMode
+                                      widget.isEditMode
                                           ? SizedBox(
                                               width: 120,
                                               child: TextFormField(
@@ -505,7 +505,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                           : Text('₹${(data['advance_taken'] ?? 0.0).toStringAsFixed(2)}'),
                                     ),
                                     DataCell(
-                                      _isEditMode
+                                      widget.isEditMode
                                           ? SizedBox(
                                               width: 120,
                                               child: TextFormField(
@@ -533,7 +533,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                       ),
                                     ),
                                     DataCell(
-                                      _isEditMode
+                                      widget.isEditMode
                                           ? SizedBox(
                                               width: 120,
                                               child: TextFormField(
@@ -552,7 +552,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                           : Text('₹${(data['bulk_advance_taken'] ?? 0.0).toStringAsFixed(2)}'),
                                     ),
                                     DataCell(
-                                      _isEditMode
+                                      widget.isEditMode
                                           ? SizedBox(
                                               width: 120,
                                               child: TextFormField(
@@ -579,25 +579,6 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                       ),
                     ),
         ),
-        if (_employees.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton.icon(
-                onPressed: _isEditMode ? _saveAttendance : () => setState(() => _isEditMode = true),
-                icon: Icon(_isEditMode ? Icons.save : Icons.edit),
-                label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.blue.shade700,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }

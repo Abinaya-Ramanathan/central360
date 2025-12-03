@@ -1832,23 +1832,23 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                                 double totalOverallBalance = 0.0;
                                 
                                 final rowsFromData = _filteredCreditData.expand((record) {
-                                  final recordId = record['id'] as int;
-                                  final credit = _parseDecimal(record['credit']); // Amount Pending = Credit value
-                                  final purchaseDateRaw = record['purchase_date'];
-                                  final purchaseDateFormatted = _formatDate(purchaseDateRaw);
-                                  final photos = _creditPhotos[recordId] ?? <Map<String, dynamic>>[];
-                                  final payments = _balancePayments[recordId] ?? [];
-                                  final isAddingNewPayment = _addingNewPayment[recordId] == true;
+                                final recordId = record['id'] as int;
+                                final credit = _parseDecimal(record['credit']); // Amount Pending = Credit value
+                                final purchaseDateRaw = record['purchase_date'];
+                                final purchaseDateFormatted = _formatDate(purchaseDateRaw);
+                                final photos = _creditPhotos[recordId] ?? <Map<String, dynamic>>[];
+                                final payments = _balancePayments[recordId] ?? [];
+                                final isAddingNewPayment = _addingNewPayment[recordId] == true;
 
-                                  // Main row
-                                  final List<DataRow> rows = [];
-                                  
-                                  // Calculate overall balance for main row (Amount Pending - sum of all payments)
-                                  double totalPaid = 0;
-                                  for (var payment in payments) {
-                                    totalPaid += _parseDecimal(payment['balance_paid']);
-                                  }
-                                  final mainOverallBalance = credit - totalPaid;
+                                // Main row
+                                final List<DataRow> rows = [];
+                                
+                                // Calculate overall balance for main row (Amount Pending - sum of all payments)
+                                double totalPaid = 0;
+                                for (var payment in payments) {
+                                  totalPaid += _parseDecimal(payment['balance_paid']);
+                                }
+                                final mainOverallBalance = credit - totalPaid;
                                   
                                   // Add to total (only count main row's overall balance)
                                   totalOverallBalance += mainOverallBalance;
@@ -2451,5 +2451,6 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
       ],
     );
   }
+
 }
 

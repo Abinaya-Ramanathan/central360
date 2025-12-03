@@ -44,6 +44,7 @@ router.post('/', async (req, res) => {
       quoted_amount,
       amount_received,
       order_status,
+      details,
     } = req.body;
 
     if (!sector_code || !mahal_detail || !event_date || !client_name) {
@@ -66,8 +67,8 @@ router.post('/', async (req, res) => {
       `INSERT INTO mahal_bookings (
         booking_id, sector_code, mahal_detail, event_date, event_timing,
         event_name, client_name, client_phone1, client_phone2, client_address, 
-        food_service, advance_received, quoted_amount, amount_received, order_status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        food_service, advance_received, quoted_amount, amount_received, order_status, details
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       ON CONFLICT (booking_id) DO UPDATE SET
         sector_code = EXCLUDED.sector_code,
         mahal_detail = EXCLUDED.mahal_detail,
@@ -83,6 +84,7 @@ router.post('/', async (req, res) => {
         quoted_amount = EXCLUDED.quoted_amount,
         amount_received = EXCLUDED.amount_received,
         order_status = EXCLUDED.order_status,
+        details = EXCLUDED.details,
         updated_at = CURRENT_TIMESTAMP
       RETURNING *`,
       [
@@ -101,6 +103,7 @@ router.post('/', async (req, res) => {
         quoted_amount || 0,
         amount_received || 0,
         order_status || 'open',
+        details || null,
       ]
     );
     const rows = result.rows;

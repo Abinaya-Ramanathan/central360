@@ -3,10 +3,22 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
+import 'package:permission_handler/permission_handler.dart';
 import '../config/env_config.dart';
+import 'format_utils.dart';
 
 class PdfGenerator {
+  // Helper function to sanitize filename by replacing invalid characters
+  static String _sanitizeFileName(String fileName) {
+    // Replace forward slashes and backslashes with dashes (common in dates)
+    return fileName.replaceAll(RegExp(r'[/\\]'), '-')
+        .replaceAll(RegExp(r'[<>:"|?*]'), '_');
+  }
+
   static Future<void> generateAndDownloadCateringPDF({
     required String bookingId,
     String? deliveryLocation,
@@ -589,6 +601,643 @@ class PdfGenerator {
         throw Exception('Failed to send email: $e');
       }
     }
+  }
+
+  // Helper function to get Downloads directory path
+  static Future<String> _getDownloadsPath() async {
+    try {
+      if (Platform.isWindows) {
+        // On Windows, try multiple methods to get Downloads folder
+        // Method 1: Use USERPROFILE environment variable
+        final userProfile = Platform.environment['USERPROFILE'];
+        if (userProfile != null && userProfile.isNotEmpty) {
+          final downloadsPath = path.join(userProfile, 'Downloads');
+          final downloadsDir = Directory(downloadsPath);
+          if (await downloadsDir.exists()) {
+            return downloadsPath;
+          }
+          // Try to create it
+          try {
+            await downloadsDir.create(recursive: true);
+            return downloadsPath;
+          } catch (e) {
+            // Continue to next method
+          }
+        }
+        
+        // Method 2: Try HOME environment variable
+        final home = Platform.environment['HOME'];
+        if (home != null && home.isNotEmpty) {
+          final downloadsPath = path.join(home, 'Downloads');
+          final downloadsDir = Directory(downloadsPath);
+          if (await downloadsDir.exists()) {
+            return downloadsPath;
+          }
+        }
+        
+        // Method 3: Use path_provider to get Documents and navigate
+        try {
+          final documentsDir = await getApplicationDocumentsDirectory();
+          final userPath = path.dirname(path.dirname(documentsDir.path));
+          final downloadsPath = path.join(userPath, 'Downloads');
+          final downloadsDir = Directory(downloadsPath);
+          if (await downloadsDir.exists()) {
+            return downloadsPath;
+          }
+          // Try to create it
+          await downloadsDir.create(recursive: true);
+          return downloadsPath;
+        } catch (e) {
+          // Fallback to Documents
+          final documentsDir = await getApplicationDocumentsDirectory();
+          return documentsDir.path;
+        }
+      } else if (Platform.isAndroid) {
+        // On Android, try multiple paths
+        // Method 1: Try standard Downloads path
+        final standardPath = '/storage/emulated/0/Download';
+        final standardDir = Directory(standardPath);
+        if (await standardDir.exists()) {
+          return standardPath;
+        }
+        
+        // Method 2: Try to get from external storage directory
+        try {
+          final directory = await getExternalStorageDirectory();
+          if (directory != null) {
+            // Get parent directory and navigate to Download
+            final parentPath = path.dirname(directory.path);
+            final downloadsPath = path.join(parentPath, 'Download');
+            final downloadsDir = Directory(downloadsPath);
+            if (await downloadsDir.exists()) {
+              return downloadsPath;
+            }
+            // Try to create it
+            try {
+              await downloadsDir.create(recursive: true);
+              return downloadsPath;
+            } catch (e) {
+              // Continue to next method
+            }
+          }
+        } catch (e) {
+          // Continue to fallback
+        }
+        
+        // Method 3: Try to create standard path
+        try {
+          await standardDir.create(recursive: true);
+          return standardPath;
+        } catch (e) {
+          // Fallback to app's external storage
+          final directory = await getExternalStorageDirectory();
+          if (directory != null) {
+            return directory.path;
+          }
+        }
+        
+        // Final fallback: use app documents directory
+        final documentsDir = await getApplicationDocumentsDirectory();
+        return documentsDir.path;
+      } else {
+        // For other platforms, use documents directory
+        final directory = await getApplicationDocumentsDirectory();
+        return directory.path;
+      }
+    } catch (e) {
+      // Ultimate fallback: use application documents directory
+      try {
+        final directory = await getApplicationDocumentsDirectory();
+        return directory.path;
+      } catch (fallbackError) {
+        // Last resort: use current directory
+        return Directory.current.path;
+      }
+    }
+  }
+
+  // Helper function to save PDF to Downloads folder
+  static Future<String> _savePdfToDownloads(pw.Document pdf, String fileName) async {
+    String? savedPath;
+    Exception? lastError;
+    
+    try {
+      // Request storage permission on Android
+      if (Platform.isAndroid) {
+        try {
+          final status = await Permission.storage.request();
+          if (!status.isGranted) {
+            // Try with manageExternalStorage for Android 11+
+            final manageStatus = await Permission.manageExternalStorage.request();
+            if (!manageStatus.isGranted) {
+              // For Android 10+, we might not need explicit permission
+              // Continue and try to save anyway
+            }
+          }
+        } catch (e) {
+          // Permission request failed, but continue anyway
+          // Some Android versions handle this differently
+        }
+      }
+
+      // Try to save to Downloads folder
+      try {
+        final downloadsPath = await _getDownloadsPath();
+        
+        // Normalize the path to handle any issues
+        final normalizedPath = path.normalize(downloadsPath);
+        
+        // Ensure the Downloads directory exists
+        final downloadsDir = Directory(normalizedPath);
+        if (!await downloadsDir.exists()) {
+          try {
+            await downloadsDir.create(recursive: true);
+          } catch (createError) {
+            throw Exception('Could not create Downloads directory at: $normalizedPath. Error: $createError');
+          }
+        }
+        
+        // Verify directory exists and is accessible
+        if (!await downloadsDir.exists()) {
+          throw Exception('Downloads directory does not exist and could not be created: $normalizedPath');
+        }
+        
+        // Sanitize filename to remove invalid characters (especially forward slashes from dates)
+        final sanitizedFileName = _sanitizeFileName(fileName);
+        final filePath = path.join(normalizedPath, sanitizedFileName);
+        final normalizedFilePath = path.normalize(filePath);
+        final file = File(normalizedFilePath);
+        
+        // Write PDF bytes to file
+        try {
+          final pdfBytes = await pdf.save();
+          await file.writeAsBytes(pdfBytes);
+        } catch (writeError) {
+          throw Exception('Failed to write PDF file at: $normalizedFilePath. Error: $writeError');
+        }
+        
+        // Verify file was written
+        if (await file.exists()) {
+          savedPath = normalizedFilePath;
+          return normalizedFilePath;
+        } else {
+          throw Exception('File was not created successfully at: $normalizedFilePath');
+        }
+      } catch (downloadsError) {
+        lastError = downloadsError is Exception ? downloadsError : Exception(downloadsError.toString());
+        // Continue to fallback
+      }
+      
+      // Fallback: Try saving to Documents directory
+      try {
+        final documentsDir = await getApplicationDocumentsDirectory();
+        final filePath = path.join(documentsDir.path, fileName);
+        final normalizedFilePath = path.normalize(filePath);
+        final file = File(normalizedFilePath);
+        final pdfBytes = await pdf.save();
+        await file.writeAsBytes(pdfBytes);
+        
+        if (await file.exists()) {
+          savedPath = normalizedFilePath;
+          return normalizedFilePath;
+        }
+      } catch (documentsError) {
+        lastError = documentsError is Exception ? documentsError : Exception(documentsError.toString());
+      }
+      
+      // If all methods failed, throw an error with helpful message
+      // At this point, lastError should always be set (from either downloadsError or documentsError)
+      final errorMessage = lastError.toString().replaceFirst('Exception: ', '');
+      throw Exception('Failed to save PDF to Downloads folder. Error: $errorMessage${savedPath != null ? ' File saved to: $savedPath' : ''}');
+      
+    } catch (e) {
+      final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      throw Exception('Failed to save PDF: $errorMessage${savedPath != null ? ' However, file was saved to: $savedPath' : ''}');
+    }
+  }
+
+  // Generate Sales Details PDF
+  static Future<String> generateSalesDetailsPDF({
+    required List<Map<String, dynamic>> salesData,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    final pdf = pw.Document();
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(20),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Sales Details Statement',
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  'From: ${dateFormat.format(fromDate)} To: ${dateFormat.format(toDate)}',
+                  style: const pw.TextStyle(fontSize: 12),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Sector', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Product', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Quantity', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Amount Received', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      ],
+                    ),
+                    ...salesData.map((record) {
+                      return pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(FormatUtils.formatDateDisplay(DateTime.parse(record['sale_date'])))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['sector_code']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['product_name']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['quantity']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${(double.tryParse(record['amount_received']?.toString() ?? '0') ?? 0).toStringAsFixed(2)}')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${(double.tryParse(record['credit_amount']?.toString() ?? '0') ?? 0).toStringAsFixed(2)}')),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    final fileName = _sanitizeFileName('Sales_Details_${dateFormat.format(fromDate)}_to_${dateFormat.format(toDate)}.pdf');
+    final filePath = await _savePdfToDownloads(pdf, fileName);
+    return filePath;
+  }
+
+  // Generate Customer Credit Details PDF
+  static Future<String> generateCustomerCreditDetailsPDF({
+    required List<Map<String, dynamic>> creditData,
+    int? totalRecords,
+    String? fileName,
+  }) async {
+    print('PDF Generator: Received ${creditData.length} rows');
+    print('PDF Generator: creditData.isEmpty = ${creditData.isEmpty}');
+    if (creditData.isNotEmpty) {
+      print('PDF Generator: First row type: ${creditData.first['type']}');
+      print('PDF Generator: Sample row keys: ${creditData.first.keys.toList()}');
+      print('PDF Generator: Sample row values: ${creditData.first}');
+    }
+    
+    final pdf = pw.Document();
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          print('PDF Generator: Building PDF page, creditData.length = ${creditData.length}');
+          
+          // Build table rows list inside build callback
+          final List<pw.TableRow> tableRows = [];
+          
+          // Add header row
+          tableRows.add(
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+              children: [
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Product', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Balance Paid', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Balance Paid Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Overall Balance', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+              ],
+            ),
+          );
+          
+          // Build data rows
+          print('PDF Generator: Starting to build ${creditData.length} table rows');
+          for (var record in creditData) {
+            try {
+              print('PDF Generator: Processing row type: ${record['type']}');
+              final rowType = record['type'] as String? ?? 'main';
+              final creditAmount = record['credit_amount'] != null 
+                  ? (double.tryParse(record['credit_amount'].toString()) ?? 0.0)
+                  : null;
+              final balancePaid = record['balance_paid'] != null
+                  ? (double.tryParse(record['balance_paid'].toString()) ?? 0.0)
+                  : null;
+              final overallBalance = record['overall_balance'] != null
+                  ? (double.tryParse(record['overall_balance'].toString()) ?? 0.0)
+                  : 0.0;
+            
+              // Handle different row types
+              if (rowType == 'total') {
+                // Total row
+                tableRows.add(
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          'TOTAL',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          'Rs.${overallBalance.toStringAsFixed(2)}',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                    ],
+                  ),
+                );
+              } else if (rowType == 'payment') {
+                // Payment row (sub-row)
+                tableRows.add(
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(balancePaid != null ? 'Rs.${balancePaid.toStringAsFixed(2)}' : ''),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          record['balance_paid_date'] != null 
+                              ? (record['balance_paid_date'] is DateTime
+                                  ? FormatUtils.formatDateDisplay(record['balance_paid_date'] as DateTime)
+                                  : FormatUtils.formatDateDisplay(DateTime.parse(record['balance_paid_date'].toString())))
+                              : '',
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text('Rs.${overallBalance.toStringAsFixed(2)}'),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(record['details']?.toString() ?? ''),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                // Main row
+                tableRows.add(
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.blue200),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          record['sale_date'] != null 
+                              ? FormatUtils.formatDateDisplay(DateTime.parse(record['sale_date'].toString()))
+                              : '',
+                        ),
+                      ),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['product_name']?.toString() ?? '')),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(creditAmount != null ? 'Rs.${creditAmount.toStringAsFixed(2)}' : ''),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(balancePaid != null ? 'Rs.${balancePaid.toStringAsFixed(2)}' : ''),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          record['balance_paid_date'] != null 
+                              ? (record['balance_paid_date'] is DateTime
+                                  ? FormatUtils.formatDateDisplay(record['balance_paid_date'] as DateTime)
+                                  : FormatUtils.formatDateDisplay(DateTime.parse(record['balance_paid_date'].toString())))
+                              : '',
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text('Rs.${overallBalance.toStringAsFixed(2)}'),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(record['details']?.toString() ?? ''),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            } catch (e) {
+              print('Error generating PDF row: $e');
+              print('Error record: $record');
+              // Continue with next row
+            }
+          }
+          
+          print('PDF Generator: Built ${tableRows.length} table rows (1 header + ${tableRows.length - 1} data rows)');
+          
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(20),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Customer Credit Details Statement',
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 20),
+                creditData.isEmpty
+                    ? pw.Padding(
+                        padding: const pw.EdgeInsets.all(20),
+                        child: pw.Text(
+                          'No data available',
+                          style: pw.TextStyle(fontSize: 14, fontStyle: pw.FontStyle.italic),
+                        ),
+                      )
+                    : pw.Table(
+                        border: pw.TableBorder.all(),
+                        children: tableRows,
+                      ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    
+    final defaultFileName = 'Customer_Credit_Details.pdf';
+    final finalFileName = fileName != null 
+        ? _sanitizeFileName('${fileName}.pdf')
+        : _sanitizeFileName(defaultFileName);
+    final filePath = await _savePdfToDownloads(pdf, finalFileName);
+    return filePath;
+  }
+
+  // Generate Company Purchase PDF
+  static Future<String> generateCompanyPurchasePDF({
+    required List<Map<String, dynamic>> purchaseData,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    final pdf = pw.Document();
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(20),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Company Purchase Details Statement',
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  'From: ${dateFormat.format(fromDate)} To: ${dateFormat.format(toDate)}',
+                  style: const pw.TextStyle(fontSize: 12),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Sector', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Shop Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Purchase Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      ],
+                    ),
+                    ...purchaseData.map((record) {
+                      return pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(FormatUtils.formatDateDisplay(DateTime.parse(record['purchase_date'])))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['sector_code']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['purchase_details']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${(double.tryParse(record['amount']?.toString() ?? '0') ?? 0).toStringAsFixed(2)}')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${(double.tryParse(record['credit_amount']?.toString() ?? '0') ?? 0).toStringAsFixed(2)}')),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    final fileName = _sanitizeFileName('Company_Purchase_Details_${dateFormat.format(fromDate)}_to_${dateFormat.format(toDate)}.pdf');
+    final filePath = await _savePdfToDownloads(pdf, fileName);
+    return filePath;
+  }
+
+  // Generate Credit Details PDF
+  static Future<String> generateCreditDetailsPDF({
+    required List<Map<String, dynamic>> creditData,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    final pdf = pw.Document();
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(20),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Credit Details Statement',
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  'From: ${dateFormat.format(fromDate)} To: ${dateFormat.format(toDate)}',
+                  style: const pw.TextStyle(fontSize: 12),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Shop Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Purchase Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Amount Settled', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Pending Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      ],
+                    ),
+                    ...creditData.map((record) {
+                      final creditAmount = double.tryParse(record['credit_amount']?.toString() ?? '0') ?? 0.0;
+                      final amountSettled = double.tryParse(record['amount_settled']?.toString() ?? '0') ?? 0.0;
+                      final pendingAmount = creditAmount - amountSettled;
+                      
+                      return pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['credit_date'] != null ? FormatUtils.formatDateDisplay(DateTime.parse(record['credit_date'])) : '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['purchase_details']?.toString() ?? '')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${creditAmount.toStringAsFixed(2)}')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${amountSettled.toStringAsFixed(2)}')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${pendingAmount.toStringAsFixed(2)}')),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    final fileName = _sanitizeFileName('Credit_Details_${dateFormat.format(fromDate)}_to_${dateFormat.format(toDate)}.pdf');
+    final filePath = await _savePdfToDownloads(pdf, fileName);
+    return filePath;
   }
 }
 

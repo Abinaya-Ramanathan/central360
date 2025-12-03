@@ -29,7 +29,6 @@ class DailyAttendanceScreen extends StatefulWidget {
 class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
   List<Employee> _employees = [];
   List<Sector> _sectors = [];
-  int? _selectedMonth;
   DateTime? _selectedDate;
   bool _isEditMode = false;
   bool _isLoading = false;
@@ -40,7 +39,6 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedMonth = widget.preSelectedMonth ?? DateTime.now().month;
     _selectedDate = widget.preSelectedDate ?? DateTime.now();
     _loadSectors();
     _loadEmployees();
@@ -237,51 +235,6 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
     }
   }
 
-  Future<void> _selectMonth() async {
-    final DateTime now = DateTime.now();
-    final int? picked = await showDialog<int>(
-      context: context,
-      builder: (context) {
-        int selectedMonth = _selectedMonth ?? now.month;
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Select Month'),
-              content: SizedBox(
-                width: 300,
-                height: 200,
-                child: ListView.builder(
-                  itemCount: 12,
-                  itemBuilder: (context, index) {
-                    final month = index + 1;
-                    final monthNames = [
-                      'January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'
-                    ];
-                    return ListTile(
-                      title: Text(monthNames[index]),
-                      selected: selectedMonth == month,
-                      onTap: () {
-                        setState(() {
-                          selectedMonth = month;
-                        });
-                        Navigator.pop(context, selectedMonth);
-                      },
-                    );
-                  },
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedMonth = picked;
-      });
-    }
-  }
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -408,10 +361,6 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -540,50 +489,24 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
-                      // Month and Date - only show if not pre-selected
+                      // Date Selection - only show if not pre-selected
                       if (widget.preSelectedMonth == null && widget.preSelectedDate == null)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: _selectMonth,
-                                child: InputDecorator(
-                                  decoration: InputDecoration(
-                                    labelText: 'Month',
-                                    prefixIcon: const Icon(Icons.calendar_month, color: Colors.blue),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _selectedMonth != null
-                                        ? monthNames[_selectedMonth! - 1]
-                                        : 'Select Month',
-                                  ),
-                                ),
+                        InkWell(
+                          onTap: _selectDate,
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Date',
+                              prefixIcon: const Icon(Icons.calendar_today, color: Colors.blue),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: InkWell(
-                                onTap: _selectDate,
-                                child: InputDecorator(
-                                  decoration: InputDecoration(
-                                    labelText: 'Date',
-                                    prefixIcon: const Icon(Icons.calendar_today, color: Colors.blue),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _selectedDate != null
-                                        ? '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'
-                                        : 'Select Date',
-                                  ),
-                                ),
-                              ),
+                            child: Text(
+                              _selectedDate != null
+                                  ? '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'
+                                  : 'Select Date',
                             ),
-                          ],
+                          ),
                         ),
                     ],
                   ),

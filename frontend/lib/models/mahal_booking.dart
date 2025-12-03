@@ -14,6 +14,7 @@ class MahalBooking {
   final double? quotedAmount;
   final double? amountReceived;
   final String? orderStatus;
+  final String? details;
 
   MahalBooking({
     this.bookingId,
@@ -31,6 +32,7 @@ class MahalBooking {
     this.quotedAmount,
     this.amountReceived,
     this.orderStatus,
+    this.details,
   });
 
   Map<String, dynamic> toJson() {
@@ -50,6 +52,7 @@ class MahalBooking {
       'quoted_amount': quotedAmount,
       'amount_received': amountReceived,
       'order_status': orderStatus,
+      'details': details,
     };
   }
 
@@ -70,6 +73,7 @@ class MahalBooking {
       quotedAmount: _parseDouble(json['quoted_amount']),
       amountReceived: _parseDouble(json['amount_received']),
       orderStatus: json['order_status'] as String?,
+      details: json['details'] as String?,
     );
   }
 
@@ -97,6 +101,7 @@ class MahalBooking {
     double? quotedAmount,
     double? amountReceived,
     String? orderStatus,
+    String? details,
   }) {
     return MahalBooking(
       bookingId: bookingId ?? this.bookingId,
@@ -114,6 +119,7 @@ class MahalBooking {
       quotedAmount: quotedAmount ?? this.quotedAmount,
       amountReceived: amountReceived ?? this.amountReceived,
       orderStatus: orderStatus ?? this.orderStatus,
+      details: details ?? this.details,
     );
   }
 }

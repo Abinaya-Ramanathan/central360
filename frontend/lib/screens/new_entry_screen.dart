@@ -7,6 +7,8 @@ import 'manage_products_dialog.dart';
 import 'manage_sectors_dialog.dart';
 import 'add_stock_item_dialog.dart';
 import 'manage_stock_items_dialog.dart';
+import 'add_rent_vehicle_dialog.dart';
+import 'manage_rent_vehicles_dialog.dart';
 import 'home_screen.dart';
 
 class NewEntryScreen extends StatefulWidget {
@@ -131,6 +133,36 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             showDialog(
                               context: context,
                               builder: (context) => ManageProductsDialog(
+                                isMainAdmin: widget.isMainAdmin,
+                                selectedSector: _selectedSector,
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildAdminButton(
+                          icon: Icons.directions_car,
+                          label: 'Add Rent Vehicle',
+                          color: Colors.teal.shade700,
+                          onPressed: () async {
+                            final result = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => const AddRentVehicleDialog(),
+                            );
+                            if (result == true) {
+                              // Rent vehicle created successfully
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildAdminButton(
+                          icon: Icons.car_rental,
+                          label: 'Manage Rent Vehicle',
+                          color: Colors.cyan.shade700,
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => ManageRentVehiclesDialog(
                                 isMainAdmin: widget.isMainAdmin,
                                 selectedSector: _selectedSector,
                               ),

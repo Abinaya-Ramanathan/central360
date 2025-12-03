@@ -5,14 +5,12 @@ import '../models/sector.dart';
 
 class ProductionTabContent extends StatefulWidget {
   final String? selectedSector;
-  final int? selectedMonth;
   final DateTime? selectedDate;
   final bool isAdmin;
 
   const ProductionTabContent({
     super.key,
     this.selectedSector,
-    this.selectedMonth,
     this.selectedDate,
     this.isAdmin = false,
   });
@@ -37,7 +35,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
     super.initState();
     _searchController.addListener(_filterProductionData);
     _loadSectors();
-    if (widget.selectedMonth != null && widget.selectedDate != null) {
+    if (widget.selectedDate != null) {
       if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
         _loadData();
       }
@@ -69,10 +67,8 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   @override
   void didUpdateWidget(ProductionTabContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((widget.selectedMonth != oldWidget.selectedMonth ||
-            widget.selectedDate != oldWidget.selectedDate ||
+    if ((widget.selectedDate != oldWidget.selectedDate ||
             widget.selectedSector != oldWidget.selectedSector) &&
-        widget.selectedMonth != null &&
         widget.selectedDate != null) {
       if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
         _loadData();
@@ -173,7 +169,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
     setState(() => _isLoading = true);
     try {
       final year = widget.selectedDate!.year;
-      final month = widget.selectedMonth ?? widget.selectedDate!.month;
+      final month = widget.selectedDate!.month;
       final monthStr = '$year-${month.toString().padLeft(2, '0')}';
       final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
 
@@ -570,10 +566,10 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.selectedMonth == null || widget.selectedDate == null) {
+    if (widget.selectedDate == null) {
       return const Center(
         child: Text(
-          'Please select month and date',
+          'Please select date',
           style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       );

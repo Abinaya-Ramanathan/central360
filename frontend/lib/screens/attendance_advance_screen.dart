@@ -26,27 +26,35 @@ class AttendanceAdvanceScreen extends StatefulWidget {
 
 class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int? _selectedMonth;
   DateTime? _selectedDate;
   List<Sector> _sectors = [];
   List<Map<String, dynamic>> _advanceDetails = [];
   bool _isLoadingAdvance = false;
   bool _sortAscendingAdvance = true; // Sort direction for Sector column
+  List<Map<String, dynamic>> _rentVehicles = [];
+  bool _isLoadingRentVehicles = false;
+  Map<int, String?> _rentVehicleStatusControllers = {}; // Map of vehicle_id to status
+  bool _isEditMode = false; // Edit mode for both employee and rent vehicle attendance
+  Future<bool> Function()? _saveEmployeeAttendance;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _selectedMonth = DateTime.now().month;
+    _tabController = TabController(length: 4, vsync: this);
     _selectedDate = DateTime.now();
     _loadSectors();
     _loadAdvanceDetails();
+    _loadRentVehicles();
     
-    // Add listener to reload advance details when switching to Advance Details tab
+    // Add listener to reload data when switching tabs
     _tabController.addListener(() {
-      if (_tabController.index == 1 && !_tabController.indexIsChanging) {
+      if (_tabController.index == 2 && !_tabController.indexIsChanging) {
         // User switched to Advance Details tab
         _loadAdvanceDetails();
+      } else if (_tabController.index == 1 && !_tabController.indexIsChanging) {
+        // User switched to Vehicle Attendance Entry tab
+        _loadRentVehicles();
+        _loadRentVehicleAttendance();
       }
     });
   }
@@ -77,6 +85,147 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       orElse: () => Sector(code: sectorCode, name: sectorCode),
     );
     return sector.name;
+  }
+
+  Future<void> _loadRentVehicles() async {
+    setState(() => _isLoadingRentVehicles = true);
+    try {
+      List<Map<String, dynamic>> vehicles;
+      if (widget.selectedSector == null && widget.isAdmin) {
+        vehicles = await ApiService.getRentVehicles();
+      } else if (widget.selectedSector != null) {
+        vehicles = await ApiService.getRentVehicles(sector: widget.selectedSector);
+      } else {
+        vehicles = [];
+      }
+
+      if (mounted) {
+        setState(() {
+          _rentVehicles = vehicles;
+          // Initialize status controllers
+          _rentVehicleStatusControllers = {};
+          for (var vehicle in vehicles) {
+            _rentVehicleStatusControllers[vehicle['id'] as int] = null;
+          }
+        });
+        // Load attendance after vehicles are loaded
+        _loadRentVehicleAttendance();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading rent vehicles: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingRentVehicles = false);
+      }
+    }
+  }
+
+  Future<void> _loadRentVehicleAttendance() async {
+    if (_selectedDate == null || _rentVehicles.isEmpty) return;
+    
+    try {
+      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      List<Map<String, dynamic>> attendance;
+      if (widget.selectedSector == null && widget.isAdmin) {
+        attendance = await ApiService.getRentVehicleAttendance(date: dateStr);
+      } else if (widget.selectedSector != null) {
+        attendance = await ApiService.getRentVehicleAttendance(sector: widget.selectedSector, date: dateStr);
+      } else {
+        attendance = [];
+      }
+
+      if (mounted) {
+        setState(() {
+          // Reset all vehicles to null first (to prevent carry forward from previous date)
+          for (var vehicle in _rentVehicles) {
+            final vehicleId = vehicle['id'] as int;
+            _rentVehicleStatusControllers[vehicleId] = null;
+          }
+          // Update status controllers from attendance data (date-specific)
+          // Only vehicles with saved attendance for this date will have a status
+          for (var att in attendance) {
+            final vehicleId = att['vehicle_id'] as int;
+            _rentVehicleStatusControllers[vehicleId] = att['status'] as String?;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        // Silently fail - attendance might not exist yet
+      }
+    }
+  }
+
+  Future<void> _saveEmployeeAttendanceAction() async {
+    if (_saveEmployeeAttendance == null) return;
+    
+    setState(() => _isLoadingRentVehicles = true);
+    try {
+      final saved = await _saveEmployeeAttendance!();
+      if (saved) {
+        setState(() => _isEditMode = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving attendance: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingRentVehicles = false);
+      }
+    }
+  }
+
+  Future<void> _saveVehicleAttendance() async {
+    if (_selectedDate == null) return;
+
+    setState(() => _isLoadingRentVehicles = true);
+    try {
+      // Save rent vehicle attendance
+      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final records = _rentVehicles.map((vehicle) {
+        return {
+          'vehicle_id': vehicle['id'] as int,
+          'vehicle_name': vehicle['vehicle_name'] as String,
+          'sector_code': vehicle['sector_code'] as String,
+          'date': dateStr,
+          'status': _rentVehicleStatusControllers[vehicle['id'] as int],
+        };
+      }).toList();
+
+      await ApiService.bulkSaveRentVehicleAttendance(records);
+      
+      // Exit edit mode
+      setState(() => _isEditMode = false);
+      
+      // Reload rent vehicle attendance
+      await _loadRentVehicleAttendance();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vehicle attendance saved successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving vehicle attendance: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingRentVehicles = false);
+      }
+    }
   }
 
   Future<void> _loadAdvanceDetails() async {
@@ -145,41 +294,6 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     }
   }
 
-  Future<void> _selectMonth() async {
-    final int? picked = await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Month'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: 12,
-            itemBuilder: (context, index) {
-              final monthNumber = index + 1;
-              final monthNames = [
-                'January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December'
-              ];
-              return ListTile(
-                title: Text(monthNames[index]),
-                selected: monthNumber == _selectedMonth,
-                onTap: () => Navigator.pop(context, monthNumber),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedMonth = picked;
-      });
-      // Reload advance details when month changes
-      _loadAdvanceDetails();
-    }
-  }
-
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -193,6 +307,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       });
       // Reload advance details when date changes
       _loadAdvanceDetails();
+      _loadRentVehicleAttendance();
     }
   }
 
@@ -209,7 +324,8 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.orange,
           tabs: const [
-            Tab(text: 'Attendance Entry'),
+            Tab(text: 'Staff Attendance Entry'),
+            Tab(text: 'Vehicle Attendance Entry'),
             Tab(text: 'Advance Details'),
             Tab(text: 'Present Days Count'),
           ],
@@ -290,51 +406,15 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Attendance Entry Tab
+          // Staff Attendance Entry Tab
           Column(
             children: [
-              // Month and Date Selection
+              // Date Selection
               Container(
                 padding: const EdgeInsets.all(16.0),
                 color: Colors.grey.shade100,
                 child: Row(
                   children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: _selectMonth,
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Select Month',
-                            prefixIcon: const Icon(Icons.calendar_month),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            _selectedMonth != null
-                                ? [
-                                    'January',
-                                    'February',
-                                    'March',
-                                    'April',
-                                    'May',
-                                    'June',
-                                    'July',
-                                    'August',
-                                    'September',
-                                    'October',
-                                    'November',
-                                    'December'
-                                  ][_selectedMonth! - 1]
-                                : 'Select Month',
-                            style: TextStyle(
-                              color: _selectedMonth != null ? Colors.black : Colors.grey,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
                     Expanded(
                       child: InkWell(
                         onTap: _selectDate,
@@ -364,13 +444,200 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
               Expanded(
                 child: AttendanceTabContent(
                   selectedSector: widget.selectedSector,
-                  selectedMonth: _selectedMonth,
                   selectedDate: _selectedDate,
                   isAdmin: widget.isAdmin,
+                  isEditMode: _isEditMode,
+                  onEditModeChanged: (bool value) {
+                    setState(() {
+                      _isEditMode = value;
+                    });
+                  },
+                  onSaveMethodReady: (Future<bool> Function() saveMethod) {
+                    _saveEmployeeAttendance = saveMethod;
+                  },
                 ),
               ),
-              // Add a listener to refresh advance details when attendance is saved
-              // This will be handled by the refresh button in Advance Details tab
+              // Edit/Save Attendance Button
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton.icon(
+                    onPressed: _isEditMode ? _saveEmployeeAttendanceAction : () => setState(() => _isEditMode = true),
+                    icon: Icon(_isEditMode ? Icons.save : Icons.edit),
+                    label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // Vehicle Attendance Entry Tab
+          Column(
+            children: [
+              // Date Selection
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                color: Colors.grey.shade100,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: _selectDate,
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Select Date',
+                            prefixIcon: const Icon(Icons.calendar_today),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _selectedDate != null
+                                ? _selectedDate!.toIso8601String().split('T')[0]
+                                : 'Select Date',
+                            style: TextStyle(
+                              color: _selectedDate != null ? Colors.black : Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Rent Vehicle Details Table
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                color: Colors.grey.shade100,
+                child: const Row(
+                  children: [
+                    Text(
+                      'Rent Vehicle Details',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _isLoadingRentVehicles
+                    ? const Center(child: CircularProgressIndicator())
+                    : _rentVehicles.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No rent vehicles found for selected sector',
+                              style: TextStyle(fontSize: 16, color: Colors.grey),
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SingleChildScrollView(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Card(
+                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: DataTable(
+                                    headingRowColor: WidgetStateProperty.all(
+                                      Colors.teal.shade100,
+                                    ),
+                                    columns: const [
+                                      DataColumn(
+                                        label: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      ),
+                                      DataColumn(
+                                        label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                    rows: _rentVehicles.map((vehicle) {
+                                      final vehicleId = vehicle['id'] as int;
+                                      final currentStatus = _rentVehicleStatusControllers[vehicleId];
+                                      return DataRow(
+                                        cells: [
+                                          DataCell(Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
+                                          DataCell(
+                                            _isEditMode
+                                                ? DropdownButton<String>(
+                                                    value: currentStatus,
+                                                    hint: const Text('Select Status'),
+                                                    isExpanded: true,
+                                                    items: const [
+                                                      DropdownMenuItem<String>(
+                                                        value: 'present',
+                                                        child: Text('Present'),
+                                                      ),
+                                                      DropdownMenuItem<String>(
+                                                        value: 'absent',
+                                                        child: Text('Absent'),
+                                                      ),
+                                                      DropdownMenuItem<String>(
+                                                        value: 'halfday',
+                                                        child: Text('Halfday'),
+                                                      ),
+                                                    ],
+                                                    onChanged: (value) {
+                                                      setState(() {
+                                                        _rentVehicleStatusControllers[vehicleId] = value;
+                                                      });
+                                                    },
+                                                  )
+                                                : Text(
+                                                    currentStatus == null
+                                                        ? '-'
+                                                        : currentStatus == 'present'
+                                                            ? 'Present'
+                                                            : currentStatus == 'absent'
+                                                                ? 'Absent'
+                                                                : 'Halfday',
+                                                    style: TextStyle(
+                                                      color: currentStatus == null
+                                                          ? Colors.grey
+                                                          : currentStatus == 'present'
+                                                              ? Colors.green.shade700
+                                                              : currentStatus == 'absent'
+                                                                  ? Colors.red.shade700
+                                                                  : Colors.orange.shade700,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+              ),
+              // Edit/Save Attendance Button
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton.icon(
+                    onPressed: _isEditMode ? _saveVehicleAttendance : () => setState(() => _isEditMode = true),
+                    icon: Icon(_isEditMode ? Icons.save : Icons.edit),
+                    label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
           // Advance Details Tab

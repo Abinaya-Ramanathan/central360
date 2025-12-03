@@ -1,7 +1,7 @@
 -- ============================================
--- Consolidated Incremental Updates (Migrations 003-047)
+-- Consolidated Incremental Updates (Migrations 003-051)
 -- ============================================
--- This file consolidates all incremental updates from migrations 003-047
+-- This file consolidates all incremental updates from migrations 003-051
 -- Use this for existing databases that need to be updated
 -- For new installations, use 001_complete_schema.sql instead
 -- ============================================
@@ -414,4 +414,90 @@ DO $$ BEGIN
     ADD COLUMN new_stock_boxes DECIMAL(10, 2) DEFAULT 0;
   END IF;
 END $$;
+
+-- ============================================
+-- Migration 048: Add details column to mahal_bookings
+-- ============================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'mahal_bookings' AND column_name = 'details'
+  ) THEN
+    ALTER TABLE mahal_bookings ADD COLUMN details TEXT;
+    COMMENT ON COLUMN mahal_bookings.details IS 'Additional details for the mahal booking';
+  END IF;
+END $$;
+
+-- ============================================
+-- Migration 049: Create mahal_vessels table
+-- ============================================
+CREATE TABLE IF NOT EXISTS mahal_vessels (
+  id SERIAL PRIMARY KEY,
+  mahal_detail VARCHAR(255) NOT NULL CHECK (mahal_detail IN ('Thanthondrimalai Mini hall', 'Thirukampuliyur Minihall', 'Thirukampuliyur Big Hall')),
+  item_name VARCHAR(255) NOT NULL,
+  count INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_mahal_vessels_mahal_detail ON mahal_vessels(mahal_detail);
+CREATE INDEX IF NOT EXISTS idx_mahal_vessels_item_name ON mahal_vessels(item_name);
+
+-- ============================================
+-- Migration 050: Create rent_vehicles and rent_vehicle_attendance tables
+-- ============================================
+CREATE TABLE IF NOT EXISTS rent_vehicles (
+  id SERIAL PRIMARY KEY,
+  vehicle_name VARCHAR(255) NOT NULL,
+  sector_code VARCHAR(50) NOT NULL REFERENCES sectors(code) ON DELETE RESTRICT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(vehicle_name, sector_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rent_vehicles_sector_code ON rent_vehicles(sector_code);
+CREATE INDEX IF NOT EXISTS idx_rent_vehicles_vehicle_name ON rent_vehicles(vehicle_name);
+
+CREATE TABLE IF NOT EXISTS rent_vehicle_attendance (
+  id SERIAL PRIMARY KEY,
+  vehicle_id INTEGER NOT NULL REFERENCES rent_vehicles(id) ON DELETE CASCADE,
+  vehicle_name VARCHAR(255) NOT NULL,
+  sector VARCHAR(50) NOT NULL,
+  date DATE NOT NULL,
+  status VARCHAR(20) NOT NULL CHECK (status IN ('present', 'absent', 'halfday')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(vehicle_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rent_vehicle_attendance_vehicle_id ON rent_vehicle_attendance(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_rent_vehicle_attendance_date ON rent_vehicle_attendance(date);
+CREATE INDEX IF NOT EXISTS idx_rent_vehicle_attendance_sector ON rent_vehicle_attendance(sector);
+
+-- ============================================
+-- Migration 051: Create ingredient_menus and ingredient_items tables
+-- ============================================
+CREATE TABLE IF NOT EXISTS ingredient_menus (
+  id SERIAL PRIMARY KEY,
+  menu VARCHAR(255) NOT NULL UNIQUE,
+  members_count INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingredient_menus_menu ON ingredient_menus(menu);
+
+CREATE TABLE IF NOT EXISTS ingredient_items (
+  id SERIAL PRIMARY KEY,
+  menu_id INTEGER NOT NULL REFERENCES ingredient_menus(id) ON DELETE CASCADE,
+  ingredient_name VARCHAR(255) NOT NULL,
+  quantity DECIMAL(10, 3) NOT NULL,
+  unit VARCHAR(50) NOT NULL CHECK (unit IN ('Litre', 'Gram', 'Kilogram', 'Pieces', 'ml')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingredient_items_menu_id ON ingredient_items(menu_id);
+CREATE INDEX IF NOT EXISTS idx_ingredient_items_ingredient_name ON ingredient_items(ingredient_name);
 

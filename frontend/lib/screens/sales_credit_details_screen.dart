@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
 import '../utils/ui_helpers.dart';
+import '../utils/pdf_generator.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -33,6 +34,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   DateTime? _selectedDate;
   List<Map<String, dynamic>> _salesData = [];
   bool _isLoadingSales = false;
+  bool _isGeneratingPDF = false;
   final Map<int, bool> _editModeSales = {};
   final Map<int, Map<String, TextEditingController>> _controllersSales = {};
   bool _salesSectorSortAscending = true; // Sort direction for Sector column in Sales Details
@@ -1447,10 +1449,11 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     );
   }
 
+
   Widget _buildCreditDetailsTab() {
     return Column(
       children: [
-        // Header and Search Bar
+        // Header, Search Bar, Download Button and Notes
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.grey.shade100,
@@ -1466,34 +1469,94 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                 ],
               ),
               const SizedBox(height: 12),
-              StatefulBuilder(
-                builder: (context, setState) {
-                  return TextField(
-                    controller: _creditSearchController,
-                    decoration: InputDecoration(
-                      labelText: 'Search by Name or Address',
-                      hintText: 'Enter name or address to search',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _creditSearchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _creditSearchController.clear();
-                                _filterCreditData('');
-                                setState(() {}); // Update UI to hide clear button
-                              },
+              Row(
+                children: [
+                  // Search Bar
+                  Expanded(
+                    flex: 2,
+                    child: StatefulBuilder(
+                      builder: (context, setState) {
+                        return TextField(
+                          controller: _creditSearchController,
+                          decoration: InputDecoration(
+                            labelText: 'Search by Name or Address',
+                            hintText: 'Enter name or address to search',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _creditSearchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      _creditSearchController.clear();
+                                      _filterCreditData('');
+                                      setState(() {}); // Update UI to hide clear button
+                                    },
+                                  )
+                                : null,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            _filterCreditData(value);
+                            setState(() {}); // Update UI to show/hide clear button
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Download Button
+                  SizedBox(
+                    width: 200,
+                    height: 56,
+                    child: ElevatedButton.icon(
+                      onPressed: _isGeneratingPDF ? null : _downloadCurrentPageData,
+                      icon: _isGeneratingPDF
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                          : const Icon(Icons.download),
+                      label: Text(_isGeneratingPDF ? 'Generating...' : 'Download Current Page Data'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
-                    onChanged: (value) {
-                      _filterCreditData(value);
-                      setState(() {}); // Update UI to show/hide clear button
-                    },
-                  );
-                },
+                  ),
+                  const SizedBox(width: 12),
+                  // Notes Section (Compact)
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Downloads only searched/filtered data currently displayed on the page.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.blue.shade900,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1587,21 +1650,21 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 double totalOverallBalance = 0.0;
                                 
                                 final rowsFromData = _filteredCreditData.expand((record) {
-                                  final recordId = record['id'] as int;
-                                  final amountPending = _parseDecimal(record['amount_pending']);
-                                  final saleDateRaw = record['sale_date'];
-                                  final saleDateFormatted = _formatDate(saleDateRaw);
-                                  final payments = _balancePayments[recordId] ?? [];
-                                  final isAddingNewPayment = _addingNewPayment[recordId] == true;
+                                final recordId = record['id'] as int;
+                                final amountPending = _parseDecimal(record['amount_pending']);
+                                final saleDateRaw = record['sale_date'];
+                                final saleDateFormatted = _formatDate(saleDateRaw);
+                                final payments = _balancePayments[recordId] ?? [];
+                                final isAddingNewPayment = _addingNewPayment[recordId] == true;
 
-                                  // Main row
-                                  final List<DataRow> rows = [];
-                                  
-                                  // Calculate overall balance for main row (Amount Pending - sum of all payments)
-                                  double totalPaid = 0;
-                                  for (var payment in payments) {
-                                    totalPaid += _parseDecimal(payment['balance_paid']);
-                                  }
+                                // Main row
+                                final List<DataRow> rows = [];
+                                
+                                // Calculate overall balance for main row (Amount Pending - sum of all payments)
+                                double totalPaid = 0;
+                                for (var payment in payments) {
+                                  totalPaid += _parseDecimal(payment['balance_paid']);
+                                }
                                   double mainOverallBalance = amountPending - totalPaid;
                                   
                                   // If in edit mode, calculate based on controller value
@@ -2130,7 +2193,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                   }
                                 }
                                 
-                                  return rows;
+                                return rows;
                                 }).toList();
                                 
                                 // Add all data rows
@@ -2151,9 +2214,9 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
-                                          ),
-                                        ),
-                                      ),
+                            ),
+                          ),
+                        ),
                                       // Contact Number - empty
                                       const DataCell(Text('')),
                                       // Address - empty
@@ -2178,9 +2241,9 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
                                             color: totalOverallBalance > 0 ? Colors.red : Colors.green,
-                                          ),
-                                        ),
-                                      ),
+                      ),
+                    ),
+        ),
                                       // Details - empty
                                       const DataCell(Text('')),
                                       // Action - empty
@@ -2199,6 +2262,225 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         ),
       ],
     );
+  }
+
+  Future<void> _downloadCurrentPageData() async {
+    if (_filteredCreditData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No data available to download'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show filename input dialog
+    final fileNameController = TextEditingController();
+    final fileName = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Enter File Name'),
+          content: TextField(
+            controller: fileNameController,
+            decoration: const InputDecoration(
+              labelText: 'File Name',
+              hintText: 'Enter file name (without .pdf)',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (fileNameController.text.trim().isNotEmpty) {
+                  Navigator.of(context).pop(fileNameController.text.trim());
+                }
+              },
+              child: const Text('Download PDF'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (fileName == null || fileName.isEmpty) {
+      return; // User cancelled
+    }
+
+    setState(() => _isGeneratingPDF = true);
+
+    try {
+      // Use all current filtered data - if empty, use all credit data
+      // This ensures we always download the data that's visible on the page
+      final filteredData = _filteredCreditData.isNotEmpty ? _filteredCreditData : _creditData;
+
+      if (filteredData.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No data available to download. Filtered: ${_filteredCreditData.length}, All: ${_creditData.length}'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        setState(() => _isGeneratingPDF = false);
+        return;
+      }
+
+      print('Download: Using ${filteredData.length} records for PDF');
+
+      // Collect all data including payment rows and calculate total
+      final List<Map<String, dynamic>> allRowsForPDF = [];
+      double totalOverallBalance = 0.0;
+
+      for (var record in filteredData) {
+        final recordId = record['id'] as int;
+        final amountPending = _parseDecimal(record['amount_pending']);
+        final payments = _balancePayments[recordId] ?? [];
+        final isAddingNewPayment = _addingNewPayment[recordId] == true;
+
+        // Calculate total paid from existing payments
+        double totalPaid = 0;
+        for (var payment in payments) {
+          totalPaid += _parseDecimal(payment['balance_paid']);
+        }
+
+        // Add new payment if being added
+        if (isAddingNewPayment) {
+          final newKey = '${recordId}_new';
+          final newPaymentController = _newPaymentControllers[newKey];
+          if (newPaymentController != null && newPaymentController.text.isNotEmpty) {
+            totalPaid += _parseDecimal(newPaymentController.text);
+          }
+        }
+
+        final mainOverallBalance = amountPending - totalPaid;
+        totalOverallBalance += mainOverallBalance;
+
+        // Add main row
+        allRowsForPDF.add({
+          'type': 'main',
+          'sale_date': record['sale_date'],
+          'name': record['name']?.toString() ?? '',
+          'product_name': record['product_name']?.toString() ?? '',
+          'credit_amount': amountPending,
+          'balance_paid': totalPaid,
+          'balance_paid_date': payments.isNotEmpty && payments.last['balance_paid_date'] != null 
+              ? payments.last['balance_paid_date'] 
+              : null,
+          'overall_balance': mainOverallBalance,
+          'details': record['details']?.toString() ?? '',
+        });
+
+        // Add payment rows
+        for (int i = 0; i < payments.length; i++) {
+          final payment = payments[i];
+          final balancePaid = _parseDecimal(payment['balance_paid']);
+          
+          // Calculate overall balance for this payment
+          double paymentOverallBalance;
+          if (i == 0) {
+            paymentOverallBalance = amountPending - balancePaid;
+          } else {
+            final prevPayment = payments[i - 1];
+            final prevOverallBalance = _parseDecimal(prevPayment['overall_balance']);
+            paymentOverallBalance = prevOverallBalance - balancePaid;
+          }
+
+          allRowsForPDF.add({
+            'type': 'payment',
+            'sale_date': null,
+            'name': '',
+            'product_name': '',
+            'credit_amount': null,
+            'balance_paid': balancePaid,
+            'balance_paid_date': payment['balance_paid_date'],
+            'overall_balance': paymentOverallBalance,
+            'details': payment['details']?.toString() ?? '',
+          });
+        }
+
+        // Add new payment row if being added
+        if (isAddingNewPayment) {
+          final newKey = '${recordId}_new';
+          final newPaymentController = _newPaymentControllers[newKey];
+          final newPaymentDate = _newPaymentDates[newKey];
+          final newDetailsController = _newPaymentDetailsControllers[newKey];
+
+          if (newPaymentController != null && newPaymentController.text.isNotEmpty) {
+            final newBalancePaid = _parseDecimal(newPaymentController.text);
+            final prevOverallBalance = payments.isNotEmpty 
+                ? _parseDecimal(payments.last['overall_balance'])
+                : mainOverallBalance;
+            final newPaymentOverallBalance = prevOverallBalance - newBalancePaid;
+
+            allRowsForPDF.add({
+              'type': 'payment',
+              'sale_date': null,
+              'name': '',
+              'product_name': '',
+              'credit_amount': null,
+              'balance_paid': newBalancePaid,
+              'balance_paid_date': newPaymentDate,
+              'overall_balance': newPaymentOverallBalance,
+              'details': newDetailsController?.text ?? '',
+            });
+          }
+        }
+      }
+
+      // Add total row
+      allRowsForPDF.add({
+        'type': 'total',
+        'sale_date': null,
+        'name': 'TOTAL',
+        'product_name': null,
+        'credit_amount': null,
+        'balance_paid': null,
+        'balance_paid_date': null,
+        'overall_balance': totalOverallBalance,
+        'details': null,
+      });
+
+      print('Download: Total rows collected for PDF: ${allRowsForPDF.length}');
+      if (allRowsForPDF.isNotEmpty) {
+        print('Download: First row type: ${allRowsForPDF.first['type']}');
+      }
+
+      await PdfGenerator.generateCustomerCreditDetailsPDF(
+        creditData: allRowsForPDF,
+        fileName: fileName,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF saved successfully to Downloads folder'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingPDF = false);
+      }
+    }
   }
 }
 

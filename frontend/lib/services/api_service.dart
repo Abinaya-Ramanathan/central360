@@ -585,6 +585,140 @@ class ApiService {
     throw Exception(errorMessage);
   }
 
+  // Rent Vehicles
+  static Future<List<Map<String, dynamic>>> getRentVehicles({String? sector}) async {
+    final queryParams = <String, String>{};
+    if (sector != null) queryParams['sector'] = sector;
+
+    final uri = Uri.parse('$baseUrl/rent-vehicles').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load rent vehicles');
+  }
+
+  static Future<Map<String, dynamic>> createRentVehicle(String vehicleName, String sectorCode) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/rent-vehicles'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'vehicle_name': vehicleName,
+        'sector_code': sectorCode,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    // Extract error message from response body
+    String errorMessage = 'Failed to create rent vehicle';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to create rent vehicle';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<Map<String, dynamic>> updateRentVehicle(String id, String vehicleName, String sectorCode) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/rent-vehicles/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'vehicle_name': vehicleName,
+        'sector_code': sectorCode,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    // Extract error message from response body
+    String errorMessage = 'Failed to update rent vehicle';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to update rent vehicle';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<void> deleteRentVehicle(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/rent-vehicles/$id'),
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    // Extract error message from response body
+    String errorMessage = 'Failed to delete rent vehicle';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete rent vehicle';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Rent Vehicle Attendance
+  static Future<List<Map<String, dynamic>>> getRentVehicleAttendance({String? sector, int? month, String? date}) async {
+    final queryParams = <String, String>{};
+    if (sector != null) queryParams['sector'] = sector;
+    if (month != null) queryParams['month'] = month.toString();
+    if (date != null) queryParams['date'] = date;
+
+    final uri = Uri.parse('$baseUrl/rent-vehicle-attendance').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load rent vehicle attendance');
+  }
+
+  static Future<Map<String, dynamic>> saveRentVehicleAttendance({
+    required int vehicleId,
+    required String vehicleName,
+    required String sectorCode,
+    required String date,
+    String? status,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/rent-vehicle-attendance'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'vehicle_id': vehicleId,
+        'vehicle_name': vehicleName,
+        'sector_code': sectorCode,
+        'date': date,
+        'status': status,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to save rent vehicle attendance');
+  }
+
+  static Future<List<Map<String, dynamic>>> bulkSaveRentVehicleAttendance(List<Map<String, dynamic>> records) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/rent-vehicle-attendance/bulk'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'records': records}),
+    );
+    if (response.statusCode == 201) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to bulk save rent vehicle attendance');
+  }
+
   // Daily Expenses
   static Future<List<Map<String, dynamic>>> getDailyExpenses({String? month, String? date, String? sector}) async {
     final queryParams = <String, String>{};
@@ -1933,6 +2067,205 @@ class ApiService {
       }
     } catch (e) {
       errorMessage = response.body.isNotEmpty ? response.body : 'Failed to generate stock statement';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Mahal Vessels API methods
+  static Future<List<Map<String, dynamic>>> getMahalVessels({String? mahalDetail}) async {
+    final queryParams = <String, String>{};
+    if (mahalDetail != null) queryParams['mahal_detail'] = mahalDetail;
+
+    final uri = Uri.parse('$baseUrl/mahal-vessels').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => json as Map<String, dynamic>).toList();
+    }
+    throw Exception('Failed to load mahal vessels');
+  }
+
+  static Future<Map<String, dynamic>> createMahalVessel({
+    required String mahalDetail,
+    required String itemName,
+    required int count,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/mahal-vessels'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'mahal_detail': mahalDetail,
+        'item_name': itemName,
+        'count': count,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    }
+    String errorMessage = 'Failed to create mahal vessel';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to create mahal vessel';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<Map<String, dynamic>> updateMahalVessel({
+    required int id,
+    required String mahalDetail,
+    required String itemName,
+    required int count,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/mahal-vessels/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'mahal_detail': mahalDetail,
+        'item_name': itemName,
+        'count': count,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    }
+    String errorMessage = 'Failed to update mahal vessel';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to update mahal vessel';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<void> deleteMahalVessel(int id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/mahal-vessels/$id'),
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    String errorMessage = 'Failed to delete mahal vessel';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete mahal vessel';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Ingredients API methods
+  static Future<List<Map<String, dynamic>>> getIngredients({String? search}) async {
+    final queryParams = <String, String>{};
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+
+    final uri = Uri.parse('$baseUrl/ingredients').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => Map<String, dynamic>.from(json)).toList();
+    }
+    throw Exception('Failed to load ingredients');
+  }
+
+  static Future<Map<String, dynamic>> getIngredientById(String id) async {
+    final response = await http.get(Uri.parse('$baseUrl/ingredients/$id'));
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    String errorMessage = 'Failed to load ingredient';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to load ingredient';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<Map<String, dynamic>> createIngredient({
+    required String menu,
+    required int membersCount,
+    required List<Map<String, dynamic>> ingredients,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/ingredients'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'menu': menu,
+        'members_count': membersCount,
+        'ingredients': ingredients,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    String errorMessage = 'Failed to create ingredient';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to create ingredient';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<Map<String, dynamic>> updateIngredient({
+    required String id,
+    required String menu,
+    required int membersCount,
+    required List<Map<String, dynamic>> ingredients,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/ingredients/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'menu': menu,
+        'members_count': membersCount,
+        'ingredients': ingredients,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    String errorMessage = 'Failed to update ingredient';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to update ingredient';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<void> deleteIngredient(String id) async {
+    final response = await http.delete(Uri.parse('$baseUrl/ingredients/$id'));
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    String errorMessage = 'Failed to delete ingredient';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete ingredient';
     }
     throw Exception(errorMessage);
   }

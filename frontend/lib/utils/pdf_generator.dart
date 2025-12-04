@@ -655,7 +655,7 @@ class PdfGenerator {
       } else if (Platform.isAndroid) {
         // On Android, try multiple paths
         // Method 1: Try standard Downloads path
-        final standardPath = '/storage/emulated/0/Download';
+        const standardPath = '/storage/emulated/0/Download';
         final standardDir = Directory(standardPath);
         if (await standardDir.exists()) {
           return standardPath;
@@ -1092,9 +1092,9 @@ class PdfGenerator {
       ),
     );
     
-    final defaultFileName = 'Customer_Credit_Details.pdf';
+    const defaultFileName = 'Customer_Credit_Details.pdf';
     final finalFileName = fileName != null 
-        ? _sanitizeFileName('${fileName}.pdf')
+        ? _sanitizeFileName('$fileName.pdf')
         : _sanitizeFileName(defaultFileName);
     final filePath = await _savePdfToDownloads(pdf, finalFileName);
     return filePath;

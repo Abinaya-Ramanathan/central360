@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS attendance (
   bulk_advance_taken DECIMAL(10, 2) DEFAULT 0, -- Added in migration 036
   bulk_advance_paid DECIMAL(10, 2) DEFAULT 0, -- Added in migration 036
   bulk_advance DECIMAL(10, 2) DEFAULT 0, -- Added in migration 036
+  ot_hours DECIMAL(10, 2) DEFAULT 0, -- Added in migration 048
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(employee_id, date)

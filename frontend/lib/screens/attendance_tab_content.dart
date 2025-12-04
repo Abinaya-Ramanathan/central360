@@ -109,6 +109,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
           if (!_attendanceData.containsKey(emp.id)) {
           _attendanceData[emp.id] = {
             'status': null,
+            'ot_hours': 0.0,
             'outstanding_advance': 0.0,
             'advance_taken': 0.0,
             'advance_paid': 0.0,
@@ -133,6 +134,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
       for (var emp in _employees) {
         if (_attendanceData.containsKey(emp.id)) {
           _attendanceData[emp.id]!['status'] = null; // Reset status to null for new date
+          _attendanceData[emp.id]!['ot_hours'] = 0.0; // Reset OT hours to 0 for new date
           _attendanceData[emp.id]!['advance_taken'] = 0.0;
           _attendanceData[emp.id]!['advance_paid'] = 0.0;
           _attendanceData[emp.id]!['bulk_advance_taken'] = 0.0;
@@ -214,9 +216,11 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
           final newBulkAdvance = previousBulk + bulkTaken - bulkPaid;
           
           final status = record['status'] as String?;
+          final otHours = FormatUtils.parseDecimal(record['ot_hours']);
 
           _attendanceData[emp.id] = {
             'status': status,
+            'ot_hours': otHours,  // Load OT hours if record exists for this date
             'previous_outstanding': previous,
             'outstanding_advance': newOutstanding,
             'advance_taken': taken,  // Only load if record exists for this date
@@ -293,13 +297,14 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
       _recalculateOutstanding();
       
       // Only save employees that have a status selected or have been edited
-      // Filter to include employees with status or with any advance/bulk advance changes
+      // Filter to include employees with status or with any advance/bulk advance/OT hours changes
       final attendanceRecords = _employees
           .where((emp) {
             final data = _attendanceData[emp.id];
-            // Save if employee has a status OR if they have advance/bulk advance changes
+            // Save if employee has a status OR if they have advance/bulk advance/OT hours changes
             return data != null && (
               data['status'] != null ||
+              (data['ot_hours'] != null && (FormatUtils.parseDecimal(data['ot_hours']) > 0.0)) ||
               (data['advance_taken'] != null && (FormatUtils.parseDecimal(data['advance_taken']) > 0.0)) ||
               (data['advance_paid'] != null && (FormatUtils.parseDecimal(data['advance_paid']) > 0.0)) ||
               (data['bulk_advance_taken'] != null && (FormatUtils.parseDecimal(data['bulk_advance_taken']) > 0.0)) ||
@@ -323,6 +328,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
               'sector': widget.selectedSector ?? emp.sector,
               'date': dateStr,
               'status': data['status'] ?? 'present', // Default to 'present' if not set
+              'ot_hours': FormatUtils.parseDecimal(data['ot_hours'] ?? 0.0),
               'outstanding_advance': FormatUtils.parseDecimal(data['outstanding_advance']),
               'advance_taken': FormatUtils.parseDecimal(data['advance_taken']),
               'advance_paid': FormatUtils.parseDecimal(data['advance_paid']),
@@ -337,7 +343,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No changes to save. Please select at least one employee status or enter advance details.'),
+              content: Text('No changes to save. Please select at least one employee status, enter OT hours, or enter advance details.'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -390,10 +396,12 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _employees.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        'No employees in selected sector',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                        widget.selectedSector == null && widget.isAdmin
+                            ? 'No employees found'
+                            : 'No employees in selected sector',
+                        style: const TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
                   : SingleChildScrollView(
@@ -429,6 +437,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                   ),
                                 const DataColumn(label: Text('Name')),
                                 const DataColumn(label: Text('Status')),
+                                const DataColumn(label: Text('OT in Hours')),
                                 const DataColumn(label: Text('Outstanding Advance')),
                                 const DataColumn(label: Text('Advance Taken')),
                                 const DataColumn(label: Text('Advance Paid')),
@@ -439,6 +448,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                               rows: _employees.map((employee) {
                                 final data = _attendanceData[employee.id] ?? {
                                   'status': null,
+                                  'ot_hours': 0.0,
                                   'outstanding_advance': 0.0,
                                   'advance_taken': 0.0,
                                   'advance_paid': 0.0,
@@ -473,6 +483,30 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                                                   : 'Not Set',
                                               style: TextStyle(
                                                 color: data['status'] == null ? Colors.grey : null,
+                                              ),
+                                            ),
+                                    ),
+                                    DataCell(
+                                      widget.isEditMode
+                                          ? SizedBox(
+                                              width: 120,
+                                              child: TextFormField(
+                                                initialValue: (data['ot_hours'] ?? 0.0).toString(),
+                                                keyboardType: TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                                ],
+                                                onChanged: (value) {
+                                                  _attendanceData[employee.id]?['ot_hours'] =
+                                                      double.tryParse(value) ?? 0.0;
+                                                },
+                                              ),
+                                            )
+                                          : Text(
+                                              '${(data['ot_hours'] ?? 0.0).toStringAsFixed(2)} hrs',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.orange.shade700,
                                               ),
                                             ),
                                     ),

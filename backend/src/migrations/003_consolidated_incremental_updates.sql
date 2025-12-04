@@ -501,3 +501,16 @@ CREATE TABLE IF NOT EXISTS ingredient_items (
 CREATE INDEX IF NOT EXISTS idx_ingredient_items_menu_id ON ingredient_items(menu_id);
 CREATE INDEX IF NOT EXISTS idx_ingredient_items_ingredient_name ON ingredient_items(ingredient_name);
 
+-- ============================================
+-- Migration 048: Add ot_hours column to attendance table
+-- ============================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'attendance' AND column_name = 'ot_hours'
+  ) THEN
+    ALTER TABLE attendance ADD COLUMN ot_hours DECIMAL(10, 2) DEFAULT 0;
+  END IF;
+END $$;
+

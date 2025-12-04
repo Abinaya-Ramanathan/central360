@@ -1171,7 +1171,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -1694,7 +1694,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
           color: Colors.grey.shade100,
           child: Column(
             children: [
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
@@ -1705,7 +1705,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                           'Company Purchases with Outstanding Credit',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: 4),
                         ],
                     ),
                   ),

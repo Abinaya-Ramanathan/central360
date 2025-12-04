@@ -971,7 +971,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                             DataCell(
                               isEditing
                                   ? DropdownButtonFormField<String>(
-                                      value: controllers['mahal_detail'] as String? ?? vessel['mahal_detail'] as String,
+                                      initialValue: controllers['mahal_detail'] as String? ?? vessel['mahal_detail'] as String,
                                       decoration: const InputDecoration(
                                         border: OutlineInputBorder(),
                                         isDense: true,
@@ -1213,7 +1213,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedMahalDetail,
+                  initialValue: selectedMahalDetail,
                   decoration: const InputDecoration(
                     labelText: 'Mahal Details *',
                     border: OutlineInputBorder(),

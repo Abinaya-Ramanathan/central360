@@ -46,6 +46,7 @@ router.post('/', async (req, res) => {
       sector,
       date,
       status,
+      ot_hours,
       outstanding_advance,
       advance_taken,
       advance_paid,
@@ -64,21 +65,21 @@ router.post('/', async (req, res) => {
       // Update existing record
       const { rows } = await db.query(
         `UPDATE attendance SET
-          status = $1, outstanding_advance = $2, advance_taken = $3, advance_paid = $4,
-          bulk_advance = $5, bulk_advance_taken = $6, bulk_advance_paid = $7
-        WHERE employee_id = $8 AND date = $9
+          status = $1, ot_hours = $2, outstanding_advance = $3, advance_taken = $4, advance_paid = $5,
+          bulk_advance = $6, bulk_advance_taken = $7, bulk_advance_paid = $8
+        WHERE employee_id = $9 AND date = $10
         RETURNING *`,
-        [status, outstanding_advance, advance_taken, advance_paid, bulk_advance || 0, bulk_advance_taken || 0, bulk_advance_paid || 0, employee_id, date]
+        [status, ot_hours || 0, outstanding_advance, advance_taken, advance_paid, bulk_advance || 0, bulk_advance_taken || 0, bulk_advance_paid || 0, employee_id, date]
       );
       res.json(rows[0]);
     } else {
       // Create new record
       const { rows } = await db.query(
         `INSERT INTO attendance (
-          employee_id, employee_name, sector, date, status,
+          employee_id, employee_name, sector, date, status, ot_hours,
           outstanding_advance, advance_taken, advance_paid,
           bulk_advance, bulk_advance_taken, bulk_advance_paid
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *`,
         [
           employee_id,
@@ -86,6 +87,7 @@ router.post('/', async (req, res) => {
           sector,
           date,
           status,
+          ot_hours || 0,
           outstanding_advance || 0,
           advance_taken || 0,
           advance_paid || 0,
@@ -189,6 +191,7 @@ router.post('/bulk', async (req, res) => {
         sector,
         date,
         status,
+        ot_hours,
         outstanding_advance,
         advance_taken,
         advance_paid,
@@ -205,20 +208,20 @@ router.post('/bulk', async (req, res) => {
       if (existing.rows.length > 0) {
         const { rows } = await db.query(
           `UPDATE attendance SET
-            status = $1, outstanding_advance = $2, advance_taken = $3, advance_paid = $4,
-            bulk_advance = $5, bulk_advance_taken = $6, bulk_advance_paid = $7
-          WHERE employee_id = $8 AND date = $9
+            status = $1, ot_hours = $2, outstanding_advance = $3, advance_taken = $4, advance_paid = $5,
+            bulk_advance = $6, bulk_advance_taken = $7, bulk_advance_paid = $8
+          WHERE employee_id = $9 AND date = $10
           RETURNING *`,
-          [status, outstanding_advance, advance_taken, advance_paid, bulk_advance || 0, bulk_advance_taken || 0, bulk_advance_paid || 0, employee_id, date]
+          [status, ot_hours || 0, outstanding_advance, advance_taken, advance_paid, bulk_advance || 0, bulk_advance_taken || 0, bulk_advance_paid || 0, employee_id, date]
         );
         results.push(rows[0]);
       } else {
         const { rows } = await db.query(
           `INSERT INTO attendance (
-            employee_id, employee_name, sector, date, status,
+            employee_id, employee_name, sector, date, status, ot_hours,
             outstanding_advance, advance_taken, advance_paid,
             bulk_advance, bulk_advance_taken, bulk_advance_paid
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           RETURNING *`,
           [
             employee_id,
@@ -226,6 +229,7 @@ router.post('/bulk', async (req, res) => {
             sector,
             date,
             status,
+            ot_hours || 0,
             outstanding_advance || 0,
             advance_taken || 0,
             advance_paid || 0,

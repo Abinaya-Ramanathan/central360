@@ -183,7 +183,7 @@ class _ManageRentVehiclesDialogState extends State<ManageRentVehiclesDialog> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _searchSectorCode,
+                      initialValue: _searchSectorCode,
                       decoration: InputDecoration(
                         hintText: 'All Sectors',
                         border: OutlineInputBorder(

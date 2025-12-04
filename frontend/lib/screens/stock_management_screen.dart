@@ -886,7 +886,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                               width: 90,
                                               child: TextField(
                                                 controller: quantityController,
-                                                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                                 inputFormatters: [
                                                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                                                 ],
@@ -904,7 +904,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                           ? ConstrainedBox(
                                               constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
                                               child: DropdownButtonFormField<String>(
-                                                value: _dailyQuantityUnits[key],
+                                                initialValue: _dailyQuantityUnits[key],
                                                 isDense: true,
                                                 isExpanded: true,
                                                 decoration: const InputDecoration(
@@ -1238,7 +1238,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                                 width: 90,
                                               child: TextField(
                                                   controller: _overallNewStockGramControllers[key],
-                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                                   inputFormatters: [
                                                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                                                   ],
@@ -1262,7 +1262,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                                 width: 90,
                                                 child: TextField(
                                                   controller: _overallNewStockKgControllers[key],
-                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                                   inputFormatters: [
                                                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                                                   ],
@@ -1286,7 +1286,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                                 width: 90,
                                                 child: TextField(
                                                   controller: _overallNewStockLitreControllers[key],
-                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                                   inputFormatters: [
                                                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                                                   ],
@@ -1310,7 +1310,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                                 width: 90,
                                                 child: TextField(
                                                   controller: _overallNewStockPiecesControllers[key],
-                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                                   inputFormatters: [
                                                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                                                   ],
@@ -1334,7 +1334,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                                 width: 90,
                                                 child: TextField(
                                                   controller: _overallNewStockBoxesControllers[key],
-                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                                   inputFormatters: [
                                                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                                                   ],

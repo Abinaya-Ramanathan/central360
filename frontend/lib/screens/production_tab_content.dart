@@ -26,7 +26,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   bool _isLoading = false;
   final TextEditingController _searchController = TextEditingController();
   bool _sortAscending = true; // Sort direction for Sector column
-  Map<String, String?> _productionUnits = {}; // Store unit for each product
+  final Map<String, String?> _productionUnits = {}; // Store unit for each product
 
   List<Sector> _sectors = [];
 
@@ -346,7 +346,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                                 labelText: 'Morning',
                                 border: OutlineInputBorder(),
                               ),
-                              keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                               ],
@@ -360,7 +360,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                                 labelText: 'Afternoon',
                                 border: OutlineInputBorder(),
                               ),
-                              keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                               ],
@@ -374,7 +374,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                                 labelText: 'Evening',
                                 border: OutlineInputBorder(),
                               ),
-                              keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                               ],
@@ -387,7 +387,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _productionUnits[controllerKey],
+                              initialValue: _productionUnits[controllerKey],
                               decoration: const InputDecoration(
                                 labelText: 'Unit',
                                 border: OutlineInputBorder(),

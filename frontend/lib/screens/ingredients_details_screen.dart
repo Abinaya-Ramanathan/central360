@@ -245,7 +245,7 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
               onPressed: () async {
                 final result = await showDialog<bool>(
                   context: context,
-                  builder: (context) => AddIngredientDialog(),
+                  builder: (context) => const AddIngredientDialog(),
                 );
                 if (result == true) {
                   _loadIngredients();
@@ -450,7 +450,7 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
                                       flex: 2,
                                       child: DropdownButtonFormField<String>(
                                         key: ValueKey('unit_${menuId}_$idx'),
-                                        value: ing['unit']?.toString() ?? 'Gram',
+                                        initialValue: ing['unit']?.toString() ?? 'Gram',
                                         decoration: const InputDecoration(
                                           labelText: 'Unit',
                                           border: OutlineInputBorder(),

@@ -21,6 +21,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
   List<DateTime> _selectedDates = [];
   List<Employee> _employees = [];
   Map<String, double> _presentDaysCount = {}; // Map of employee_id to present days count (supports 0.5 for halfday)
+  Map<String, double> _totalOtHours = {}; // Map of employee_id to total OT hours
   List<Map<String, dynamic>> _rentVehicles = [];
   Map<int, double> _rentVehiclePresentDaysCount = {}; // Map of vehicle_id to present days count (supports 0.5 for halfday)
   bool _isLoading = false;
@@ -49,6 +50,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
           _employees = [];
           _rentVehicles = [];
           _presentDaysCount = {};
+          _totalOtHours = {};
           _rentVehiclePresentDaysCount = {};
         });
       }
@@ -149,6 +151,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         _selectedMonth = picked;
         _selectedDates = []; // Clear selected dates when month changes
         _presentDaysCount = {for (var emp in _employees) emp.id: 0.0}; // Reset counts
+        _totalOtHours = {for (var emp in _employees) emp.id: 0.0}; // Reset OT hours
         _rentVehiclePresentDaysCount = {for (var vehicle in _rentVehicles) vehicle['id'] as int: 0.0}; // Reset rent vehicle counts
       });
     }
@@ -221,6 +224,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
     try {
       // Initialize all counts to 0
       _presentDaysCount = {for (var emp in _employees) emp.id: 0.0};
+      _totalOtHours = {for (var emp in _employees) emp.id: 0.0};
       _rentVehiclePresentDaysCount = {for (var vehicle in _rentVehicles) vehicle['id'] as int: 0.0};
 
       // Query attendance for each selected date
@@ -235,20 +239,47 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
           );
 
           // Count status for each employee (Present=1, Absent=0, Halfday=0.5)
+          // Also sum OT hours for each employee
           for (var record in attendanceRecords) {
-            final empId = record['employee_id']?.toString();
+            // Handle both int and string employee_id formats
+            final empIdRaw = record['employee_id'];
+            final empId = empIdRaw?.toString();
             final status = record['status']?.toString().toLowerCase();
             
-            if (empId != null && status != null) {
-              double count = 0.0;
-              if (status == 'present') {
-                count = 1.0;
-              } else if (status == 'halfday') {
-                count = 0.5;
-              } else if (status == 'absent') {
-                count = 0.0;
+            if (empId != null) {
+              // Count status (only if status exists)
+              if (status != null) {
+                double count = 0.0;
+                if (status == 'present') {
+                  count = 1.0;
+                } else if (status == 'halfday') {
+                  count = 0.5;
+                } else if (status == 'absent') {
+                  count = 0.0;
+                }
+                _presentDaysCount[empId] = (_presentDaysCount[empId] ?? 0.0) + count;
               }
-              _presentDaysCount[empId] = (_presentDaysCount[empId] ?? 0.0) + count;
+              
+              // Sum OT hours - handle various data types from database
+              final otHoursRaw = record['ot_hours'];
+              double otHours = 0.0;
+              if (otHoursRaw != null) {
+                if (otHoursRaw is num) {
+                  otHours = otHoursRaw.toDouble();
+                } else if (otHoursRaw is String) {
+                  otHours = double.tryParse(otHoursRaw) ?? 0.0;
+                } else {
+                  otHours = double.tryParse(otHoursRaw.toString()) ?? 0.0;
+                }
+              }
+              
+              // Always accumulate OT hours (even if 0, to ensure we process all records)
+              _totalOtHours[empId] = (_totalOtHours[empId] ?? 0.0) + otHours;
+              
+              // Debug: Print OT hours for verification
+              if (otHours > 0) {
+                debugPrint('Date $dateStr - Employee $empId: OT Hours = $otHours, Total = ${_totalOtHours[empId]}');
+              }
             }
           }
 
@@ -403,9 +434,11 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                                     columns: const [
                                       DataColumn(label: Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                       DataColumn(label: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
+                                      DataColumn(label: Text('Total OT in hours', style: TextStyle(fontWeight: FontWeight.bold))),
                                     ],
                                     rows: _employees.map((employee) {
                                       final presentDays = _presentDaysCount[employee.id] ?? 0;
+                                      final totalOtHours = _totalOtHours[employee.id] ?? 0.0;
                                       return DataRow(
                                         cells: [
                                           DataCell(Text(employee.name)),
@@ -415,6 +448,15 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 color: presentDays > 0 ? Colors.green.shade700 : Colors.grey,
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Text(
+                                              totalOtHours.toStringAsFixed(2),
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: totalOtHours > 0 ? Colors.orange.shade700 : Colors.grey,
                                               ),
                                             ),
                                           ),

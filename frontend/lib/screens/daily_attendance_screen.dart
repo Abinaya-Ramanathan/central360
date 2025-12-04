@@ -80,6 +80,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
           if (!_attendanceData.containsKey(emp.id)) {
             _attendanceData[emp.id] = {
               'status': null, // Default to null (select status)
+              'ot_hours': 0.0,
               'outstanding_advance': 0.0,
               'advance_taken': 0.0,
               'advance_paid': 0.0,
@@ -88,6 +89,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
           } else {
             // Reset status to null when loading new date (status is date-specific)
             _attendanceData[emp.id]!['status'] = null;
+            _attendanceData[emp.id]!['ot_hours'] = 0.0;
           }
         }
       });
@@ -170,6 +172,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
         if (!_attendanceData.containsKey(emp.id)) {
           _attendanceData[emp.id] = {
             'status': null,
+            'ot_hours': 0.0,
             'outstanding_advance': 0.0,
             'advance_taken': 0.0,
             'advance_paid': 0.0,
@@ -178,6 +181,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
         } else {
           // Reset status to null for new date (status is date-specific)
           _attendanceData[emp.id]!['status'] = null;
+          _attendanceData[emp.id]!['ot_hours'] = 0.0;
         }
       }
       
@@ -200,12 +204,14 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
           final taken = FormatUtils.parseDecimal(record['advance_taken']);
           final paid = FormatUtils.parseDecimal(record['advance_paid']);
           final status = record['status']; // Get status from record for this specific date
+          final otHours = FormatUtils.parseDecimal(record['ot_hours']);
           
           // Calculate outstanding: previous day's outstanding + today's taken - today's paid
           final newOutstanding = previousOutstanding + taken - paid;
           
           _attendanceData[emp.id] = {
             'status': status, // Use saved status for this date
+            'ot_hours': otHours, // Load OT hours for this date
             'previous_outstanding': previousOutstanding, // Keep previous day's value
             'outstanding_advance': newOutstanding, // Recalculate
             'advance_taken': taken,
@@ -216,6 +222,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
           // Employee has no saved data for this date - status remains null
           _attendanceData[emp.id] = {
             'status': null, // No status selected yet for this date
+            'ot_hours': 0.0, // Default OT hours to 0
             'previous_outstanding': previousOutstanding,
             'outstanding_advance': previousOutstanding, // Start with previous outstanding
             'advance_taken': 0.0,
@@ -258,6 +265,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
             if (!_attendanceData.containsKey(emp.id)) {
               _attendanceData[emp.id] = {
                 'status': null,
+                'ot_hours': 0.0,
                 'outstanding_advance': 0.0,
                 'advance_taken': 0.0,
                 'advance_paid': 0.0,
@@ -271,6 +279,8 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
             _attendanceData[emp.id]!['advance_paid'] = 0.0;
             // Initialize status to null (will be loaded from attendance data if exists)
             _attendanceData[emp.id]!['status'] = null;
+            // Initialize OT hours to 0 (will be loaded from attendance data if exists)
+            _attendanceData[emp.id]!['ot_hours'] = 0.0;
           } catch (e) {
             // Ignore errors, use 0 as default
             if (!_attendanceData.containsKey(emp.id)) {
@@ -284,6 +294,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
             } else {
               _attendanceData[emp.id]!['previous_outstanding'] = 0.0;
               _attendanceData[emp.id]!['status'] = null;
+              _attendanceData[emp.id]!['ot_hours'] = 0.0;
             }
           }
         }
@@ -322,6 +333,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
               'sector': widget.selectedSector!,
               'date': dateStr,
               'status': data['status'] ?? 'present', // Default to 'present' if not set
+              'ot_hours': data['ot_hours'] ?? 0.0,
               'outstanding_advance': data['outstanding_advance'] ?? 0.0,
               'advance_taken': data['advance_taken'] ?? 0.0,
               'advance_paid': data['advance_paid'] ?? 0.0,
@@ -557,6 +569,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                                   columns: const [
                                     DataColumn(label: Text('Name')),
                                     DataColumn(label: Text('Status')),
+                                    DataColumn(label: Text('OT in Hours')),
                                     DataColumn(label: Text('Outstanding Advance')),
                                     DataColumn(label: Text('Advance Taken')),
                                     DataColumn(label: Text('Advance Paid')),
@@ -564,6 +577,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                                   rows: _employees.map((employee) {
                                     final data = _attendanceData[employee.id] ?? {
                                       'status': 'present',
+                                      'ot_hours': 0.0,
                                       'outstanding_advance': 0.0,
                                       'advance_taken': 0.0,
                                       'advance_paid': 0.0,
@@ -602,6 +616,30 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                                                       : 'Not Set',
                                                   style: TextStyle(
                                                     color: data['status'] == null ? Colors.grey : null,
+                                                  ),
+                                                ),
+                                        ),
+                                        DataCell(
+                                          _isEditMode
+                                              ? SizedBox(
+                                                  width: 120,
+                                                  child: TextFormField(
+                                                    initialValue: (data['ot_hours'] ?? 0.0).toString(),
+                                                    keyboardType: TextInputType.number,
+                                                    inputFormatters: [
+                                                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                                    ],
+                                                    onChanged: (value) {
+                                                      _attendanceData[employee.id]?['ot_hours'] =
+                                                          double.tryParse(value) ?? 0.0;
+                                                    },
+                                                  ),
+                                                )
+                                              : Text(
+                                                  '${(data['ot_hours'] ?? 0.0).toStringAsFixed(2)} hrs',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.orange.shade700,
                                                   ),
                                                 ),
                                         ),

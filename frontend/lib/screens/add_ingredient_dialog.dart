@@ -12,7 +12,7 @@ class _AddIngredientDialogState extends State<AddIngredientDialog> {
   final _formKey = GlobalKey<FormState>();
   final _menuController = TextEditingController();
   final _membersCountController = TextEditingController();
-  List<Map<String, dynamic>> _ingredients = [
+  final List<Map<String, dynamic>> _ingredients = [
     {
       'ingredient_name': '',
       'quantity': 0.0,
@@ -266,7 +266,7 @@ class _AddIngredientDialogState extends State<AddIngredientDialog> {
                                     Expanded(
                                       flex: 2,
                                       child: DropdownButtonFormField<String>(
-                                        value: ingredient['unit'] ?? 'Gram',
+                                        initialValue: ingredient['unit'] ?? 'Gram',
                                         decoration: const InputDecoration(
                                           labelText: 'Unit',
                                           border: OutlineInputBorder(),

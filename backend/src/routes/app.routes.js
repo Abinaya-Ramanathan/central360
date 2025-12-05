@@ -10,15 +10,15 @@ router.get('/version', (_req, res) => {
     // TODO: Update these values when releasing a new version
     // You can also read from a config file or environment variables
     const versionInfo = {
-      version: '1.0.14',  // Update this when releasing new version
-      buildNumber: '15',  // Update this when releasing new version
+      version: '1.0.15',  // Update this when releasing new version
+      buildNumber: '16',  // Update this when releasing new version
       platforms: {
         windows: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.14/company360-setup.exe',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.15/company360-setup.exe',
           isRequired: false,
         },
         android: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.14/company360-v1.0.14.apk',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.15/company360-v1.0.15.apk',
           isRequired: false,
         }
       },

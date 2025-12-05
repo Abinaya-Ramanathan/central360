@@ -1,7 +1,7 @@
 -- ============================================
--- Consolidated Incremental Updates (Migrations 003-051)
+-- Consolidated Incremental Updates (Migrations 003-052)
 -- ============================================
--- This file consolidates all incremental updates from migrations 003-051
+-- This file consolidates all incremental updates from migrations 003-052
 -- Use this for existing databases that need to be updated
 -- For new installations, use 001_complete_schema.sql instead
 -- ============================================
@@ -502,7 +502,7 @@ CREATE INDEX IF NOT EXISTS idx_ingredient_items_menu_id ON ingredient_items(menu
 CREATE INDEX IF NOT EXISTS idx_ingredient_items_ingredient_name ON ingredient_items(ingredient_name);
 
 -- ============================================
--- Migration 048: Add ot_hours column to attendance table
+-- Migration 052: Add ot_hours column to attendance table
 -- ============================================
 DO $$
 BEGIN

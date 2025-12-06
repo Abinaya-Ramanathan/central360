@@ -105,22 +105,37 @@ router.post('/', async (req, res) => {
 });
 
 // Get latest outstanding advance for an employee before a given date
-// This gets the outstanding_advance from the most recent attendance record BEFORE the given date
+// This gets the outstanding_advance from the most recent attendance record up to and including the given date
+// It prioritizes records with non-zero outstanding_advance to ensure advances persist until paid off
 router.get('/outstanding/:employeeId/:date', async (req, res) => {
   try {
     const { employeeId, date } = req.params;
     console.log(`[Outstanding Advance] Request for employeeId: ${employeeId}, date: ${date}`);
     
-    // Get the outstanding_advance from the most recent record up to and including the given date
-    // This includes any transactions on the date itself
-    const { rows } = await db.query(
+    // First, try to get the most recent record with non-zero outstanding_advance
+    // This ensures that if an advance was taken and not yet paid, it will be returned
+    let { rows } = await db.query(
       `SELECT outstanding_advance, date
        FROM attendance 
-       WHERE employee_id = $1 AND date <= $2::date
+       WHERE employee_id = $1 AND date <= $2::date AND (outstanding_advance IS NOT NULL AND outstanding_advance > 0)
        ORDER BY date DESC 
        LIMIT 1`,
       [employeeId, date]
     );
+    
+    // If no non-zero record found, get the most recent record (which might be 0 or NULL)
+    // This handles the case where advance was fully paid off
+    if (rows.length === 0) {
+      const result = await db.query(
+        `SELECT outstanding_advance, date
+         FROM attendance 
+         WHERE employee_id = $1 AND date <= $2::date
+         ORDER BY date DESC 
+         LIMIT 1`,
+        [employeeId, date]
+      );
+      rows = result.rows;
+    }
     
     console.log(`[Outstanding Advance] Found ${rows.length} record(s) for employeeId: ${employeeId}, date: ${date}`);
     if (rows.length > 0) {
@@ -142,22 +157,37 @@ router.get('/outstanding/:employeeId/:date', async (req, res) => {
 });
 
 // Get latest bulk advance for an employee before a given date
-// This gets the bulk_advance from the most recent attendance record BEFORE the given date
+// This gets the bulk_advance from the most recent attendance record up to and including the given date
+// It prioritizes records with non-zero bulk_advance to ensure advances persist until paid off
 router.get('/bulk-advance/:employeeId/:date', async (req, res) => {
   try {
     const { employeeId, date } = req.params;
     console.log(`[Bulk Advance] Request for employeeId: ${employeeId}, date: ${date}`);
     
-    // Get the bulk_advance from the most recent record up to and including the given date
-    // This includes any transactions on the date itself
-    const { rows } = await db.query(
+    // First, try to get the most recent record with non-zero bulk_advance
+    // This ensures that if a bulk advance was taken and not yet paid, it will be returned
+    let { rows } = await db.query(
       `SELECT bulk_advance, date
        FROM attendance 
-       WHERE employee_id = $1 AND date <= $2::date
+       WHERE employee_id = $1 AND date <= $2::date AND (bulk_advance IS NOT NULL AND bulk_advance > 0)
        ORDER BY date DESC 
        LIMIT 1`,
       [employeeId, date]
     );
+    
+    // If no non-zero record found, get the most recent record (which might be 0 or NULL)
+    // This handles the case where bulk advance was fully paid off
+    if (rows.length === 0) {
+      const result = await db.query(
+        `SELECT bulk_advance, date
+         FROM attendance 
+         WHERE employee_id = $1 AND date <= $2::date
+         ORDER BY date DESC 
+         LIMIT 1`,
+        [employeeId, date]
+      );
+      rows = result.rows;
+    }
     
     console.log(`[Bulk Advance] Found ${rows.length} record(s) for employeeId: ${employeeId}, date: ${date}`);
     if (rows.length > 0) {

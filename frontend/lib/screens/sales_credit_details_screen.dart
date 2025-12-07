@@ -37,6 +37,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   bool _isGeneratingPDF = false;
   final Map<int, bool> _editModeSales = {};
   final Map<int, Map<String, TextEditingController>> _controllersSales = {};
+  final Map<int, bool> _companyStaffValues = {}; // Store company_staff values for editing
   bool _salesSectorSortAscending = true; // Sort direction for Sector column in Sales Details
   
   // Credit Details Tab State
@@ -46,6 +47,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   final TextEditingController _creditSearchController = TextEditingController();
   bool _creditDateSortAscending = true; // true = ascending (oldest first), false = descending (newest first)
   bool _creditSectorSortAscending = true; // Sort direction for Sector column in Credit Details
+  String? _selectedCompanyStaffFilterCredit; // null, 'true', or 'false' for Customer Credit Details tab
+  Set<String> _selectedMonthsCredit = {}; // Set of 'YYYY-MM' strings for multiple month selection
   final Map<int, bool> _editModeCredit = {}; // Track which rows are in edit mode (key = record ID)
   final Map<int, TextEditingController> _balancePaidControllers = {}; // Controllers for Balance Paid field (key = record ID or payment ID)
   final Map<int, DateTime?> _balancePaidDates = {}; // Selected dates for Balance Paid Date (key = record ID or payment ID)
@@ -120,6 +123,142 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     return sector.name;
   }
 
+  Future<void> _showMonthYearPickerCredit() async {
+    final now = DateTime.now();
+    int selectedYear = now.year;
+    Set<String> tempSelectedMonths = Set.from(_selectedMonthsCredit);
+    
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Select Months'),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Year selector
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedYear--;
+                          });
+                        },
+                      ),
+                      Text(
+                        selectedYear.toString(),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedYear++;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Month grid
+                  SizedBox(
+                    height: 280,
+                    child: GridView.builder(
+                      shrinkWrap: false,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 2.5,
+                      ),
+                      itemCount: 12,
+                      itemBuilder: (context, index) {
+                        final month = index + 1;
+                        final monthKey = '$selectedYear-${month.toString().padLeft(2, '0')}';
+                        final isSelected = tempSelectedMonths.contains(monthKey);
+                        final monthNames = [
+                          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                        ];
+                        
+                        return InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              if (isSelected) {
+                                tempSelectedMonths.remove(monthKey);
+                              } else {
+                                tempSelectedMonths.add(monthKey);
+                              }
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.blue.shade700 : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? Colors.blue.shade900 : Colors.grey.shade400,
+                                width: 2,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                monthNames[index],
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.black87,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Clear all button
+                  if (tempSelectedMonths.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        setDialogState(() {
+                          tempSelectedMonths.clear();
+                        });
+                      },
+                      child: const Text('Clear All'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, tempSelectedMonths),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    if (result != null) {
+      setState(() {
+        _selectedMonthsCredit = result;
+      });
+      // Apply filter with current search query to preserve both month and search filters
+      _filterCreditData(_creditSearchController.text);
+    }
+  }
+
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -178,12 +317,18 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
 
     setState(() => _isLoadingCredit = true);
     try {
+      // For multiple months, we'll filter on the frontend
+      // since the backend only supports single month filter
+      // Pass null to backend when multiple months are selected, filter locally instead
+      String? monthFilter = null; // Always pass null, filter on frontend for multiple months
+      
       final credits = await ApiService.getCreditDetailsFromSales(
         sector: widget.selectedSector,
+        companyStaff: _selectedCompanyStaffFilterCredit,
+        month: monthFilter,
       );
-
-
-      // Load balance payments for each credit record
+      
+      // Load balance payments for each credit record (use original credits, not filtered)
       _balancePayments.clear();
       for (var credit in credits) {
         final creditId = credit['id'] as int;
@@ -192,8 +337,72 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       }
 
       setState(() {
-        _creditData = credits;
-        _filteredCreditData = List.from(credits);
+        // Store all credits (with company staff filter applied from backend) in _creditData
+        _creditData = List.from(credits);
+        
+        // Apply all filters (month, search) to get the final filtered data
+        // Start with the data that already has company staff filter applied
+        List<Map<String, dynamic>> finalFiltered = List.from(credits);
+        
+        // Apply month filter if months are selected
+        if (_selectedMonthsCredit.isNotEmpty) {
+          finalFiltered = finalFiltered.where((record) {
+            final saleDate = record['sale_date'];
+            if (saleDate == null) return false;
+            
+            String dateStr;
+            try {
+              if (saleDate is DateTime) {
+                dateStr = '${saleDate.year}-${saleDate.month.toString().padLeft(2, '0')}';
+              } else if (saleDate is String) {
+                String dateString = saleDate;
+                if (dateString.contains('T')) {
+                  dateString = dateString.split('T')[0];
+                }
+                if (dateString.contains(' ')) {
+                  dateString = dateString.split(' ')[0];
+                }
+                
+                final parsed = DateTime.tryParse(dateString);
+                if (parsed == null) {
+                  final parts = dateString.split('-');
+                  if (parts.length >= 2) {
+                    final year = int.tryParse(parts[0]);
+                    final month = int.tryParse(parts[1]);
+                    if (year != null && month != null) {
+                      dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                    } else {
+                      return false;
+                    }
+                  } else {
+                    return false;
+                  }
+                } else {
+                  dateStr = '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}';
+                }
+              } else {
+                return false;
+              }
+            } catch (e) {
+              print('Error parsing sale_date: $saleDate, error: $e');
+              return false;
+            }
+            
+            return _selectedMonthsCredit.contains(dateStr);
+          }).toList();
+        }
+        
+        // Apply search filter if search query exists
+        if (_creditSearchController.text.isNotEmpty) {
+          final searchQuery = _creditSearchController.text.toLowerCase();
+          finalFiltered = finalFiltered.where((record) {
+            final name = (record['name']?.toString() ?? '').toLowerCase();
+            final address = (record['address']?.toString() ?? '').toLowerCase();
+            return name.contains(searchQuery) || address.contains(searchQuery);
+          }).toList();
+        }
+        
+        _filteredCreditData = finalFiltered;
         // Apply initial sorting
         _sortCreditData();
       });
@@ -530,16 +739,67 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
 
   void _filterCreditData(String query) {
     setState(() {
-      if (query.isEmpty) {
-        _filteredCreditData = List.from(_creditData);
-      } else {
+      List<Map<String, dynamic>> filtered = List.from(_creditData);
+      
+      // Apply month filter if months are selected
+      if (_selectedMonthsCredit.isNotEmpty) {
+        filtered = filtered.where((record) {
+          final saleDate = record['sale_date'];
+          if (saleDate == null) return false;
+          
+          String dateStr;
+          try {
+            if (saleDate is DateTime) {
+              dateStr = '${saleDate.year}-${saleDate.month.toString().padLeft(2, '0')}';
+            } else if (saleDate is String) {
+              // Handle different date formats from PostgreSQL
+              String dateString = saleDate;
+              if (dateString.contains('T')) {
+                dateString = dateString.split('T')[0];
+              }
+              if (dateString.contains(' ')) {
+                dateString = dateString.split(' ')[0];
+              }
+              
+              final parsed = DateTime.tryParse(dateString);
+              if (parsed == null) {
+                final parts = dateString.split('-');
+                if (parts.length >= 2) {
+                  final year = int.tryParse(parts[0]);
+                  final month = int.tryParse(parts[1]);
+                  if (year != null && month != null) {
+                    dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                  } else {
+                    return false;
+                  }
+                } else {
+                  return false;
+                }
+              } else {
+                dateStr = '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}';
+              }
+            } else {
+              return false;
+            }
+          } catch (e) {
+            return false;
+          }
+          
+          return _selectedMonthsCredit.contains(dateStr);
+        }).toList();
+      }
+      
+      // Apply search filter
+      if (query.isNotEmpty) {
         final searchQuery = query.toLowerCase();
-        _filteredCreditData = _creditData.where((record) {
+        filtered = filtered.where((record) {
           final name = (record['name']?.toString() ?? '').toLowerCase();
           final address = (record['address']?.toString() ?? '').toLowerCase();
           return name.contains(searchQuery) || address.contains(searchQuery);
         }).toList();
       }
+      
+      _filteredCreditData = filtered;
       // Apply sorting after filtering
       _sortCreditData();
     });
@@ -612,10 +872,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     final quantityController = TextEditingController();
     final amountReceivedController = TextEditingController();
     final creditAmountController = TextEditingController();
+    bool companyStaff = false; // Default to No
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
         title: const Text('Add Sales Details'),
         content: SingleChildScrollView(
           child: Column(
@@ -627,6 +889,23 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                   labelText: 'Name *',
                   border: OutlineInputBorder(),
                 ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<bool>(
+                value: companyStaff,
+                decoration: const InputDecoration(
+                  labelText: 'Company Staff',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem<bool>(value: false, child: Text('No')),
+                  DropdownMenuItem<bool>(value: true, child: Text('Yes')),
+                ],
+                onChanged: (value) {
+                  setDialogState(() {
+                    companyStaff = value ?? false;
+                  });
+                },
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -728,6 +1007,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
             child: const Text('Add'),
           ),
         ],
+        ),
       ),
     );
 
@@ -740,6 +1020,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         quantity: quantityController.text.trim(),
         amountReceived: _parseDecimal(amountReceivedController.text),
         creditAmount: _parseDecimal(creditAmountController.text),
+        companyStaff: companyStaff,
       );
     }
 
@@ -760,6 +1041,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     required String quantity,
     required double amountReceived,
     required double creditAmount,
+    required bool companyStaff,
   }) async {
     if (widget.selectedSector == null && !_isAdmin) return;
     if (_selectedDate == null) return;
@@ -777,6 +1059,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         'amount_received': amountReceived,
         'credit_amount': creditAmount,
         'sale_date': dateStr,
+        'company_staff': companyStaff,
       };
 
       await ApiService.saveSalesDetails(record);
@@ -811,6 +1094,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           }
           _controllersSales.remove(index);
         }
+        _companyStaffValues.remove(index);
         _editModeSales[index] = false;
       } else {
         // Entering edit mode
@@ -846,6 +1130,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           'amount_received': TextEditingController(text: _parseDecimal(record['amount_received']).toString()),
           'credit_amount': TextEditingController(text: _parseDecimal(record['credit_amount']).toString()),
         };
+        // Store company_staff value for editing
+        _companyStaffValues[index] = record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1;
         _editModeSales[index] = true;
       }
     });
@@ -958,6 +1244,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         'amount_received': _parseDecimal(controllers['amount_received']!.text),
         'credit_amount': newCreditAmount,
         'sale_date': saleDateToUse, // Use selected date - this becomes the Credit Taken Date
+        'company_staff': _companyStaffValues[index] ?? false,
       };
 
       final savedRecord = await ApiService.saveSalesDetails(updatedRecord);
@@ -1244,6 +1531,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     ),
                                   ),
                                 const DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Company Staff', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Contact Number', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Address', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -1276,6 +1564,32 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                               ),
                                             )
                                           : Text(record['name']?.toString() ?? ''),
+                                    ),
+                                    DataCell(
+                                      isEditMode && _controllersSales.containsKey(index)
+                                          ? SizedBox(
+                                              width: 120,
+                                              child: DropdownButton<bool>(
+                                                value: _companyStaffValues[index] ?? (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1),
+                                                isExpanded: true,
+                                                items: const [
+                                                  DropdownMenuItem<bool>(value: false, child: Text('No')),
+                                                  DropdownMenuItem<bool>(value: true, child: Text('Yes')),
+                                                ],
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _companyStaffValues[index] = value ?? false;
+                                                  });
+                                                },
+                                              ),
+                                            )
+                                          : Text(
+                                              (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? 'Yes' : 'No',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? Colors.green.shade700 : Colors.grey,
+                                              ),
+                                            ),
                                     ),
                                     DataCell(
                                       isEditMode && _controllersSales.containsKey(index)
@@ -1469,12 +1783,14 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  // Search Bar
-                  Expanded(
-                    flex: 2,
-                    child: StatefulBuilder(
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    // Search Bar
+                    SizedBox(
+                      width: 250,
+                      child: StatefulBuilder(
                       builder: (context, setState) {
                         return TextField(
                           controller: _creditSearchController,
@@ -1505,6 +1821,56 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                     ),
                   ),
                   const SizedBox(width: 12),
+                  // Company Staff Filter
+                  SizedBox(
+                    width: 150,
+                    child: DropdownButtonFormField<String?>(
+                      value: _selectedCompanyStaffFilterCredit,
+                      decoration: InputDecoration(
+                        labelText: 'Company Staff',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      ),
+                      items: const [
+                        DropdownMenuItem<String?>(value: null, child: Text('All')),
+                        DropdownMenuItem<String?>(value: 'true', child: Text('Yes')),
+                        DropdownMenuItem<String?>(value: 'false', child: Text('No')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCompanyStaffFilterCredit = value;
+                        });
+                        _loadCreditData();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Month/Year Picker Button
+                  SizedBox(
+                    width: 180,
+                    height: 56,
+                    child: OutlinedButton.icon(
+                      onPressed: _showMonthYearPickerCredit,
+                      icon: const Icon(Icons.calendar_today),
+                      label: Text(
+                        _selectedMonthsCredit.isEmpty
+                            ? 'Select Months'
+                            : _selectedMonthsCredit.length == 1
+                                ? _selectedMonthsCredit.first
+                                : '${_selectedMonthsCredit.length} Months',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: _selectedMonthsCredit.isEmpty ? Colors.grey : Colors.blue),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   // Download Button
                   SizedBox(
                     width: 200,
@@ -1528,8 +1894,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                   ),
                   const SizedBox(width: 12),
                   // Notes Section (Compact)
-                  Expanded(
-                    flex: 2,
+                  SizedBox(
+                    width: 300,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
@@ -1542,7 +1908,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                         children: [
                           Icon(Icons.info_outline, color: Colors.blue.shade700, size: 16),
                           const SizedBox(width: 6),
-                          Expanded(
+                          Flexible(
                             child: Text(
                               'Downloads only searched/filtered data currently displayed on the page.',
                               style: TextStyle(
@@ -1556,7 +1922,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                       ),
                     ),
                   ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -1613,6 +1980,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     ),
                                   ),
                                 const DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Company Staff', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Contact Number', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Address', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -1681,6 +2049,15 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     if (widget.selectedSector == null && _isAdmin)
                                       DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
                                     DataCell(Text(record['name']?.toString() ?? '')),
+                                    DataCell(
+                                      Text(
+                                        (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? 'Yes' : 'No',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? Colors.green.shade700 : Colors.grey,
+                                        ),
+                                      ),
+                                    ),
                                     DataCell(Text(record['contact_number']?.toString() ?? 'N/A')),
                                     DataCell(
                                       SizedBox(
@@ -1890,6 +2267,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                         const DataCell(Text('')), // Empty cell
                                       // Name - empty
                                       const DataCell(Text('')),
+                                      // Company Staff - empty
+                                      const DataCell(Text('')),
                                       // Contact Number - empty
                                       const DataCell(Text('')),
                                       // Address - empty
@@ -2078,13 +2457,14 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     cells: [
                                       if (widget.selectedSector == null && _isAdmin)
                                         const DataCell(Text('')),
-                                      const DataCell(Text('')),
-                                      const DataCell(Text('')),
-                                      const DataCell(Text('')),
-                                      const DataCell(Text('')),
-                                      const DataCell(Text('')),
-                                      const DataCell(Text('')),
-                                      const DataCell(Text('')),
+                                      const DataCell(Text('')), // Name
+                                      const DataCell(Text('')), // Company Staff
+                                      const DataCell(Text('')), // Contact Number
+                                      const DataCell(Text('')), // Address
+                                      const DataCell(Text('')), // Product Name
+                                      const DataCell(Text('')), // Quantity
+                                      const DataCell(Text('')), // Amount Pending
+                                      const DataCell(Text('')), // Credit Taken Date
                                       // Balance Paid - editable
                                       DataCell(
                                         SizedBox(
@@ -2217,6 +2597,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                             ),
                           ),
                         ),
+                                      // Company Staff - empty
+                                      const DataCell(Text('')),
                                       // Contact Number - empty
                                       const DataCell(Text('')),
                                       // Address - empty
@@ -2265,11 +2647,16 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   }
 
   Future<void> _downloadCurrentPageData() async {
+    // Ensure filters are applied before download
+    // This ensures _filteredCreditData is up-to-date with current filter selections
+    _filterCreditData(_creditSearchController.text);
+    
     if (_filteredCreditData.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No data available to download'),
+        SnackBar(
+          content: Text('No data available to download.\nFiltered: ${_filteredCreditData.length}, All: ${_creditData.length}\nMonth Filter: ${_selectedMonthsCredit.isEmpty ? "None" : _selectedMonthsCredit.join(", ")}\nCompany Staff: ${_selectedCompanyStaffFilterCredit ?? "All"}'),
           backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 5),
         ),
       );
       return;
@@ -2316,11 +2703,25 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     setState(() => _isGeneratingPDF = true);
 
     try {
-      // Use all current filtered data - if empty, use all credit data
-      // This ensures we always download the data that's visible on the page
-      final filteredData = _filteredCreditData.isNotEmpty ? _filteredCreditData : _creditData;
-
-      if (filteredData.isEmpty) {
+      // Use exactly what's displayed in the table - _filteredCreditData
+      // This is the data that's currently visible on the page after all filters are applied
+      print('Download: _filteredCreditData.length = ${_filteredCreditData.length}');
+      print('Download: _creditData.length = ${_creditData.length}');
+      print('Download: _selectedMonthsCredit = $_selectedMonthsCredit');
+      print('Download: _selectedCompanyStaffFilterCredit = $_selectedCompanyStaffFilterCredit (type: ${_selectedCompanyStaffFilterCredit.runtimeType})');
+      print('Download: _creditSearchController.text = ${_creditSearchController.text}');
+      
+      // Debug: Check if data has company_staff values
+      if (_creditData.isNotEmpty) {
+        final companyStaffValues = _creditData.map((r) => r['company_staff']).toSet();
+        print('Download: company_staff values in _creditData: $companyStaffValues');
+      }
+      if (_filteredCreditData.isNotEmpty) {
+        final companyStaffValues = _filteredCreditData.map((r) => r['company_staff']).toSet();
+        print('Download: company_staff values in _filteredCreditData: $companyStaffValues');
+      }
+      
+      if (_filteredCreditData.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -2333,13 +2734,25 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         return;
       }
 
-      print('Download: Using ${filteredData.length} records for PDF');
+      print('Download: Using ${_filteredCreditData.length} records for PDF (exactly what is displayed on the page)');
+      
+      // Debug: Print first record to see structure
+      if (_filteredCreditData.isNotEmpty) {
+        print('Download: First record keys: ${_filteredCreditData.first.keys.toList()}');
+        print('Download: First record sale_date: ${_filteredCreditData.first['sale_date']}');
+        print('Download: First record id: ${_filteredCreditData.first['id']}');
+      }
 
       // Collect all data including payment rows and calculate total
       final List<Map<String, dynamic>> allRowsForPDF = [];
       double totalOverallBalance = 0.0;
 
-      for (var record in filteredData) {
+      for (var record in _filteredCreditData) {
+        if (record.isEmpty || record['id'] == null) {
+          print('Download: Skipping invalid record: $record');
+          continue;
+        }
+        
         final recordId = record['id'] as int;
         final amountPending = _parseDecimal(record['amount_pending']);
         final payments = _balancePayments[recordId] ?? [];
@@ -2451,6 +2864,23 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       print('Download: Total rows collected for PDF: ${allRowsForPDF.length}');
       if (allRowsForPDF.isNotEmpty) {
         print('Download: First row type: ${allRowsForPDF.first['type']}');
+        print('Download: First row data: ${allRowsForPDF.first}');
+      } else {
+        print('Download: WARNING - No rows collected for PDF!');
+        print('Download: _filteredCreditData had ${_filteredCreditData.length} records but no rows were added to PDF');
+      }
+
+      if (allRowsForPDF.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No data rows to include in PDF. Please check the console for details.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        setState(() => _isGeneratingPDF = false);
+        return;
       }
 
       await PdfGenerator.generateCustomerCreditDetailsPDF(

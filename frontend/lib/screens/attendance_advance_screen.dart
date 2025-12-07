@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'attendance_tab_content.dart';
 import 'present_days_count_tab_content.dart';
+import 'daily_mining_activity_tab_content.dart';
 import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../utils/pdf_generator.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -29,7 +31,11 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   DateTime? _selectedDate;
   List<Sector> _sectors = [];
   List<Map<String, dynamic>> _advanceDetails = [];
+  List<Map<String, dynamic>> _filteredAdvanceDetails = [];
+  final TextEditingController _advanceSearchController = TextEditingController();
+  Set<String> _selectedMonthsAdvance = {}; // Set of 'YYYY-MM' strings for multiple month selection
   bool _isLoadingAdvance = false;
+  bool _isGeneratingPDF = false;
   bool _sortAscendingAdvance = true; // Sort direction for Sector column
   List<Map<String, dynamic>> _rentVehicles = [];
   bool _isLoadingRentVehicles = false;
@@ -37,10 +43,16 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   bool _isEditMode = false; // Edit mode for both employee and rent vehicle attendance
   Future<bool> Function()? _saveEmployeeAttendance;
 
+  bool get _showMiningActivityTab {
+    // Show tab if All sector (null) or SSBM
+    return widget.selectedSector == null || widget.selectedSector == 'SSBM';
+  }
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    // Tab length: 4 base tabs + 1 mining activity tab (if visible)
+    _tabController = TabController(length: _showMiningActivityTab ? 5 : 4, vsync: this);
     _selectedDate = DateTime.now();
     _loadSectors();
     _loadAdvanceDetails();
@@ -55,6 +67,9 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
         // User switched to Vehicle Attendance Entry tab
         _loadRentVehicles();
         _loadRentVehicleAttendance();
+      } else if (_tabController.index == 4 && !_tabController.indexIsChanging && _showMiningActivityTab) {
+        // User switched to Daily Mining Activity tab
+        // Data will be loaded in the tab content
       }
     });
   }
@@ -62,6 +77,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   @override
   void dispose() {
     _tabController.dispose();
+    _advanceSearchController.dispose();
     super.dispose();
   }
 
@@ -279,7 +295,13 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       if (mounted) {
         setState(() {
           _advanceDetails = advanceList;
+          _filterAdvanceData(_advanceSearchController.text);
         });
+      }
+      
+      // Also trigger filter when date changes
+      if (_selectedDate != null) {
+        _filterAdvanceData(_advanceSearchController.text);
       }
     } catch (e) {
       if (mounted) {
@@ -290,6 +312,248 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     } finally {
       if (mounted) {
         setState(() => _isLoadingAdvance = false);
+      }
+    }
+  }
+
+  void _filterAdvanceData(String query) {
+    setState(() {
+      List<Map<String, dynamic>> filtered = List.from(_advanceDetails);
+      
+      // Apply month filter if months are selected
+      if (_selectedMonthsAdvance.isNotEmpty && _selectedDate != null) {
+        final dateStr = '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}';
+        if (!_selectedMonthsAdvance.contains(dateStr)) {
+          filtered = []; // No data if selected date is not in selected months
+        }
+      }
+      
+      // Apply search filter
+      if (query.isNotEmpty) {
+        final searchQuery = query.toLowerCase();
+        filtered = filtered.where((detail) {
+          final employeeName = (detail['employee_name']?.toString() ?? '').toLowerCase();
+          return employeeName.contains(searchQuery);
+        }).toList();
+      }
+      
+      _filteredAdvanceDetails = filtered;
+    });
+  }
+
+  Future<void> _showMonthYearPickerAdvance() async {
+    final now = DateTime.now();
+    int selectedYear = now.year;
+    Set<String> tempSelectedMonths = Set.from(_selectedMonthsAdvance);
+    
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Select Months'),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Year selector
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedYear--;
+                          });
+                        },
+                      ),
+                      Text(
+                        selectedYear.toString(),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedYear++;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Month grid
+                  SizedBox(
+                    height: 280,
+                    child: GridView.builder(
+                      shrinkWrap: false,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 2.5,
+                      ),
+                      itemCount: 12,
+                      itemBuilder: (context, index) {
+                        final month = index + 1;
+                        final monthKey = '$selectedYear-${month.toString().padLeft(2, '0')}';
+                        final isSelected = tempSelectedMonths.contains(monthKey);
+                        final monthNames = [
+                          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                        ];
+                        
+                        return InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              if (isSelected) {
+                                tempSelectedMonths.remove(monthKey);
+                              } else {
+                                tempSelectedMonths.add(monthKey);
+                              }
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.blue.shade700 : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? Colors.blue.shade900 : Colors.grey.shade400,
+                                width: 2,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                monthNames[index],
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.black87,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Clear all button
+                  if (tempSelectedMonths.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        setDialogState(() {
+                          tempSelectedMonths.clear();
+                        });
+                      },
+                      child: const Text('Clear All'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, tempSelectedMonths),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    if (result != null) {
+      setState(() {
+        _selectedMonthsAdvance = result;
+        _filterAdvanceData(_advanceSearchController.text);
+      });
+    }
+  }
+
+  Future<void> _downloadAdvanceDetailsPDF() async {
+    if (_filteredAdvanceDetails.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No data available to download'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show filename input dialog
+    final fileNameController = TextEditingController();
+    final fileName = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Enter File Name'),
+          content: TextField(
+            controller: fileNameController,
+            decoration: const InputDecoration(
+              labelText: 'File Name',
+              hintText: 'Enter file name (without .pdf)',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (fileNameController.text.trim().isNotEmpty) {
+                  Navigator.of(context).pop(fileNameController.text.trim());
+                }
+              },
+              child: const Text('Download PDF'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (fileName == null || fileName.isEmpty) {
+      return; // User cancelled
+    }
+
+    setState(() => _isGeneratingPDF = true);
+
+    try {
+      await PdfGenerator.generateAdvanceDetailsPDF(
+        advanceData: _filteredAdvanceDetails,
+        fileName: fileName,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PDF saved successfully to Downloads folder'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingPDF = false);
       }
     }
   }
@@ -308,6 +572,8 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       // Reload advance details when date changes
       _loadAdvanceDetails();
       _loadRentVehicleAttendance();
+      // Apply filters after loading
+      _filterAdvanceData(_advanceSearchController.text);
     }
   }
 
@@ -323,11 +589,13 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.orange,
-          tabs: const [
-            Tab(text: 'Staff Attendance Entry'),
-            Tab(text: 'Vehicle Attendance Entry'),
-            Tab(text: 'Advance Details'),
-            Tab(text: 'Present Days Count'),
+          tabs: [
+            const Tab(text: 'Staff Attendance Entry'),
+            const Tab(text: 'Rent Vehicle Attendance Entry'),
+            const Tab(text: 'Advance Details'),
+            const Tab(text: 'Present Days Count'),
+            if (_showMiningActivityTab)
+              const Tab(text: 'Daily Mining Activity'),
           ],
         ),
         actions: [
@@ -643,21 +911,142 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
           // Advance Details Tab
           Column(
             children: [
-              // Refresh button
+              // Header, Search Bar, Download Button and Notes
               Container(
                 padding: const EdgeInsets.all(16.0),
                 color: Colors.grey.shade100,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
                   children: [
-                    const Text(
-                      'Employees with Outstanding Advance / Bulk Advance',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Employees with Outstanding Advance / Bulk Advance',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          onPressed: _loadAdvanceDetails,
+                          tooltip: 'Refresh',
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: _loadAdvanceDetails,
-                      tooltip: 'Refresh',
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          // Search Bar
+                          SizedBox(
+                            width: 250,
+                            child: StatefulBuilder(
+                              builder: (context, setState) {
+                                return TextField(
+                                  controller: _advanceSearchController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Search by Employee Name',
+                                    hintText: 'Enter employee name to search',
+                                    prefixIcon: const Icon(Icons.search),
+                                    suffixIcon: _advanceSearchController.text.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear),
+                                            onPressed: () {
+                                              _advanceSearchController.clear();
+                                              _filterAdvanceData('');
+                                              setState(() {}); // Update UI to hide clear button
+                                            },
+                                          )
+                                        : null,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  onChanged: (value) {
+                                    _filterAdvanceData(value);
+                                    setState(() {}); // Update UI to show/hide clear button
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Month/Year Picker Button
+                          SizedBox(
+                            width: 180,
+                            height: 56,
+                            child: OutlinedButton.icon(
+                              onPressed: _showMonthYearPickerAdvance,
+                              icon: const Icon(Icons.calendar_today),
+                              label: Text(
+                                _selectedMonthsAdvance.isEmpty
+                                    ? 'Select Months'
+                                    : _selectedMonthsAdvance.length == 1
+                                        ? _selectedMonthsAdvance.first
+                                        : '${_selectedMonthsAdvance.length} Months',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                side: BorderSide(color: _selectedMonthsAdvance.isEmpty ? Colors.grey : Colors.blue),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Download Button
+                          SizedBox(
+                            width: 200,
+                            height: 56,
+                            child: ElevatedButton.icon(
+                              onPressed: _isGeneratingPDF ? null : _downloadAdvanceDetailsPDF,
+                              icon: _isGeneratingPDF
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.download),
+                              label: Text(_isGeneratingPDF ? 'Generating...' : 'Download Current Page Data'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green.shade700,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Notes Section (Compact)
+                          SizedBox(
+                            width: 300,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.blue.shade200),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 16),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      'Downloads only searched/filtered data currently displayed on the page.',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.blue.shade900,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -666,7 +1055,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
               Expanded(
                 child: _isLoadingAdvance
                     ? const Center(child: CircularProgressIndicator())
-                    : _advanceDetails.isEmpty
+                    : _filteredAdvanceDetails.isEmpty
                         ? Center(
                             child: Text(
                               'No employees with outstanding advance',
@@ -716,7 +1105,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                                         label: Text('Outstanding Advance', style: TextStyle(fontWeight: FontWeight.bold)),
                                       ),
                                       // Only show Bulk Advance column if any employee has bulk_advance > 0
-                                      if (_advanceDetails.any((detail) => ((detail['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01))
+                                      if (_filteredAdvanceDetails.any((detail) => ((detail['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01))
                                         const DataColumn(
                                           label: Text('Bulk Advance', style: TextStyle(fontWeight: FontWeight.bold)),
                                         ),
@@ -725,10 +1114,10 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                                       // Calculate totals
                                       double totalOutstandingAdvance = 0.0;
                                       double totalBulkAdvance = 0.0;
-                                      final showBulkColumn = _advanceDetails.any((d) => ((d['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01);
+                                      final showBulkColumn = _filteredAdvanceDetails.any((d) => ((d['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01);
                                       
                                       // Generate data rows and calculate totals
-                                      final dataRows = _advanceDetails.map((detail) {
+                                      final dataRows = _filteredAdvanceDetails.map((detail) {
                                         final outstandingAdvance = (detail['outstanding_advance'] as num?)?.toDouble() ?? 0.0;
                                         final bulkAdvance = (detail['bulk_advance'] as num?)?.toDouble() ?? 0.0;
                                         
@@ -823,6 +1212,12 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
             selectedSector: widget.selectedSector,
             isAdmin: widget.isAdmin,
           ),
+          // Daily Mining Activity Tab (only if All sector or SSBM)
+          if (_showMiningActivityTab)
+            DailyMiningActivityTabContent(
+              selectedSector: widget.selectedSector,
+              isAdmin: widget.isAdmin,
+            ),
         ],
       ),
     );

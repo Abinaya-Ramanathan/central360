@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
 import '../utils/ui_helpers.dart';
+import '../utils/pdf_generator.dart';
 import '../config/env_config.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -48,6 +49,8 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
   List<Map<String, dynamic>> _filteredCreditData = [];
   bool _isLoadingCredit = false;
   final TextEditingController _creditSearchController = TextEditingController();
+  Set<String> _selectedMonthsCredit = {}; // Set of 'YYYY-MM' strings for multiple month selection
+  bool _isGeneratingPDF = false;
   bool _creditDateSortAscending = true; // true = ascending (oldest first), false = descending (newest first)
   bool _creditSectorSortAscending = true; // Sort direction for Sector column in Credit Details
   final Map<int, bool> _editModeCredit = {}; // Track which rows are in edit mode (key = record ID)
@@ -583,19 +586,364 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
 
   void _filterCreditData(String query) {
     setState(() {
-      if (query.isEmpty) {
-        _filteredCreditData = List.from(_creditData);
-      } else {
+      List<Map<String, dynamic>> filtered = List.from(_creditData);
+      
+      // Apply month filter if months are selected
+      if (_selectedMonthsCredit.isNotEmpty) {
+        filtered = filtered.where((record) {
+          final purchaseDate = record['purchase_date'];
+          if (purchaseDate == null) return false;
+          
+          String dateStr;
+          try {
+            if (purchaseDate is DateTime) {
+              dateStr = '${purchaseDate.year}-${purchaseDate.month.toString().padLeft(2, '0')}';
+            } else if (purchaseDate is String) {
+              String dateString = purchaseDate;
+              if (dateString.contains('T')) {
+                dateString = dateString.split('T')[0];
+              }
+              if (dateString.contains(' ')) {
+                dateString = dateString.split(' ')[0];
+              }
+              
+              final parsed = DateTime.tryParse(dateString);
+              if (parsed == null) {
+                final parts = dateString.split('-');
+                if (parts.length >= 2) {
+                  final year = int.tryParse(parts[0]);
+                  final month = int.tryParse(parts[1]);
+                  if (year != null && month != null) {
+                    dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                  } else {
+                    return false;
+                  }
+                } else {
+                  return false;
+                }
+              } else {
+                dateStr = '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}';
+              }
+            } else {
+              return false;
+            }
+          } catch (e) {
+            return false;
+          }
+          
+          return _selectedMonthsCredit.contains(dateStr);
+        }).toList();
+      }
+      
+      // Apply search filter
+      if (query.isNotEmpty) {
         final searchQuery = query.toLowerCase();
-        _filteredCreditData = _creditData.where((record) {
+        filtered = filtered.where((record) {
           final itemName = (record['item_name']?.toString() ?? '').toLowerCase();
           final shopName = (record['shop_name']?.toString() ?? '').toLowerCase();
           return itemName.contains(searchQuery) || shopName.contains(searchQuery);
         }).toList();
       }
+      
+      _filteredCreditData = filtered;
       // Apply sorting after filtering
       _sortCreditData();
     });
+  }
+
+  Future<void> _showMonthYearPickerCredit() async {
+    final now = DateTime.now();
+    int selectedYear = now.year;
+    Set<String> tempSelectedMonths = Set.from(_selectedMonthsCredit);
+    
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Select Months'),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Year selector
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedYear--;
+                          });
+                        },
+                      ),
+                      Text(
+                        selectedYear.toString(),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedYear++;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Month grid
+                  SizedBox(
+                    height: 280,
+                    child: GridView.builder(
+                      shrinkWrap: false,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 2.5,
+                      ),
+                      itemCount: 12,
+                      itemBuilder: (context, index) {
+                        final month = index + 1;
+                        final monthKey = '$selectedYear-${month.toString().padLeft(2, '0')}';
+                        final isSelected = tempSelectedMonths.contains(monthKey);
+                        final monthNames = [
+                          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                        ];
+                        
+                        return InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              if (isSelected) {
+                                tempSelectedMonths.remove(monthKey);
+                              } else {
+                                tempSelectedMonths.add(monthKey);
+                              }
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.blue.shade700 : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? Colors.blue.shade900 : Colors.grey.shade400,
+                                width: 2,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                monthNames[index],
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.black87,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Clear all button
+                  if (tempSelectedMonths.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        setDialogState(() {
+                          tempSelectedMonths.clear();
+                        });
+                      },
+                      child: const Text('Clear All'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, tempSelectedMonths),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    if (result != null) {
+      setState(() {
+        _selectedMonthsCredit = result;
+        _filterCreditData(_creditSearchController.text);
+      });
+    }
+  }
+
+  Future<void> _downloadCompanyPurchaseCreditPDF() async {
+    if (_filteredCreditData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No data available to download'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show filename input dialog
+    final fileNameController = TextEditingController();
+    final fileName = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Enter File Name'),
+          content: TextField(
+            controller: fileNameController,
+            decoration: const InputDecoration(
+              labelText: 'File Name',
+              hintText: 'Enter file name (without .pdf)',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (fileNameController.text.trim().isNotEmpty) {
+                  Navigator.of(context).pop(fileNameController.text.trim());
+                }
+              },
+              child: const Text('Download PDF'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (fileName == null || fileName.isEmpty) {
+      return; // User cancelled
+    }
+
+    setState(() => _isGeneratingPDF = true);
+
+    try {
+      // Collect all data including payment rows and calculate total
+      final List<Map<String, dynamic>> allRowsForPDF = [];
+      double totalOverallBalance = 0.0;
+
+      for (var record in _filteredCreditData) {
+        final recordId = record['id'] as int;
+        final credit = _parseDecimal(record['credit']); // Amount Pending = Credit value
+        final payments = _balancePayments[recordId] ?? [];
+
+        // Calculate total paid from existing payments
+        double totalPaid = 0;
+        for (var payment in payments) {
+          totalPaid += _parseDecimal(payment['balance_paid']);
+        }
+
+        final mainOverallBalance = credit - totalPaid;
+        totalOverallBalance += mainOverallBalance;
+
+        // Add main row
+        allRowsForPDF.add({
+          'type': 'main',
+          'purchase_date': record['purchase_date'],
+          'item_name': record['item_name']?.toString() ?? '',
+          'shop_name': record['shop_name']?.toString() ?? '',
+          'purchase_details': record['purchase_details']?.toString() ?? '',
+          'credit': credit,
+          'balance_paid': totalPaid,
+          'balance_paid_date': payments.isNotEmpty && payments.last['balance_paid_date'] != null 
+              ? payments.last['balance_paid_date'] 
+              : null,
+          'overall_balance': mainOverallBalance,
+          'details': record['details']?.toString() ?? '',
+        });
+
+        // Add payment rows
+        for (int i = 0; i < payments.length; i++) {
+          final payment = payments[i];
+          final balancePaid = _parseDecimal(payment['balance_paid']);
+          
+          // Calculate overall balance for this payment
+          double paymentOverallBalance;
+          if (i == 0) {
+            paymentOverallBalance = credit - balancePaid;
+          } else {
+            final prevPayment = payments[i - 1];
+            final prevOverallBalance = _parseDecimal(prevPayment['overall_balance']);
+            paymentOverallBalance = prevOverallBalance - balancePaid;
+          }
+
+          allRowsForPDF.add({
+            'type': 'payment',
+            'purchase_date': null,
+            'item_name': '',
+            'shop_name': '',
+            'purchase_details': '',
+            'credit': null,
+            'balance_paid': balancePaid,
+            'balance_paid_date': payment['balance_paid_date'],
+            'overall_balance': paymentOverallBalance,
+            'details': payment['details']?.toString() ?? '',
+          });
+        }
+      }
+
+      // Add total row
+      allRowsForPDF.add({
+        'type': 'total',
+        'purchase_date': null,
+        'item_name': 'TOTAL',
+        'shop_name': null,
+        'purchase_details': null,
+        'credit': null,
+        'balance_paid': null,
+        'balance_paid_date': null,
+        'overall_balance': totalOverallBalance,
+        'details': null,
+      });
+
+      await PdfGenerator.generateCompanyPurchaseCreditDetailsPDF(
+        creditData: allRowsForPDF,
+        fileName: fileName,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PDF saved successfully to Downloads folder'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingPDF = false);
+      }
+    }
   }
 
   void _sortCreditData() {
@@ -1712,34 +2060,121 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                 ],
               ),
               const SizedBox(height: 12),
-              StatefulBuilder(
-                builder: (context, setState) {
-                  return TextField(
-                    controller: _creditSearchController,
-                    decoration: InputDecoration(
-                      labelText: 'Search by Item Name or Shop Name',
-                      hintText: 'Enter item name or shop name to search',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _creditSearchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _creditSearchController.clear();
-                                _filterCreditData('');
-                                setState(() {}); // Update UI to hide clear button
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    // Search Bar
+                    SizedBox(
+                      width: 250,
+                      child: StatefulBuilder(
+                        builder: (context, setState) {
+                          return TextField(
+                            controller: _creditSearchController,
+                            decoration: InputDecoration(
+                              labelText: 'Search by Item Name or Shop Name',
+                              hintText: 'Enter item name or shop name to search',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _creditSearchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      onPressed: () {
+                                        _creditSearchController.clear();
+                                        _filterCreditData('');
+                                        setState(() {}); // Update UI to hide clear button
+                                      },
+                                    )
+                                  : null,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              _filterCreditData(value);
+                              setState(() {}); // Update UI to show/hide clear button
+                            },
+                          );
+                        },
                       ),
                     ),
-                    onChanged: (value) {
-                      _filterCreditData(value);
-                      setState(() {}); // Update UI to show/hide clear button
-                    },
-                  );
-                },
+                    const SizedBox(width: 12),
+                    // Month/Year Picker Button
+                    SizedBox(
+                      width: 180,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: _showMonthYearPickerCredit,
+                        icon: const Icon(Icons.calendar_today),
+                        label: Text(
+                          _selectedMonthsCredit.isEmpty
+                              ? 'Select Months'
+                              : _selectedMonthsCredit.length == 1
+                                  ? _selectedMonthsCredit.first
+                                  : '${_selectedMonthsCredit.length} Months',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: BorderSide(color: _selectedMonthsCredit.isEmpty ? Colors.grey : Colors.blue),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Download Button
+                    SizedBox(
+                      width: 200,
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        onPressed: _isGeneratingPDF ? null : _downloadCompanyPurchaseCreditPDF,
+                        icon: _isGeneratingPDF
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.download),
+                        label: Text(_isGeneratingPDF ? 'Generating...' : 'Download Current Page Data'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade700,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Notes Section (Compact)
+                    SizedBox(
+                      width: 300,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.blue.shade700, size: 16),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'Downloads only searched/filtered data currently displayed on the page.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.blue.shade900,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

@@ -35,6 +35,8 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
   bool _creditDateSortAscending = true; // true = ascending (oldest first), false = descending (newest first)
   bool _sectorSortAscending = true; // Sort direction for Sector column
   bool _isGeneratingPDF = false;
+  String? _selectedCompanyStaffFilter; // null, 'true', or 'false'
+  Set<String> _selectedMonths = {}; // Set of 'YYYY-MM' strings for multiple month selection
 
   @override
   void initState() {
@@ -59,17 +61,67 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
 
   void _filterCreditData(String query) {
     setState(() {
-      if (query.isEmpty) {
-        _filteredCreditData = _creditData;
-      } else {
-        _filteredCreditData = _creditData.where((record) {
+      List<Map<String, dynamic>> filtered = List.from(_creditData);
+      
+      // Apply month filter if months are selected
+      if (_selectedMonths.isNotEmpty) {
+        filtered = filtered.where((record) {
+          final creditDate = record['credit_date'];
+          if (creditDate == null) return false;
+          
+          String dateStr;
+          try {
+            if (creditDate is DateTime) {
+              dateStr = '${creditDate.year}-${creditDate.month.toString().padLeft(2, '0')}';
+            } else if (creditDate is String) {
+              String dateString = creditDate;
+              if (dateString.contains('T')) {
+                dateString = dateString.split('T')[0];
+              }
+              if (dateString.contains(' ')) {
+                dateString = dateString.split(' ')[0];
+              }
+              
+              final parsed = DateTime.tryParse(dateString);
+              if (parsed == null) {
+                final parts = dateString.split('-');
+                if (parts.length >= 2) {
+                  final year = int.tryParse(parts[0]);
+                  final month = int.tryParse(parts[1]);
+                  if (year != null && month != null) {
+                    dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                  } else {
+                    return false;
+                  }
+                } else {
+                  return false;
+                }
+              } else {
+                dateStr = '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}';
+              }
+            } else {
+              return false;
+            }
+          } catch (e) {
+            return false;
+          }
+          
+          return _selectedMonths.contains(dateStr);
+        }).toList();
+      }
+      
+      // Apply search filter
+      if (query.isNotEmpty) {
+        final searchQuery = query.toLowerCase();
+        filtered = filtered.where((record) {
           final shopName = (record['name']?.toString() ?? '').toLowerCase();
           final purchaseDetails = (record['purchase_details']?.toString() ?? '').toLowerCase();
-          final searchQuery = query.toLowerCase();
           // Search by shop name (name field) and item name (within purchase_details)
           return shopName.contains(searchQuery) || purchaseDetails.contains(searchQuery);
         }).toList();
       }
+      
+      _filteredCreditData = filtered;
       // Apply sorting after filtering
       _sortCreditData();
     });
@@ -138,6 +190,142 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
     return sector.name;
   }
 
+  Future<void> _showMonthYearPicker() async {
+    final now = DateTime.now();
+    int selectedYear = now.year;
+    Set<String> tempSelectedMonths = Set.from(_selectedMonths);
+    
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Select Months'),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Year selector
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedYear--;
+                          });
+                        },
+                      ),
+                      Text(
+                        selectedYear.toString(),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedYear++;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Month grid
+                  SizedBox(
+                    height: 280,
+                    child: GridView.builder(
+                      shrinkWrap: false,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 2.5,
+                      ),
+                      itemCount: 12,
+                      itemBuilder: (context, index) {
+                        final month = index + 1;
+                        final monthKey = '$selectedYear-${month.toString().padLeft(2, '0')}';
+                        final isSelected = tempSelectedMonths.contains(monthKey);
+                        final monthNames = [
+                          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                        ];
+                        
+                        return InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              if (isSelected) {
+                                tempSelectedMonths.remove(monthKey);
+                              } else {
+                                tempSelectedMonths.add(monthKey);
+                              }
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.blue.shade700 : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? Colors.blue.shade900 : Colors.grey.shade400,
+                                width: 2,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                monthNames[index],
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.black87,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Clear all button
+                  if (tempSelectedMonths.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        setDialogState(() {
+                          tempSelectedMonths.clear();
+                        });
+                      },
+                      child: const Text('Clear All'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, tempSelectedMonths),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    if (result != null) {
+      setState(() {
+        _selectedMonths = result;
+      });
+      // Apply filter with current search query to preserve both month and search filters
+      _filterCreditData(_searchController.text);
+    }
+  }
+
   String _formatDate(dynamic dateValue) {
     if (dateValue == null) return 'N/A';
     try {
@@ -167,14 +355,75 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // Load all credit details for the selected sector (no date/month filter)
+      // For multiple months, we'll filter on the frontend
+      // since the backend only supports single month filter
+      // Pass null to backend when multiple months are selected, filter locally instead
+      String? monthFilter = null; // Always pass null, filter on frontend for multiple months
+      
+      // Load credit details with filters (without month filter, we'll filter on frontend)
       final credits = await ApiService.getCreditDetails(
         sector: widget.selectedSector,
+        month: monthFilter,
+        companyStaff: _selectedCompanyStaffFilter,
       );
+      
+      // Apply multiple month filter on frontend if months are selected
+      List<Map<String, dynamic>> filteredCredits = credits;
+      if (_selectedMonths.isNotEmpty) {
+        filteredCredits = credits.where((record) {
+          final creditDate = record['credit_date'];
+          if (creditDate == null) return false;
+          
+          String dateStr;
+          try {
+            if (creditDate is DateTime) {
+              dateStr = '${creditDate.year}-${creditDate.month.toString().padLeft(2, '0')}';
+            } else if (creditDate is String) {
+              // Handle different date formats from PostgreSQL
+              // PostgreSQL returns dates in format: "2025-01-15T00:00:00.000Z" or "2025-01-15"
+              String dateString = creditDate;
+              // Remove time portion if present
+              if (dateString.contains('T')) {
+                dateString = dateString.split('T')[0];
+              }
+              // Remove time portion if space separated
+              if (dateString.contains(' ')) {
+                dateString = dateString.split(' ')[0];
+              }
+              
+              final parsed = DateTime.tryParse(dateString);
+              if (parsed == null) {
+                // Try parsing as just YYYY-MM-DD format
+                final parts = dateString.split('-');
+                if (parts.length >= 2) {
+                  final year = int.tryParse(parts[0]);
+                  final month = int.tryParse(parts[1]);
+                  if (year != null && month != null) {
+                    dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                  } else {
+                    return false;
+                  }
+                } else {
+                  return false;
+                }
+              } else {
+                dateStr = '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}';
+              }
+            } else {
+              return false;
+            }
+          } catch (e) {
+            print('Error parsing credit_date: $creditDate, error: $e');
+            return false;
+          }
+          
+          return _selectedMonths.contains(dateStr);
+        }).toList();
+      }
 
       setState(() {
-        _creditData = credits;
-        _filteredCreditData = credits;
+        _creditData = filteredCredits;
+        _filteredCreditData = filteredCredits;
         // Clear edit mode and controllers when data reloads
         _editMode.clear();
         for (var controllers in _controllers.values) {
@@ -874,11 +1123,13 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
           // Search Bar, Download Button and Notes
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
                 // Search Bar
-                Expanded(
-                  flex: 2,
+                SizedBox(
+                  width: 250,
                   child: StatefulBuilder(
                     builder: (context, setState) {
                       return TextField(
@@ -910,6 +1161,56 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
+                // Company Staff Filter
+                SizedBox(
+                  width: 150,
+                  child: DropdownButtonFormField<String?>(
+                    value: _selectedCompanyStaffFilter,
+                    decoration: InputDecoration(
+                      labelText: 'Company Staff',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    ),
+                    items: const [
+                      DropdownMenuItem<String?>(value: null, child: Text('All')),
+                      DropdownMenuItem<String?>(value: 'true', child: Text('Yes')),
+                      DropdownMenuItem<String?>(value: 'false', child: Text('No')),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCompanyStaffFilter = value;
+                      });
+                      _loadData();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Month/Year Picker Button
+                SizedBox(
+                  width: 180,
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    onPressed: _showMonthYearPicker,
+                    icon: const Icon(Icons.calendar_today),
+                    label: Text(
+                      _selectedMonths.isEmpty
+                          ? 'Select Months'
+                          : _selectedMonths.length == 1
+                              ? _selectedMonths.first
+                              : '${_selectedMonths.length} Months',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: BorderSide(color: _selectedMonths.isEmpty ? Colors.grey : Colors.blue),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 // Download Button
                 SizedBox(
                   width: 200,
@@ -933,8 +1234,8 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                 ),
                 const SizedBox(width: 12),
                 // Notes Section (Compact)
-                Expanded(
-                  flex: 2,
+                SizedBox(
+                  width: 300,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -947,7 +1248,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                       children: [
                         Icon(Icons.info_outline, color: Colors.blue.shade700, size: 16),
                         const SizedBox(width: 6),
-                        Expanded(
+                        Flexible(
                           child: Text(
                             'Downloads only searched/filtered data currently displayed on the page.',
                             style: TextStyle(
@@ -961,7 +1262,8 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                     ),
                   ),
                 ),
-              ],
+                ],
+              ),
             ),
           ),
           // Table
@@ -1008,6 +1310,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                                       },
                                     ),
                                   const DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  const DataColumn(label: Text('Company Staff', style: TextStyle(fontWeight: FontWeight.bold))),
                                   const DataColumn(label: Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold))),
                                   const DataColumn(label: Text('Address', style: TextStyle(fontWeight: FontWeight.bold))),
                                   const DataColumn(label: Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -1061,6 +1364,15 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                                                 ),
                                               )
                                             : Text(record['name']?.toString() ?? ''),
+                                      ),
+                                      DataCell(
+                                        Text(
+                                          (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? 'Yes' : 'No',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? Colors.green.shade700 : Colors.grey,
+                                          ),
+                                        ),
                                       ),
                                       DataCell(
                                         isEditMode && _controllers.containsKey(index)

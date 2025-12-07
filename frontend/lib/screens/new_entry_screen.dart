@@ -9,6 +9,8 @@ import 'add_stock_item_dialog.dart';
 import 'manage_stock_items_dialog.dart';
 import 'add_rent_vehicle_dialog.dart';
 import 'manage_rent_vehicles_dialog.dart';
+import 'add_mining_activity_dialog.dart';
+import 'manage_mining_activities_dialog.dart';
 import 'home_screen.dart';
 
 class NewEntryScreen extends StatefulWidget {
@@ -193,6 +195,36 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             showDialog(
                               context: context,
                               builder: (context) => ManageStockItemsDialog(
+                                isMainAdmin: widget.isMainAdmin,
+                                selectedSector: _selectedSector,
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildAdminButton(
+                          icon: Icons.construction,
+                          label: 'Add Mining Activity',
+                          color: Colors.amber.shade700,
+                          onPressed: () async {
+                            final result = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => const AddMiningActivityDialog(),
+                            );
+                            if (result == true) {
+                              // Mining activity created successfully
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildAdminButton(
+                          icon: Icons.settings,
+                          label: 'Manage Mining Activity',
+                          color: Colors.orange.shade700,
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => ManageMiningActivitiesDialog(
                                 isMainAdmin: widget.isMainAdmin,
                                 selectedSector: _selectedSector,
                               ),

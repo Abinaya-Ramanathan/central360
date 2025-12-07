@@ -10,6 +10,15 @@ router.get('/', async (req, res) => {
     const params = [];
     let paramCount = 1;
 
+    // Check if boxes columns exist in the database
+    const columnCheck = await db.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'overall_stock' 
+      AND column_name IN ('remaining_stock_boxes', 'new_stock_boxes')
+    `);
+    const hasBoxesColumns = columnCheck.rows.length === 2;
+
     // Build the daily_stock join condition (no date/month filtering for overall stock)
     let dailyStockJoinCondition = 'os.item_id = ds.item_id';
 
@@ -42,10 +51,21 @@ router.get('/', async (req, res) => {
     }
 
     // Include all overall_stock columns in GROUP BY
+    // Conditionally include boxes columns only if they exist
     query += ` GROUP BY os.id, os.item_id, os.remaining_stock, os.new_stock, os.unit, 
-      os.remaining_stock_gram, os.remaining_stock_kg, os.remaining_stock_litre, os.remaining_stock_pieces, os.remaining_stock_boxes,
-      os.new_stock_gram, os.new_stock_kg, os.new_stock_litre, os.new_stock_pieces, os.new_stock_boxes,
-      os.created_at, os.updated_at, os.new_stock_date,
+      os.remaining_stock_gram, os.remaining_stock_kg, os.remaining_stock_litre, os.remaining_stock_pieces`;
+    
+    if (hasBoxesColumns) {
+      query += `, os.remaining_stock_boxes`;
+    }
+    
+    query += `, os.new_stock_gram, os.new_stock_kg, os.new_stock_litre, os.new_stock_pieces`;
+    
+    if (hasBoxesColumns) {
+      query += `, os.new_stock_boxes`;
+    }
+    
+    query += `, os.created_at, os.updated_at, os.new_stock_date,
       si.id, si.item_name, si.sector_code, si.vehicle_type, si.part_number, 
       s.code, s.name 
       ORDER BY si.sector_code, si.item_name`;

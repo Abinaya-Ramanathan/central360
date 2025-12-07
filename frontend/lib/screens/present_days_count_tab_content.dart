@@ -24,6 +24,8 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
   Map<String, double> _totalOtHours = {}; // Map of employee_id to total OT hours
   List<Map<String, dynamic>> _rentVehicles = [];
   Map<int, double> _rentVehiclePresentDaysCount = {}; // Map of vehicle_id to present days count (supports 0.5 for halfday)
+  List<Map<String, dynamic>> _miningActivities = [];
+  Map<int, double> _miningActivityTotals = {}; // Map of activity_id to total quantity
   bool _isLoading = false;
 
   @override
@@ -33,6 +35,10 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
     if (widget.selectedSector != null || widget.isAdmin) {
       _loadEmployees();
       _loadRentVehicles();
+    }
+    // Load mining activities if All sector or SSBM
+    if (widget.selectedSector == null || widget.selectedSector == 'SSBM') {
+      _loadMiningActivities();
     }
   }
 
@@ -54,6 +60,15 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
           _rentVehiclePresentDaysCount = {};
         });
       }
+      // Reload mining activities if All sector or SSBM
+      if (widget.selectedSector == null || widget.selectedSector == 'SSBM') {
+        _loadMiningActivities();
+      } else {
+        setState(() {
+          _miningActivities = [];
+          _miningActivityTotals = {};
+        });
+      }
     }
   }
 
@@ -73,6 +88,43 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         setState(() {
           _rentVehicles = vehicles;
           _rentVehiclePresentDaysCount = {for (var vehicle in vehicles) vehicle['id'] as int: 0};
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        // Silently fail
+      }
+    }
+  }
+
+  Future<void> _loadMiningActivities() async {
+    // Load mining activities only if All sector (null) or SSBM
+    if (widget.selectedSector != null && widget.selectedSector != 'SSBM') {
+      if (mounted) {
+        setState(() {
+          _miningActivities = [];
+          _miningActivityTotals = {};
+        });
+      }
+      return;
+    }
+
+    try {
+      List<Map<String, dynamic>> activities;
+      if (widget.selectedSector == null && widget.isAdmin) {
+        // All sectors - load all mining activities
+        activities = await ApiService.getMiningActivities();
+      } else if (widget.selectedSector == 'SSBM') {
+        // SSBM sector - load only SSBM activities
+        activities = await ApiService.getMiningActivities(sector: 'SSBM');
+      } else {
+        activities = [];
+      }
+
+      if (mounted) {
+        setState(() {
+          _miningActivities = activities;
+          _miningActivityTotals = {for (var activity in activities) activity['id'] as int: 0.0};
         });
       }
     } catch (e) {
@@ -153,6 +205,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         _presentDaysCount = {for (var emp in _employees) emp.id: 0.0}; // Reset counts
         _totalOtHours = {for (var emp in _employees) emp.id: 0.0}; // Reset OT hours
         _rentVehiclePresentDaysCount = {for (var vehicle in _rentVehicles) vehicle['id'] as int: 0.0}; // Reset rent vehicle counts
+        _miningActivityTotals = {for (var activity in _miningActivities) activity['id'] as int: 0.0}; // Reset mining activity totals
       });
     }
   }
@@ -207,12 +260,16 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
     if (_rentVehicles.isEmpty && (widget.selectedSector != null || widget.isAdmin)) {
       await _loadRentVehicles();
     }
+    // Ensure mining activities are loaded if All sector or SSBM
+    if (_miningActivities.isEmpty && (widget.selectedSector == null || widget.selectedSector == 'SSBM')) {
+      await _loadMiningActivities();
+    }
 
-    if (_employees.isEmpty && _rentVehicles.isEmpty) {
+    if (_employees.isEmpty && _rentVehicles.isEmpty && _miningActivities.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No employees or vehicles found for the selected sector'),
+            content: Text('No employees, vehicles, or mining activities found for the selected sector'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -226,6 +283,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
       _presentDaysCount = {for (var emp in _employees) emp.id: 0.0};
       _totalOtHours = {for (var emp in _employees) emp.id: 0.0};
       _rentVehiclePresentDaysCount = {for (var vehicle in _rentVehicles) vehicle['id'] as int: 0.0};
+      _miningActivityTotals = {for (var activity in _miningActivities) activity['id'] as int: 0.0};
 
       // Query attendance for each selected date
       for (var date in _selectedDates) {
@@ -305,6 +363,36 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
               }
               _rentVehiclePresentDaysCount[vehicleId] = (_rentVehiclePresentDaysCount[vehicleId] ?? 0.0) + count;
             }
+          }
+
+          // Get daily mining activities for this date
+          try {
+            final dailyMiningActivities = await ApiService.getDailyMiningActivities(
+              date: dateStr,
+              sector: widget.selectedSector,
+            );
+
+            // Sum quantities for each activity
+            for (var entry in dailyMiningActivities) {
+              final activityId = entry['activity_id'] as int?;
+              final quantityRaw = entry['quantity'];
+              
+              if (activityId != null && quantityRaw != null) {
+                double quantity = 0.0;
+                if (quantityRaw is num) {
+                  quantity = quantityRaw.toDouble();
+                } else if (quantityRaw is String) {
+                  quantity = double.tryParse(quantityRaw) ?? 0.0;
+                } else {
+                  quantity = double.tryParse(quantityRaw.toString()) ?? 0.0;
+                }
+                
+                _miningActivityTotals[activityId] = (_miningActivityTotals[activityId] ?? 0.0) + quantity;
+              }
+            }
+          } catch (e) {
+            debugPrint('Error loading daily mining activities for date $dateStr: $e');
+            // Continue with other dates even if one fails
           }
         } catch (e) {
           debugPrint('Error loading attendance for date $dateStr: $e');
@@ -407,10 +495,10 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : (_employees.isEmpty && _rentVehicles.isEmpty)
+              : (_employees.isEmpty && _rentVehicles.isEmpty && _miningActivities.isEmpty)
                   ? const Center(
                       child: Text(
-                        'No employees or rent vehicles in selected sector',
+                        'No employees, rent vehicles, or mining activities in selected sector',
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
@@ -499,6 +587,57 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                                         ],
                                       );
                                     }).toList(),
+                                  ),
+                                ),
+                              ],
+                              // Daily Mining Activity Table
+                              if (_miningActivities.isNotEmpty) ...[
+                                const SizedBox(height: 16),
+                                Card(
+                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(12.0),
+                                        child: Text(
+                                          'Daily Mining Activity',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.amber.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                      DataTable(
+                                        headingRowColor: WidgetStateProperty.all(Colors.amber.shade100),
+                                        columns: const [
+                                          DataColumn(label: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                          DataColumn(label: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
+                                        ],
+                                        rows: _miningActivities.map((activity) {
+                                          final activityId = activity['id'] as int;
+                                          final totalQuantity = _miningActivityTotals[activityId] ?? 0.0;
+                                          return DataRow(
+                                            cells: [
+                                              DataCell(Text(activity['activity_name']?.toString() ?? 'N/A')),
+                                              DataCell(
+                                                Text(
+                                                  totalQuantity.toStringAsFixed(2),
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: totalQuantity > 0 ? Colors.amber.shade700 : Colors.grey,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],

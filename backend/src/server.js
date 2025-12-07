@@ -30,6 +30,7 @@ import stockStatementRouter from './routes/stock_statement.routes.js';
 import rentVehiclesRouter from './routes/rent_vehicles.routes.js';
 import rentVehicleAttendanceRouter from './routes/rent_vehicle_attendance.routes.js';
 import ingredientsRouter from './routes/ingredients.routes.js';
+import miningActivitiesRouter from './routes/mining_activities.routes.js';
 import appRouter from './routes/app.routes.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -83,6 +84,7 @@ app.use('/api/v1/stock-statement', stockStatementRouter);
 app.use('/api/v1/rent-vehicles', rentVehiclesRouter);
 app.use('/api/v1/rent-vehicle-attendance', rentVehicleAttendanceRouter);
 app.use('/api/v1/ingredients', ingredientsRouter);
+app.use('/api/v1/mining-activities', miningActivitiesRouter);
 app.use('/api/v1/app', appRouter);
 
 export default app;

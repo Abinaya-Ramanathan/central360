@@ -1278,11 +1278,13 @@ class ApiService {
     String? sector,
     String? date,
     String? month,
+    String? companyStaff,
   }) async {
     final queryParams = <String, String>{};
     if (sector != null) queryParams['sector'] = sector;
     if (date != null) queryParams['date'] = date;
     if (month != null) queryParams['month'] = month;
+    if (companyStaff != null) queryParams['company_staff'] = companyStaff;
 
     final uri = Uri.parse('$baseUrl/credit-details').replace(queryParameters: queryParams);
     final response = await http.get(uri);
@@ -1355,9 +1357,13 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> getCreditDetailsFromSales({
     String? sector,
+    String? companyStaff,
+    String? month,
   }) async {
     final queryParams = <String, String>{};
     if (sector != null) queryParams['sector'] = sector;
+    if (companyStaff != null) queryParams['company_staff'] = companyStaff;
+    if (month != null) queryParams['month'] = month;
 
     final uri = Uri.parse('$baseUrl/sales-details/credits').replace(queryParameters: queryParams);
     final response = await http.get(uri);
@@ -2266,6 +2272,162 @@ class ApiService {
       }
     } catch (e) {
       errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete ingredient';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Mining Activities
+  static Future<List<Map<String, dynamic>>> getMiningActivities({String? sector}) async {
+    final queryParams = <String, String>{};
+    if (sector != null) queryParams['sector'] = sector;
+
+    final uri = Uri.parse('$baseUrl/mining-activities').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load mining activities');
+  }
+
+  static Future<Map<String, dynamic>> createMiningActivity(
+    String activityName,
+    String sectorCode, {
+    String? description,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/mining-activities'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'activity_name': activityName,
+        'sector_code': sectorCode,
+        if (description != null) 'description': description,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return json.decode(response.body);
+    }
+    String errorMessage = 'Failed to create mining activity';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to create mining activity';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<Map<String, dynamic>> updateMiningActivity(
+    String id,
+    String activityName,
+    String sectorCode, {
+    String? description,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/mining-activities/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'activity_name': activityName,
+        'sector_code': sectorCode,
+        if (description != null) 'description': description,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    String errorMessage = 'Failed to update mining activity';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to update mining activity';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<void> deleteMiningActivity(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/mining-activities/$id'),
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    String errorMessage = 'Failed to delete mining activity';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete mining activity';
+    }
+    throw Exception(errorMessage);
+  }
+
+  // Daily Mining Activities
+  static Future<List<Map<String, dynamic>>> getDailyMiningActivities({
+    String? date,
+    String? sector,
+  }) async {
+    final queryParams = <String, String>{};
+    if (date != null) queryParams['date'] = date;
+    if (sector != null) queryParams['sector'] = sector;
+
+    final uri = Uri.parse('$baseUrl/mining-activities/daily').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load daily mining activities');
+  }
+
+  static Future<Map<String, dynamic>> createOrUpdateDailyMiningActivity({
+    required int activityId,
+    required String date,
+    double? quantity,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/mining-activities/daily'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'activity_id': activityId,
+        'date': date,
+        if (quantity != null) 'quantity': quantity,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return json.decode(response.body);
+    }
+    String errorMessage = 'Failed to save daily mining activity';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to save daily mining activity';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<void> deleteDailyMiningActivity(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/mining-activities/daily/$id'),
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    String errorMessage = 'Failed to delete daily mining activity';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete daily mining activity';
     }
     throw Exception(errorMessage);
   }

@@ -194,3 +194,5 @@ ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 **Final Recommendation: Start with 50 GB disk space for optimal performance and peace of mind.**
 
 
+
+

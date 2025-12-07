@@ -19,6 +19,33 @@ class PdfGenerator {
         .replaceAll(RegExp(r'[<>:"|?*]'), '_');
   }
 
+  // Helper function to format date for PDF display
+  static String _formatDateForPDF(dynamic dateValue) {
+    if (dateValue == null) return '';
+    try {
+      if (dateValue is DateTime) {
+        return FormatUtils.formatDateDisplay(dateValue);
+      } else if (dateValue is String) {
+        final dateStr = dateValue.split('T')[0].split(' ')[0];
+        final parsed = FormatUtils.parseDate(dateStr);
+        if (parsed != null) {
+          return FormatUtils.formatDateDisplay(parsed);
+        }
+        return dateStr; // Return as-is if parsing fails
+      }
+      return dateValue.toString();
+    } catch (e) {
+      print('Error formatting date in PDF: $e, value: $dateValue');
+      return dateValue?.toString() ?? '';
+    }
+  }
+
+  // Helper function to format amount for PDF display
+  static String _formatAmountForPDF(double? amount) {
+    if (amount == null) return '';
+    return 'Rs.${amount.toStringAsFixed(2)}';
+  }
+
   static Future<void> generateAndDownloadCateringPDF({
     required String bookingId,
     String? deliveryLocation,
@@ -334,29 +361,6 @@ class PdfGenerator {
     }
   }
 
-  static String _formatDateForPDF(dynamic dateValue) {
-    if (dateValue == null) return 'N/A';
-    try {
-      if (dateValue is String) {
-        // Handle ISO format with T separator or space separator
-        final dateStr = dateValue.split('T')[0].split(' ')[0];
-        return dateStr;
-      } else if (dateValue is DateTime) {
-        return dateValue.toIso8601String().split('T')[0];
-      } else {
-        // Try parsing as string first
-        final dateStr = dateValue.toString();
-        final parsed = DateTime.tryParse(dateStr);
-        if (parsed != null) {
-          return parsed.toIso8601String().split('T')[0];
-        }
-        // If it's already in date format, split by T or space
-        return dateStr.split('T')[0].split(' ')[0];
-      }
-    } catch (e) {
-      return 'N/A';
-    }
-  }
 
   static String _getSectorNameForPDF(Map<String, dynamic> record, List<Map<String, dynamic>> sectors) {
     final sectorCode = record['sector_code']?.toString();
@@ -867,8 +871,8 @@ class PdfGenerator {
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['product_name']?.toString() ?? '')),
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['quantity']?.toString() ?? '')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${(double.tryParse(record['amount_received']?.toString() ?? '0') ?? 0).toStringAsFixed(2)}')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${(double.tryParse(record['credit_amount']?.toString() ?? '0') ?? 0).toStringAsFixed(2)}')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text((double.tryParse(record['amount_received']?.toString() ?? '0') ?? 0).toStringAsFixed(2))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text((double.tryParse(record['credit_amount']?.toString() ?? '0') ?? 0).toStringAsFixed(2))),
                         ],
                       );
                     }),
@@ -966,7 +970,7 @@ class PdfGenerator {
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
                         child: pw.Text(
-                          'Rs.${overallBalance.toStringAsFixed(2)}',
+                          _formatAmountForPDF(overallBalance),
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
                         ),
                       ),
@@ -976,6 +980,8 @@ class PdfGenerator {
                 );
               } else if (rowType == 'payment') {
                 // Payment row (sub-row)
+                final balancePaidDateStr = _formatDateForPDF(record['balance_paid_date']);
+                
                 tableRows.add(
                   pw.TableRow(
                     children: [
@@ -985,21 +991,15 @@ class PdfGenerator {
                       pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(balancePaid != null ? 'Rs.${balancePaid.toStringAsFixed(2)}' : ''),
+                        child: pw.Text(_formatAmountForPDF(balancePaid)),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(
-                          record['balance_paid_date'] != null 
-                              ? (record['balance_paid_date'] is DateTime
-                                  ? FormatUtils.formatDateDisplay(record['balance_paid_date'] as DateTime)
-                                  : FormatUtils.formatDateDisplay(DateTime.parse(record['balance_paid_date'].toString())))
-                              : '',
-                        ),
+                        child: pw.Text(balancePaidDateStr),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text('Rs.${overallBalance.toStringAsFixed(2)}'),
+                        child: pw.Text(_formatAmountForPDF(overallBalance)),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
@@ -1010,41 +1010,40 @@ class PdfGenerator {
                 );
               } else {
                 // Main row
+                final saleDateStr = _formatDateForPDF(record['sale_date']);
+                final balancePaidDateStr = _formatDateForPDF(record['balance_paid_date']);
+                
                 tableRows.add(
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.blue200),
                     children: [
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(
-                          record['sale_date'] != null 
-                              ? FormatUtils.formatDateDisplay(DateTime.parse(record['sale_date'].toString()))
-                              : '',
-                        ),
-                      ),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['product_name']?.toString() ?? '')),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(creditAmount != null ? 'Rs.${creditAmount.toStringAsFixed(2)}' : ''),
+                        child: pw.Text(saleDateStr),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(balancePaid != null ? 'Rs.${balancePaid.toStringAsFixed(2)}' : ''),
+                        child: pw.Text(record['name']?.toString() ?? ''),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(
-                          record['balance_paid_date'] != null 
-                              ? (record['balance_paid_date'] is DateTime
-                                  ? FormatUtils.formatDateDisplay(record['balance_paid_date'] as DateTime)
-                                  : FormatUtils.formatDateDisplay(DateTime.parse(record['balance_paid_date'].toString())))
-                              : '',
-                        ),
+                        child: pw.Text(record['product_name']?.toString() ?? ''),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text('Rs.${overallBalance.toStringAsFixed(2)}'),
+                        child: pw.Text(_formatAmountForPDF(creditAmount)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(_formatAmountForPDF(balancePaid)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(balancePaidDateStr),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(_formatAmountForPDF(overallBalance)),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
@@ -1063,6 +1062,19 @@ class PdfGenerator {
           
           print('PDF Generator: Built ${tableRows.length} table rows (1 header + ${tableRows.length - 1} data rows)');
           
+          if (tableRows.isEmpty) {
+            print('PDF Generator: WARNING - tableRows is empty!');
+          } else {
+            print('PDF Generator: First table row has ${tableRows.first.children.length} cells');
+            if (tableRows.length > 1) {
+              print('PDF Generator: Second table row has ${tableRows[1].children.length} cells');
+              // Debug: Print first data row content
+              if (tableRows[1].children.isNotEmpty) {
+                print('PDF Generator: First data cell text: ${tableRows[1].children[0]}');
+              }
+            }
+          }
+          
           return pw.Padding(
             padding: const pw.EdgeInsets.all(20),
             child: pw.Column(
@@ -1073,16 +1085,28 @@ class PdfGenerator {
                   style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
                 ),
                 pw.SizedBox(height: 20),
-                creditData.isEmpty
+                creditData.isEmpty || tableRows.isEmpty
                     ? pw.Padding(
                         padding: const pw.EdgeInsets.all(20),
                         child: pw.Text(
-                          'No data available',
+                          creditData.isEmpty 
+                              ? 'No data available'
+                              : 'Error: Table rows not generated properly',
                           style: pw.TextStyle(fontSize: 14, fontStyle: pw.FontStyle.italic),
                         ),
                       )
                     : pw.Table(
                         border: pw.TableBorder.all(),
+                        columnWidths: {
+                          0: const pw.FlexColumnWidth(1.2), // Date
+                          1: const pw.FlexColumnWidth(1.5), // Name
+                          2: const pw.FlexColumnWidth(1.5), // Product
+                          3: const pw.FlexColumnWidth(1.2), // Credit Amount
+                          4: const pw.FlexColumnWidth(1.2), // Balance Paid
+                          5: const pw.FlexColumnWidth(1.2), // Balance Paid Date
+                          6: const pw.FlexColumnWidth(1.2), // Overall Balance
+                          7: const pw.FlexColumnWidth(2.0), // Details
+                        },
                         children: tableRows,
                       ),
               ],
@@ -1149,8 +1173,8 @@ class PdfGenerator {
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['sector_code']?.toString() ?? '')),
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['purchase_details']?.toString() ?? '')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${(double.tryParse(record['amount']?.toString() ?? '0') ?? 0).toStringAsFixed(2)}')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${(double.tryParse(record['credit_amount']?.toString() ?? '0') ?? 0).toStringAsFixed(2)}')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text((double.tryParse(record['amount']?.toString() ?? '0') ?? 0).toStringAsFixed(2))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text((double.tryParse(record['credit_amount']?.toString() ?? '0') ?? 0).toStringAsFixed(2))),
                         ],
                       );
                     }),
@@ -1165,6 +1189,364 @@ class PdfGenerator {
 
     final fileName = _sanitizeFileName('Company_Purchase_Details_${dateFormat.format(fromDate)}_to_${dateFormat.format(toDate)}.pdf');
     final filePath = await _savePdfToDownloads(pdf, fileName);
+    return filePath;
+  }
+
+  // Generate Advance Details PDF
+  static Future<String> generateAdvanceDetailsPDF({
+    required List<Map<String, dynamic>> advanceData,
+    required String fileName,
+  }) async {
+    final pdf = pw.Document();
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          // Build table rows list
+          final List<pw.TableRow> tableRows = [];
+          
+          // Check if bulk advance column is needed
+          final showBulkColumn = advanceData.any((d) => ((d['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01);
+          
+          // Add header row
+          final headerChildren = <pw.Widget>[
+            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Sector', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Employee Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Outstanding Advance', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+          ];
+          
+          if (showBulkColumn) {
+            headerChildren.add(
+              pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Bulk Advance', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+            );
+          }
+          
+          tableRows.add(
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+              children: headerChildren,
+            ),
+          );
+          
+          // Calculate totals
+          double totalOutstandingAdvance = 0.0;
+          double totalBulkAdvance = 0.0;
+          
+          // Build data rows
+          for (var record in advanceData) {
+            final outstandingAdvance = (record['outstanding_advance'] as num?)?.toDouble() ?? 0.0;
+            final bulkAdvance = (record['bulk_advance'] as num?)?.toDouble() ?? 0.0;
+            
+            totalOutstandingAdvance += outstandingAdvance;
+            totalBulkAdvance += bulkAdvance;
+            
+            final rowChildren = <pw.Widget>[
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(8), 
+                child: pw.Text(record['sector_code']?.toString() ?? 'N/A'),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(8), 
+                child: pw.Text(record['employee_name']?.toString() ?? 'N/A'),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(8), 
+                child: pw.Text(
+                  'Rs.${outstandingAdvance.toStringAsFixed(2)}',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+            ];
+            
+            if (showBulkColumn) {
+              rowChildren.add(
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(8), 
+                  child: pw.Text(
+                    bulkAdvance > 0.01 ? 'Rs.${bulkAdvance.toStringAsFixed(2)}' : 'Rs.0.00',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
+                ),
+              );
+            }
+            
+            tableRows.add(
+              pw.TableRow(
+                children: rowChildren,
+              ),
+            );
+          }
+          
+          // Add total row
+          final totalRowChildren = <pw.Widget>[
+            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(8), 
+              child: pw.Text(
+                'TOTAL',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(8), 
+              child: pw.Text(
+                'Rs.${totalOutstandingAdvance.toStringAsFixed(2)}',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              ),
+            ),
+          ];
+          
+          if (showBulkColumn) {
+            totalRowChildren.add(
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(8), 
+                child: pw.Text(
+                  'Rs.${totalBulkAdvance.toStringAsFixed(2)}',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            );
+          }
+          
+          tableRows.add(
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+              children: totalRowChildren,
+            ),
+          );
+          
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(20),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Advance Details Statement',
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 20),
+                advanceData.isEmpty
+                    ? pw.Padding(
+                        padding: const pw.EdgeInsets.all(20),
+                        child: pw.Text(
+                          'No data available',
+                          style: pw.TextStyle(fontSize: 14, fontStyle: pw.FontStyle.italic),
+                        ),
+                      )
+                    : pw.Table(
+                        border: pw.TableBorder.all(),
+                        children: tableRows,
+                      ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    
+    final finalFileName = _sanitizeFileName('$fileName.pdf');
+    final filePath = await _savePdfToDownloads(pdf, finalFileName);
+    return filePath;
+  }
+
+  // Generate Company Purchase Credit Details PDF
+  static Future<String> generateCompanyPurchaseCreditDetailsPDF({
+    required List<Map<String, dynamic>> creditData,
+    required String fileName,
+  }) async {
+    final pdf = pw.Document();
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          // Build table rows list
+          final List<pw.TableRow> tableRows = [];
+          
+          // Add header row
+          tableRows.add(
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+              children: [
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Item Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Shop Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Purchase Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Balance Paid', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Balance Paid Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Overall Balance', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+              ],
+            ),
+          );
+          
+          // Build data rows
+          for (var record in creditData) {
+            try {
+              final rowType = record['type'] as String? ?? 'main';
+              final creditAmount = record['credit'] != null 
+                  ? (double.tryParse(record['credit'].toString()) ?? 0.0)
+                  : null;
+              final balancePaid = record['balance_paid'] != null
+                  ? (double.tryParse(record['balance_paid'].toString()) ?? 0.0)
+                  : null;
+              final overallBalance = record['overall_balance'] != null
+                  ? (double.tryParse(record['overall_balance'].toString()) ?? 0.0)
+                  : 0.0;
+            
+              // Handle different row types
+              if (rowType == 'total') {
+                // Total row
+                tableRows.add(
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          'TOTAL',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          'Rs.${overallBalance.toStringAsFixed(2)}',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                    ],
+                  ),
+                );
+              } else if (rowType == 'payment') {
+                // Payment row (sub-row)
+                tableRows.add(
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(balancePaid != null ? 'Rs.${balancePaid.toStringAsFixed(2)}' : ''),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          record['balance_paid_date'] != null 
+                              ? (record['balance_paid_date'] is DateTime
+                                  ? FormatUtils.formatDateDisplay(record['balance_paid_date'] as DateTime)
+                                  : FormatUtils.formatDateDisplay(DateTime.parse(record['balance_paid_date'].toString())))
+                              : '',
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text('Rs.${overallBalance.toStringAsFixed(2)}'),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(record['details']?.toString() ?? ''),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                // Main row
+                tableRows.add(
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.blue200),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          record['purchase_date'] != null 
+                              ? FormatUtils.formatDateDisplay(DateTime.parse(record['purchase_date'].toString()))
+                              : '',
+                        ),
+                      ),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['item_name']?.toString() ?? '')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['shop_name']?.toString() ?? '')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['purchase_details']?.toString() ?? '')),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(creditAmount != null ? 'Rs.${creditAmount.toStringAsFixed(2)}' : ''),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(balancePaid != null ? 'Rs.${balancePaid.toStringAsFixed(2)}' : ''),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(
+                          record['balance_paid_date'] != null 
+                              ? (record['balance_paid_date'] is DateTime
+                                  ? FormatUtils.formatDateDisplay(record['balance_paid_date'] as DateTime)
+                                  : FormatUtils.formatDateDisplay(DateTime.parse(record['balance_paid_date'].toString())))
+                              : '',
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text('Rs.${overallBalance.toStringAsFixed(2)}'),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8), 
+                        child: pw.Text(record['details']?.toString() ?? ''),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            } catch (e) {
+              print('Error generating PDF row: $e');
+              print('Error record: $record');
+              // Continue with next row
+            }
+          }
+          
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(20),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Company Purchase Credit Details Statement',
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 20),
+                creditData.isEmpty
+                    ? pw.Padding(
+                        padding: const pw.EdgeInsets.all(20),
+                        child: pw.Text(
+                          'No data available',
+                          style: pw.TextStyle(fontSize: 14, fontStyle: pw.FontStyle.italic),
+                        ),
+                      )
+                    : pw.Table(
+                        border: pw.TableBorder.all(),
+                        children: tableRows,
+                      ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    
+    final finalFileName = _sanitizeFileName('$fileName.pdf');
+    final filePath = await _savePdfToDownloads(pdf, finalFileName);
     return filePath;
   }
 
@@ -1220,9 +1602,9 @@ class PdfGenerator {
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['credit_date'] != null ? FormatUtils.formatDateDisplay(DateTime.parse(record['credit_date'])) : '')),
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
                           pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['purchase_details']?.toString() ?? '')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${creditAmount.toStringAsFixed(2)}')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${amountSettled.toStringAsFixed(2)}')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs.${pendingAmount.toStringAsFixed(2)}')),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(creditAmount.toStringAsFixed(2))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(amountSettled.toStringAsFixed(2))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(pendingAmount.toStringAsFixed(2))),
                         ],
                       );
                     }),

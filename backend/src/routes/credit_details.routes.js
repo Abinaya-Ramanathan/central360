@@ -6,7 +6,7 @@ const router = Router();
 // Get credit details
 router.get('/', async (req, res) => {
   try {
-    const { sector, date, month } = req.query;
+    const { sector, date, month, company_staff } = req.query;
     let query = 'SELECT * FROM credit_details WHERE 1=1';
     const params = [];
     let paramCount = 1;
@@ -24,6 +24,15 @@ router.get('/', async (req, res) => {
     if (month) {
       query += ` AND TO_CHAR(credit_date, 'YYYY-MM') = $${paramCount++}`;
       params.push(month);
+    }
+
+    if (company_staff !== undefined && company_staff !== null && company_staff !== '') {
+      if (company_staff === 'true' || company_staff === true) {
+        query += ` AND company_staff = true`;
+      } else if (company_staff === 'false' || company_staff === false) {
+        query += ` AND company_staff = false`;
+      }
+      // If company_staff is 'null' or empty string, don't filter (show all)
     }
 
     query += ' ORDER BY credit_date DESC, created_at DESC';
@@ -50,6 +59,7 @@ router.post('/', async (req, res) => {
       credit_date,
       full_settlement_date,
       comments,
+      company_staff,
     } = req.body;
 
     if (!sector_code || !name || !credit_date) {
@@ -72,8 +82,9 @@ router.post('/', async (req, res) => {
           credit_date = $8,
           full_settlement_date = $9,
           comments = $10,
+          company_staff = $11,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $11
+        WHERE id = $12
         RETURNING *`,
         [
           sector_code,
@@ -86,6 +97,7 @@ router.post('/', async (req, res) => {
           credit_date,
           full_settlement_date || null,
           comments || null,
+          company_staff !== undefined && company_staff !== null ? company_staff : null,
           id,
         ]
       );
@@ -100,8 +112,8 @@ router.post('/', async (req, res) => {
       const result = await db.query(
         `INSERT INTO credit_details (
           sector_code, name, phone_number, address, purchase_details,
-          credit_amount, amount_settled, credit_date, full_settlement_date, comments
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          credit_amount, amount_settled, credit_date, full_settlement_date, comments, company_staff
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *`,
         [
           sector_code,
@@ -114,6 +126,7 @@ router.post('/', async (req, res) => {
           credit_date,
           full_settlement_date || null,
           comments || null,
+          company_staff !== undefined && company_staff !== null ? company_staff : null,
         ]
       );
 

@@ -12,6 +12,7 @@ router.get('/', async (req, res) => {
       id, sector_code, name, contact_number, address, product_name, quantity,
       amount_received, credit_amount, amount_pending,
       COALESCE(balance_paid, 0) as balance_paid,
+      COALESCE(company_staff, false) as company_staff,
       TO_CHAR(sale_date, 'YYYY-MM-DD') as sale_date,
       TO_CHAR(balance_paid_date, 'YYYY-MM-DD') as balance_paid_date,
       created_at, updated_at
@@ -46,12 +47,13 @@ router.get('/', async (req, res) => {
 // Get credit details (people with credit_amount > 0)
 router.get('/credits', async (req, res) => {
   try {
-    const { sector } = req.query;
+    const { sector, company_staff, month } = req.query;
     // Use TO_CHAR to format sale_date as string to avoid timezone issues
     let query = `SELECT 
       id, sector_code, name, contact_number, address, product_name, quantity,
       amount_received, credit_amount, amount_pending,
       COALESCE(balance_paid, 0) as balance_paid,
+      COALESCE(company_staff, false) as company_staff,
       TO_CHAR(sale_date, 'YYYY-MM-DD') as sale_date,
       TO_CHAR(balance_paid_date, 'YYYY-MM-DD') as balance_paid_date,
       details,
@@ -65,8 +67,24 @@ router.get('/credits', async (req, res) => {
       params.push(sector);
     }
 
+    if (company_staff !== undefined && company_staff !== null && company_staff !== '') {
+      if (company_staff === 'true' || company_staff === true) {
+        query += ` AND company_staff = true`;
+      } else if (company_staff === 'false' || company_staff === false) {
+        // Include both false and NULL values when filtering for "No"
+        query += ` AND (company_staff = false OR company_staff IS NULL)`;
+      }
+      // If company_staff is 'null' or empty string, don't filter (show all)
+    }
+
+    if (month) {
+      query += ` AND TO_CHAR(sale_date, 'YYYY-MM') = $${paramCount++}`;
+      params.push(month);
+    }
+
     query += ' ORDER BY sale_date DESC, created_at DESC';
     console.log(`[Credit Details] Query: ${query}, params:`, params);
+    console.log(`[Credit Details] company_staff filter: ${company_staff} (type: ${typeof company_staff})`);
     const { rows } = await db.query(query, params);
     console.log(`[Credit Details] Found ${rows.length} records with credit_amount > 0`);
     
@@ -110,6 +128,7 @@ router.post('/', async (req, res) => {
       balance_paid_date,
       sale_date,
       details,
+      company_staff,
     } = req.body;
 
     if (!sector_code || !name || !product_name || !quantity || !sale_date) {
@@ -139,8 +158,9 @@ router.post('/', async (req, res) => {
           balance_paid_date = $11,
           details = $12,
           sale_date = $13,
+          company_staff = $14,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $14
+        WHERE id = $15
         RETURNING *`,
         [
           sector_code,
@@ -156,6 +176,7 @@ router.post('/', async (req, res) => {
           balance_paid_date || null,
           details || null,
           sale_date,
+          company_staff || false,
           id,
         ]
       );
@@ -171,8 +192,8 @@ router.post('/', async (req, res) => {
       const { rows } = await db.query(
         `INSERT INTO sales_details (
           sector_code, name, contact_number, address, product_name, quantity,
-          amount_received, credit_amount, amount_pending, balance_paid, balance_paid_date, details, sale_date
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          amount_received, credit_amount, amount_pending, balance_paid, balance_paid_date, details, sale_date, company_staff
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING *`,
         [
           sector_code,
@@ -188,6 +209,7 @@ router.post('/', async (req, res) => {
           balance_paid_date || null,
           details || null,
           sale_date,
+          company_staff || false,
         ]
       );
 

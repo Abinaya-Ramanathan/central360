@@ -12,10 +12,24 @@ import '../config/env_config.dart';
 class UpdateService {
   static const String _versionEndpoint = '/api/v1/app/version';
   static const String _dismissedVersionKey = 'dismissed_update_version';
+  static const String _lastCheckTimeKey = 'last_update_check_time';
+  static const Duration _checkCooldown = Duration(hours: 1); // Only check once per hour
   
   /// Check if a new version is available
   /// Returns [UpdateInfo] if update is available, null otherwise
   static Future<UpdateInfo?> checkForUpdate() async {
+    // Check if we've checked recently (cooldown period)
+    final lastCheckTime = await _getLastCheckTime();
+    if (lastCheckTime != null) {
+      final timeSinceLastCheck = DateTime.now().difference(lastCheckTime);
+      if (timeSinceLastCheck < _checkCooldown) {
+        debugPrint('Update check skipped - cooldown period active (${_checkCooldown.inMinutes - timeSinceLastCheck.inMinutes} minutes remaining)');
+        return null;
+      }
+    }
+    
+    // Update last check time
+    await _setLastCheckTime(DateTime.now());
     try {
       // Get current app version
       final packageInfo = await PackageInfo.fromPlatform();
@@ -63,15 +77,20 @@ class UpdateService {
         debugPrint('Download URL: $downloadUrl');
         debugPrint('Platforms data: ${data['platforms']}');
         
-        // Compare versions
-        if (_isNewerVersion(latestVersion, latestBuildNumber, currentVersion, currentBuildNumber)) {
+        // Compare versions - only show update if there's actually a newer version
+        final isNewer = _isNewerVersion(latestVersion, latestBuildNumber, currentVersion, currentBuildNumber);
+        debugPrint('Version comparison: Latest=$latestVersion+$latestBuildNumber, Current=$currentVersion+$currentBuildNumber, IsNewer=$isNewer');
+        
+        if (isNewer) {
           // Check if user has already dismissed this version
           final dismissedVersion = await _getDismissedVersion();
           final latestVersionString = '$latestVersion+$latestBuildNumber';
           
+          debugPrint('Dismissed version check: Stored=$dismissedVersion, Latest=$latestVersionString');
+          
           // If this version was already dismissed, don't show it again
           if (dismissedVersion == latestVersionString) {
-            debugPrint('Update $latestVersionString was already dismissed by user');
+            debugPrint('Update $latestVersionString was already dismissed by user - skipping');
             return null;
           }
           
@@ -79,6 +98,8 @@ class UpdateService {
             debugPrint('WARNING: Download URL is empty! Backend may not be deployed with latest version.');
             debugPrint('Platform-specific URL not found. Check backend deployment.');
           }
+          
+          debugPrint('Update available: $latestVersionString (current: $currentVersion+$currentBuildNumber)');
           return UpdateInfo(
             currentVersion: currentVersion,
             currentBuildNumber: currentBuildNumber,
@@ -88,6 +109,14 @@ class UpdateService {
             releaseNotes: releaseNotes ?? 'Bug fixes and improvements',
             isRequired: platformIsRequired,
           );
+        } else {
+          debugPrint('No update available - current version is up to date or newer');
+          // Clear any dismissed version if we're on the latest version
+          final dismissedVersion = await _getDismissedVersion();
+          if (dismissedVersion != null) {
+            debugPrint('Clearing dismissed version $dismissedVersion since we are on latest version');
+            await clearDismissedVersion();
+          }
         }
       } else {
         debugPrint('Failed to check for updates: ${response.statusCode}');
@@ -104,8 +133,17 @@ class UpdateService {
   static Future<void> dismissVersion(String version, int buildNumber) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_dismissedVersionKey, '$version+$buildNumber');
-      debugPrint('Marked version $version+$buildNumber as dismissed');
+      final versionString = '$version+$buildNumber';
+      final success = await prefs.setString(_dismissedVersionKey, versionString);
+      if (success) {
+        debugPrint('✓ Successfully marked version $versionString as dismissed');
+      } else {
+        debugPrint('✗ Failed to save dismissed version $versionString');
+      }
+      
+      // Verify it was saved
+      final saved = await prefs.getString(_dismissedVersionKey);
+      debugPrint('Verification: Saved dismissed version = $saved');
     } catch (e) {
       debugPrint('Error saving dismissed version: $e');
     }
@@ -115,7 +153,9 @@ class UpdateService {
   static Future<String?> _getDismissedVersion() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(_dismissedVersionKey);
+      final dismissed = prefs.getString(_dismissedVersionKey);
+      debugPrint('Retrieved dismissed version from preferences: $dismissed');
+      return dismissed;
     } catch (e) {
       debugPrint('Error reading dismissed version: $e');
       return null;
@@ -133,34 +173,58 @@ class UpdateService {
     }
   }
   
+  /// Get the last update check time
+  static Future<DateTime?> _getLastCheckTime() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = prefs.getInt(_lastCheckTimeKey);
+      if (timestamp != null) {
+        return DateTime.fromMillisecondsSinceEpoch(timestamp);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error reading last check time: $e');
+      return null;
+    }
+  }
+  
+  /// Set the last update check time
+  static Future<void> _setLastCheckTime(DateTime time) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_lastCheckTimeKey, time.millisecondsSinceEpoch);
+    } catch (e) {
+      debugPrint('Error saving last check time: $e');
+    }
+  }
+  
   /// Compare version strings and build numbers
+  /// Returns true only if latest version is actually newer than current version
   static bool _isNewerVersion(
     String latestVersion,
     int latestBuildNumber,
     String currentVersion,
     int currentBuildNumber,
   ) {
-    // Compare build numbers first (more reliable)
-    if (latestBuildNumber > currentBuildNumber) {
-      return true;
+    // If build numbers are different, use that as the primary comparison
+    if (latestBuildNumber != currentBuildNumber) {
+      return latestBuildNumber > currentBuildNumber;
     }
     
     // If build numbers are equal, compare version strings
-    if (latestBuildNumber == currentBuildNumber) {
-      final latestParts = latestVersion.split('.').map(int.tryParse).toList();
-      final currentParts = currentVersion.split('.').map(int.tryParse).toList();
-      
-      for (int i = 0; i < latestParts.length && i < currentParts.length; i++) {
-        final latest = latestParts[i] ?? 0;
-        final current = currentParts[i] ?? 0;
-        if (latest > current) return true;
-        if (latest < current) return false;
-      }
-      
-      // If all parts are equal, latest is longer
-      return latestParts.length > currentParts.length;
+    final latestParts = latestVersion.split('.').map((s) => int.tryParse(s) ?? 0).toList();
+    final currentParts = currentVersion.split('.').map((s) => int.tryParse(s) ?? 0).toList();
+    
+    // Compare each version part
+    final maxLength = latestParts.length > currentParts.length ? latestParts.length : currentParts.length;
+    for (int i = 0; i < maxLength; i++) {
+      final latest = i < latestParts.length ? latestParts[i] : 0;
+      final current = i < currentParts.length ? currentParts[i] : 0;
+      if (latest > current) return true;
+      if (latest < current) return false;
     }
     
+    // If all parts are equal, versions are the same - return false (no update needed)
     return false;
   }
   

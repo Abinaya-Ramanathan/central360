@@ -63,6 +63,8 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final updateInfo = await UpdateService.checkForUpdate();
       if (updateInfo != null && mounted) {
+        debugPrint('Update available: ${updateInfo.versionString}');
+        
         // Show update dialog
         final shouldUpdate = await showDialog<bool>(
           context: context,
@@ -72,18 +74,24 @@ class _HomeScreenState extends State<HomeScreen> {
         
         // If user clicked "Later", mark this version as dismissed
         if (shouldUpdate == false && !updateInfo.isRequired) {
+          debugPrint('User dismissed update ${updateInfo.versionString} - saving to preferences');
           await UpdateService.dismissVersion(
             updateInfo.latestVersion,
             updateInfo.latestBuildNumber,
           );
+          debugPrint('Update ${updateInfo.versionString} marked as dismissed');
         }
         
         // If update is required and user dismissed, show again after delay
+        // But only if it's actually required
         if (updateInfo.isRequired && shouldUpdate == false) {
+          debugPrint('Required update dismissed - will check again in 5 seconds');
           Future.delayed(const Duration(seconds: 5), () {
             if (mounted) _checkForUpdates();
           });
         }
+      } else {
+        debugPrint('No update available or already dismissed');
       }
     } catch (e) {
       // Silently fail - don't interrupt user experience

@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 
     // Optimized: Only select needed columns
     const { rows } = await db.query(
-      'SELECT id, sector_code, item_name, quantity, income_amount, expense_amount, entry_date, created_at, updated_at FROM daily_income_expense WHERE sector_code = $1 AND entry_date = $2::date ORDER BY created_at ASC',
+      'SELECT id, sector_code, item_name, quantity, income_amount, expense_amount, entry_date FROM daily_income_expense WHERE sector_code = $1 AND entry_date = $2::date ORDER BY entry_date ASC',
       [sector, date]
     );
     

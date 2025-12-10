@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
     const startTime = Date.now();
     const { month, date, sector } = req.query;
     // Optimized: Only select needed columns
-    let query = 'SELECT id, item_details, amount, reason_for_purchase, expense_date, sector_code, created_at, updated_at FROM daily_expenses WHERE 1=1';
+    let query = 'SELECT id, item_details, amount, reason_for_purchase, expense_date, sector_code FROM daily_expenses WHERE 1=1';
     const params = [];
     let paramCount = 1;
 

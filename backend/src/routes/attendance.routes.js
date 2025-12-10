@@ -8,8 +8,8 @@ router.get('/', async (req, res) => {
   try {
     const startTime = Date.now();
     const { sector, month, date } = req.query;
-    // Optimized: Only select needed columns
-    let query = 'SELECT id, employee_id, employee_name, sector, date, status, outstanding_advance, advance_taken, advance_paid, bulk_advance_taken, bulk_advance_paid, bulk_advance, ot_hours, created_at, updated_at FROM attendance WHERE 1=1';
+    // Optimized: Only select necessary columns (removed id, created_at, updated_at)
+    let query = 'SELECT employee_id, employee_name, sector, date, status, outstanding_advance, advance_taken, advance_paid, bulk_advance_taken, bulk_advance_paid, bulk_advance, ot_hours FROM attendance WHERE 1=1';
     const params = [];
     let paramCount = 1;
 

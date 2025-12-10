@@ -7,7 +7,7 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const { sector, month, date } = req.query;
-    let query = 'SELECT * FROM rent_vehicle_attendance WHERE 1=1';
+    let query = 'SELECT id, vehicle_id, vehicle_name, sector_code, date, status FROM rent_vehicle_attendance WHERE 1=1';
     const params = [];
     let paramCount = 1;
 

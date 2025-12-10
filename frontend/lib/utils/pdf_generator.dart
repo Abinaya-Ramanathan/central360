@@ -1151,22 +1151,19 @@ class PdfGenerator {
                           style: pw.TextStyle(fontSize: 14, fontStyle: pw.FontStyle.italic),
                         ),
                       )
-                    : pw.SizedBox(
-                        width: double.infinity,
-                        child: pw.Table(
-                          border: pw.TableBorder.all(),
-                          columnWidths: {
-                            0: const pw.FlexColumnWidth(1.2), // Date
-                            1: const pw.FlexColumnWidth(1.5), // Name
-                            2: const pw.FlexColumnWidth(1.5), // Product
-                            3: const pw.FlexColumnWidth(1.2), // Credit Amount
-                            4: const pw.FlexColumnWidth(1.2), // Balance Paid
-                            5: const pw.FlexColumnWidth(1.2), // Balance Paid Date
-                            6: const pw.FlexColumnWidth(1.2), // Overall Balance
-                            7: const pw.FlexColumnWidth(2.0), // Details
-                          },
-                          children: tableRows,
-                        ),
+                    : pw.Table(
+                        border: pw.TableBorder.all(),
+                        columnWidths: {
+                          0: const pw.FlexColumnWidth(1.2), // Date
+                          1: const pw.FlexColumnWidth(1.5), // Name
+                          2: const pw.FlexColumnWidth(1.5), // Product
+                          3: const pw.FlexColumnWidth(1.2), // Credit Amount
+                          4: const pw.FlexColumnWidth(1.2), // Balance Paid
+                          5: const pw.FlexColumnWidth(1.2), // Balance Paid Date
+                          6: const pw.FlexColumnWidth(1.2), // Overall Balance
+                          7: const pw.FlexColumnWidth(2.0), // Details
+                        },
+                        children: tableRows,
                       ),
               ],
             ),

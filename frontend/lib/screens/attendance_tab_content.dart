@@ -93,13 +93,8 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
     try {
       List<Employee> employees;
       if (widget.selectedSector == null && widget.isAdmin) {
-        // Load all employees from all sectors
-        final allSectors = await ApiService.getSectors();
-        employees = [];
-        for (var sector in allSectors) {
-          final sectorEmployees = await ApiService.getEmployeesBySector(sector.code);
-          employees.addAll(sectorEmployees);
-        }
+        // Load all employees in a single call instead of per-sector
+        employees = await ApiService.getEmployees();
       } else {
         employees = await ApiService.getEmployeesBySector(widget.selectedSector!);
       }

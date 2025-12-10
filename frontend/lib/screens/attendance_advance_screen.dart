@@ -263,32 +263,32 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
       final advanceList = <Map<String, dynamic>>[];
 
-      // For each employee, get the most recent outstanding_advance and bulk_advance up to and including the selected date
-      // This will persist across dates until it becomes 0
-      for (var employee in employees) {
+      if (employees.isNotEmpty) {
         try {
-          // Get the most recent outstanding_advance from attendance records
-          // This endpoint returns the outstanding_advance from the most recent record up to and including the date
-          // The outstanding_advance field in attendance records is already calculated cumulatively
-          // (previous + advance_taken - advance_paid) and persists until paid off
-          final outstandingAdvance = await ApiService.getOutstandingAdvance(employee.id, dateStr);
+          // Use batch endpoints to fetch outstanding and bulk advances for all employees in 2 calls
+          final employeeIds = employees.map((e) => e.id).toList();
+          final outstandingMap = await ApiService.getOutstandingAdvanceBatch(employeeIds, dateStr);
+          final bulkAdvanceMap = await ApiService.getBulkAdvanceBatch(employeeIds, dateStr);
           
-          // Get the most recent bulk_advance from attendance records
-          final bulkAdvance = await ApiService.getBulkAdvance(employee.id, dateStr);
-          
-          // Only show employees with outstanding advance > 0 or bulk advance > 0
-          // Use a small epsilon to handle floating point precision issues
-          if (outstandingAdvance > 0.01 || bulkAdvance > 0.01) {
-            advanceList.add({
-              'employee_id': employee.id,
-              'employee_name': employee.name,
-              'sector_code': employee.sector,
-              'outstanding_advance': outstandingAdvance,
-              'bulk_advance': bulkAdvance,
-            });
+          // Build advance list from batch results
+          for (var employee in employees) {
+            final outstandingAdvance = outstandingMap[employee.id] ?? 0.0;
+            final bulkAdvance = bulkAdvanceMap[employee.id] ?? 0.0;
+            
+            // Only show employees with outstanding advance > 0 or bulk advance > 0
+            // Use a small epsilon to handle floating point precision issues
+            if (outstandingAdvance > 0.01 || bulkAdvance > 0.01) {
+              advanceList.add({
+                'employee_id': employee.id,
+                'employee_name': employee.name,
+                'sector_code': employee.sector,
+                'outstanding_advance': outstandingAdvance,
+                'bulk_advance': bulkAdvance,
+              });
+            }
           }
         } catch (e) {
-          // Skip employees with errors
+          debugPrint('Error loading advance details batch: $e');
         }
       }
 

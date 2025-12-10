@@ -6,8 +6,10 @@ const router = Router();
 // Get daily production records
 router.get('/', async (req, res) => {
   try {
+    const startTime = Date.now();
     const { month, date } = req.query;
-    let query = 'SELECT * FROM daily_production WHERE 1=1';
+    // Optimized: Only select needed columns
+    let query = 'SELECT id, product_name, sector_code, morning_production, afternoon_production, evening_production, unit, production_date, created_at, updated_at FROM daily_production WHERE 1=1';
     const params = [];
     let paramCount = 1;
 
@@ -24,9 +26,11 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY production_date DESC, product_name';
     const { rows } = await db.query(query, params);
+    const duration = Date.now() - startTime;
+    console.log(`[Performance] Daily production query took ${duration}ms, returned ${rows.length} records`);
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    console.error('Error fetching daily production:', err);
     res.status(500).json({ message: 'Error fetching daily production' });
   }
 });

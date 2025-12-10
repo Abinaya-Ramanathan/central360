@@ -6,8 +6,10 @@ const router = Router();
 // Get daily expense records
 router.get('/', async (req, res) => {
   try {
+    const startTime = Date.now();
     const { month, date, sector } = req.query;
-    let query = 'SELECT * FROM daily_expenses WHERE 1=1';
+    // Optimized: Only select needed columns
+    let query = 'SELECT id, item_details, amount, reason_for_purchase, expense_date, sector_code, created_at, updated_at FROM daily_expenses WHERE 1=1';
     const params = [];
     let paramCount = 1;
 
@@ -28,6 +30,8 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY expense_date DESC, item_details';
     const { rows } = await db.query(query, params);
+    const duration = Date.now() - startTime;
+    console.log(`[Performance] Daily expenses query took ${duration}ms, returned ${rows.length} records`);
     res.json(rows);
   } catch (err) {
     console.error('Error fetching daily expenses:', err);

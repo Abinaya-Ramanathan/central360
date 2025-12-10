@@ -22,8 +22,8 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
   List<Sector> _sectors = [];
   DateTime? _selectedDate;
   bool _isLoading = false;
-  Map<int, TextEditingController> _quantityControllers = {};
-  Map<int, bool> _editMode = {};
+  final Map<int, TextEditingController> _quantityControllers = {};
+  final Map<int, bool> _editMode = {};
 
   @override
   void initState() {

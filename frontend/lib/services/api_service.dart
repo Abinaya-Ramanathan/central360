@@ -2431,5 +2431,90 @@ class ApiService {
     }
     throw Exception(errorMessage);
   }
+
+  // Daily Income and Expense
+  static Future<List<Map<String, dynamic>>> getDailyIncomeExpense({
+    required String sector,
+    required String date,
+  }) async {
+    final queryParams = <String, String>{
+      'sector': sector,
+      'date': date,
+    };
+
+    final uri = Uri.parse('$baseUrl/daily-income-expense').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load daily income/expense');
+  }
+
+  static Future<Map<String, dynamic>> saveDailyIncomeExpense(Map<String, dynamic> record) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/daily-income-expense'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode(record),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    String errorMessage = 'Failed to save daily income/expense';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to save daily income/expense';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<void> deleteDailyIncomeExpense(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/daily-income-expense/$id'),
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    String errorMessage = 'Failed to delete daily income/expense';
+    try {
+      final errorBody = json.decode(response.body);
+      if (errorBody is Map && errorBody.containsKey('message')) {
+        errorMessage = errorBody['message'];
+      }
+    } catch (e) {
+      errorMessage = response.body.isNotEmpty ? response.body : 'Failed to delete daily income/expense';
+    }
+    throw Exception(errorMessage);
+  }
+
+  static Future<List<Map<String, dynamic>>> getOverallIncomeExpense({
+    required List<String> dates,
+    required List<String> months,
+  }) async {
+    // Build query string manually to support multiple values
+    final queryParts = <String>[];
+    if (dates.isNotEmpty) {
+      for (var date in dates) {
+        queryParts.add('dates=${Uri.encodeComponent(date)}');
+      }
+    }
+    if (months.isNotEmpty) {
+      for (var month in months) {
+        queryParts.add('months=${Uri.encodeComponent(month)}');
+      }
+    }
+
+    final queryString = queryParts.join('&');
+    final uri = Uri.parse('$baseUrl/daily-income-expense/overall?$queryString');
+    
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load overall income/expense');
+  }
 }
 

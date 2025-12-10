@@ -6,8 +6,10 @@ const router = Router();
 // Get credit details
 router.get('/', async (req, res) => {
   try {
+    const startTime = Date.now();
     const { sector, date, month, company_staff } = req.query;
-    let query = 'SELECT * FROM credit_details WHERE 1=1';
+    // Optimized: Only select needed columns
+    let query = 'SELECT id, sector_code, name, phone_number, address, purchase_details, credit_amount, amount_settled, credit_date, full_settlement_date, comments, company_staff, created_at, updated_at FROM credit_details WHERE 1=1';
     const params = [];
     let paramCount = 1;
 
@@ -37,6 +39,8 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY credit_date DESC, created_at DESC';
     const { rows } = await db.query(query, params);
+    const duration = Date.now() - startTime;
+    console.log(`[Performance] Credit details query took ${duration}ms, returned ${rows.length} records`);
     res.json(rows);
   } catch (err) {
     console.error('Error fetching credit details:', err);

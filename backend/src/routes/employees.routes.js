@@ -6,10 +6,16 @@ const router = Router();
 // Get all employees
 router.get('/', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT * FROM employees ORDER BY name');
+    const startTime = Date.now();
+    // Optimized query: Only select needed columns, use index on name
+    const { rows } = await db.query(
+      'SELECT id, name, contact, contact2, address, bank_details, sector, role, daily_salary, weekly_salary, monthly_salary, joining_date, joining_year, created_at, updated_at FROM employees ORDER BY name ASC'
+    );
+    const queryTime = Date.now() - startTime;
+    console.log(`[Performance] Employees query took ${queryTime}ms, returned ${rows.length} records`);
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    console.error('Error fetching employees:', err);
     res.status(500).json({ message: 'Error fetching employees' });
   }
 });
@@ -18,13 +24,17 @@ router.get('/', async (req, res) => {
 router.get('/sector/:sectorCode', async (req, res) => {
   try {
     const { sectorCode } = req.params;
+    const startTime = Date.now();
+    // Optimized query: Use index on sector, only select needed columns
     const { rows } = await db.query(
-      'SELECT * FROM employees WHERE sector = $1 ORDER BY name',
+      'SELECT id, name, contact, contact2, address, bank_details, sector, role, daily_salary, weekly_salary, monthly_salary, joining_date, joining_year, created_at, updated_at FROM employees WHERE sector = $1 ORDER BY name ASC',
       [sectorCode]
     );
+    const queryTime = Date.now() - startTime;
+    console.log(`[Performance] Employees by sector query took ${queryTime}ms, returned ${rows.length} records`);
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    console.error('Error fetching employees by sector:', err);
     res.status(500).json({ message: 'Error fetching employees by sector' });
   }
 });

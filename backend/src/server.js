@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import authRouter from './routes/auth.routes.js';
 import employeesRouter from './routes/employees.routes.js';
 import sectorsRouter from './routes/sectors.routes.js';
@@ -31,6 +32,7 @@ import rentVehiclesRouter from './routes/rent_vehicles.routes.js';
 import rentVehicleAttendanceRouter from './routes/rent_vehicle_attendance.routes.js';
 import ingredientsRouter from './routes/ingredients.routes.js';
 import miningActivitiesRouter from './routes/mining_activities.routes.js';
+import dailyIncomeExpenseRouter from './routes/daily_income_expense.routes.js';
 import appRouter from './routes/app.routes.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -42,6 +44,8 @@ const app = express();
 
 app.use(helmet());
 app.use(cors());
+// Enable response compression for better performance
+app.use(compression());
 app.use(express.json());
 // Serve uploaded images
 app.use('/uploads', express.static(join(__dirname, '../uploads')));
@@ -85,6 +89,7 @@ app.use('/api/v1/rent-vehicles', rentVehiclesRouter);
 app.use('/api/v1/rent-vehicle-attendance', rentVehicleAttendanceRouter);
 app.use('/api/v1/ingredients', ingredientsRouter);
 app.use('/api/v1/mining-activities', miningActivitiesRouter);
+app.use('/api/v1/daily-income-expense', dailyIncomeExpenseRouter);
 app.use('/api/v1/app', appRouter);
 
 export default app;

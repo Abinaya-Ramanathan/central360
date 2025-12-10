@@ -131,9 +131,9 @@ router.post('/', async (req, res) => {
       company_staff,
     } = req.body;
 
-    if (!sector_code || !name || !product_name || !quantity || !sale_date) {
+    if (!sector_code || !product_name || !quantity || !sale_date) {
       return res.status(400).json({
-        message: 'Sector code, name, product name, quantity, and sale date are required'
+        message: 'Sector code, product name, quantity, and sale date are required'
       });
     }
 
@@ -164,7 +164,7 @@ router.post('/', async (req, res) => {
         RETURNING *`,
         [
           sector_code,
-          name,
+          name || null,
           contact_number || null,
           address || null,
           product_name,
@@ -197,7 +197,7 @@ router.post('/', async (req, res) => {
         RETURNING *`,
         [
           sector_code,
-          name,
+          name || null,
           contact_number || null,
           address || null,
           product_name,

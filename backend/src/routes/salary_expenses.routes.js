@@ -6,8 +6,10 @@ const router = Router();
 // Get salary expenses
 router.get('/', async (req, res) => {
   try {
+    const startTime = Date.now();
     const { sector, week_start, week_end, employee_id } = req.query;
-    let query = 'SELECT * FROM salary_expenses WHERE 1=1';
+    // Optimized: Only select needed columns
+    let query = 'SELECT id, employee_id, employee_name, sector, week_start_date, week_end_date, outstanding_advance, days_present, estimated_salary, salary_issued, salary_issued_date, advance_deducted, selected_dates, created_at, updated_at FROM salary_expenses WHERE 1=1';
     const params = [];
     let paramCount = 1;
 
@@ -30,9 +32,11 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY week_start_date DESC, employee_name';
     const { rows } = await db.query(query, params);
+    const duration = Date.now() - startTime;
+    console.log(`[Performance] Salary expenses query took ${duration}ms, returned ${rows.length} records`);
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    console.error('Error fetching salary expenses:', err);
     res.status(500).json({ message: 'Error fetching salary expenses' });
   }
 });

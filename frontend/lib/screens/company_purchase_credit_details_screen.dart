@@ -614,7 +614,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                   final year = int.tryParse(parts[0]);
                   final month = int.tryParse(parts[1]);
                   if (year != null && month != null) {
-                    dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                    dateStr = '$year-${month.toString().padLeft(2, '0')}';
                   } else {
                     return false;
                   }
@@ -787,7 +787,10 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
   }
 
   Future<void> _downloadCompanyPurchaseCreditPDF() async {
-    if (_filteredCreditData.isEmpty) {
+    // Use ALL data, ignore search + filters
+    final dataToUse = _creditData;
+
+    if (dataToUse.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No data available to download'),
@@ -842,7 +845,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
       final List<Map<String, dynamic>> allRowsForPDF = [];
       double totalOverallBalance = 0.0;
 
-      for (var record in _filteredCreditData) {
+      for (var record in dataToUse) {
         final recordId = record['id'] as int;
         final credit = _parseDecimal(record['credit']); // Amount Pending = Credit value
         final payments = _balancePayments[recordId] ?? [];

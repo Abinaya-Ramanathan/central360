@@ -142,7 +142,7 @@ class UpdateService {
       }
       
       // Verify it was saved
-      final saved = await prefs.getString(_dismissedVersionKey);
+      final saved = prefs.getString(_dismissedVersionKey);
       debugPrint('Verification: Saved dismissed version = $saved');
     } catch (e) {
       debugPrint('Error saving dismissed version: $e');

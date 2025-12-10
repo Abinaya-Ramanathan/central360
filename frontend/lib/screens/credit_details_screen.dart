@@ -89,7 +89,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                   final year = int.tryParse(parts[0]);
                   final month = int.tryParse(parts[1]);
                   if (year != null && month != null) {
-                    dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                    dateStr = '$year-${month.toString().padLeft(2, '0')}';
                   } else {
                     return false;
                   }
@@ -358,7 +358,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
       // For multiple months, we'll filter on the frontend
       // since the backend only supports single month filter
       // Pass null to backend when multiple months are selected, filter locally instead
-      String? monthFilter = null; // Always pass null, filter on frontend for multiple months
+      String? monthFilter; // Always pass null, filter on frontend for multiple months
       
       // Load credit details with filters (without month filter, we'll filter on frontend)
       final credits = await ApiService.getCreditDetails(
@@ -399,7 +399,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                   final year = int.tryParse(parts[0]);
                   final month = int.tryParse(parts[1]);
                   if (year != null && month != null) {
-                    dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                    dateStr = '$year-${month.toString().padLeft(2, '0')}';
                   } else {
                     return false;
                   }
@@ -905,7 +905,10 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
 
 
   Future<void> _downloadCurrentPageData() async {
-    if (_filteredCreditData.isEmpty) {
+    // Use ALL data, ignore search + filters
+    final dataToUse = _creditData;
+
+    if (dataToUse.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No data available to download'),
@@ -918,23 +921,25 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
     setState(() => _isGeneratingPDF = true);
 
     try {
-      // Get date range from current filtered data
+      // Calculate min & max date from ALL credit data
       DateTime? minDate;
       DateTime? maxDate;
-      
-      for (var record in _filteredCreditData) {
+
+      for (var record in dataToUse) {
         try {
-          final creditDateStr = _formatDate(record['credit_date']);
-          if (creditDateStr == 'N/A') continue;
-          final creditDate = DateTime.parse(record['credit_date']);
+          final dateValue = record['credit_date'];
+          if (dateValue == null) continue;
+
+          final creditDate = DateTime.parse(dateValue);
+
           if (minDate == null || creditDate.isBefore(minDate)) {
             minDate = creditDate;
           }
           if (maxDate == null || creditDate.isAfter(maxDate)) {
             maxDate = creditDate;
-      }
-    } catch (e) {
-          // Skip invalid dates
+          }
+        } catch (e) {
+          // Ignore invalid dates
         }
       }
 
@@ -942,7 +947,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
       final toDate = maxDate ?? DateTime.now();
 
       await PdfGenerator.generateCreditDetailsPDF(
-        creditData: _filteredCreditData,
+        creditData: dataToUse,
         fromDate: fromDate,
         toDate: toDate,
       );
@@ -1165,7 +1170,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                 SizedBox(
                   width: 150,
                   child: DropdownButtonFormField<String?>(
-                    value: _selectedCompanyStaffFilter,
+                    initialValue: _selectedCompanyStaffFilter,
                     decoration: InputDecoration(
                       labelText: 'Company Staff',
                       border: OutlineInputBorder(

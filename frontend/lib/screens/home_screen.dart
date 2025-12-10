@@ -16,6 +16,7 @@ import 'update_dialog.dart';
 import '../services/update_service.dart';
 import 'new_entry_screen.dart';
 import 'ingredients_details_screen.dart';
+import 'daily_income_expense_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -576,6 +577,47 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                               ],
+                              // Daily Income and Expense Details - available for all users
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    if (_selectedSector == null && !_isAdmin) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Please select a sector first'),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => DailyIncomeExpenseScreen(
+                                          username: widget.username,
+                                          selectedSector: _selectedSector,
+                                          isMainAdmin: _isMainAdmin,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.account_balance_wallet),
+                                  label: const Text(
+                                    'Daily Income and Expense Details',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal.shade700,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
                               // Ingredients Details - visible for admin when sector is SSC or All Sectors
                               if (_isAdmin && (_selectedSector == 'SSC' || _selectedSector == null)) ...[
                                 const SizedBox(height: 16),

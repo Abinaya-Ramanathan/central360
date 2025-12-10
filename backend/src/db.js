@@ -20,8 +20,12 @@ if (process.env.DATABASE_URL) {
 
   poolConfig = {
     connectionString: connectionString,
-    connectionTimeoutMillis: 5000,
+    max: 20, // Maximum number of clients in the pool
+    min: 2, // Minimum number of clients in the pool
+    connectionTimeoutMillis: 10000, // Increased timeout for slow connections
     idleTimeoutMillis: 30000,
+    statement_timeout: 30000, // 30 second query timeout
+    query_timeout: 30000,
   };
   console.log('Using DATABASE_URL connection string');
 }
@@ -33,8 +37,12 @@ else if (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD &
     database: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    connectionTimeoutMillis: 5000,
+    max: 20, // Maximum number of clients in the pool
+    min: 2, // Minimum number of clients in the pool
+    connectionTimeoutMillis: 10000, // Increased timeout for slow connections
     idleTimeoutMillis: 30000,
+    statement_timeout: 30000, // 30 second query timeout
+    query_timeout: 30000,
   };
   console.log('Using individual database connection parameters');
 }

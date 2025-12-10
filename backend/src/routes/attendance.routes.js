@@ -6,8 +6,10 @@ const router = Router();
 // Get attendance records
 router.get('/', async (req, res) => {
   try {
+    const startTime = Date.now();
     const { sector, month, date } = req.query;
-    let query = 'SELECT * FROM attendance WHERE 1=1';
+    // Optimized: Only select needed columns
+    let query = 'SELECT id, employee_id, employee_name, sector, date, status, outstanding_advance, advance_taken, advance_paid, bulk_advance_taken, bulk_advance_paid, bulk_advance, ot_hours, created_at, updated_at FROM attendance WHERE 1=1';
     const params = [];
     let paramCount = 1;
 
@@ -26,13 +28,12 @@ router.get('/', async (req, res) => {
     }
 
     query += ' ORDER BY date DESC, employee_name';
-    console.log('Attendance query:', query);
-    console.log('Attendance params:', params);
     const { rows } = await db.query(query, params);
-    console.log('Attendance results:', rows.length, 'records');
+    const duration = Date.now() - startTime;
+    console.log(`[Performance] Attendance query took ${duration}ms, returned ${rows.length} records`);
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    console.error('Error fetching attendance:', err);
     res.status(500).json({ message: 'Error fetching attendance' });
   }
 });
@@ -210,10 +211,12 @@ router.get('/bulk-advance/:employeeId/:date', async (req, res) => {
 
 // Bulk update attendance
 router.post('/bulk', async (req, res) => {
+  const client = await db.pool.connect();
   try {
+    await client.query('BEGIN');
     const { attendance_records } = req.body;
-
     const results = [];
+    
     for (const record of attendance_records) {
       const {
         employee_id,
@@ -230,13 +233,13 @@ router.post('/bulk', async (req, res) => {
         bulk_advance_paid,
       } = record;
 
-      const existing = await db.query(
-        'SELECT * FROM attendance WHERE employee_id = $1 AND date = $2',
+      const existing = await client.query(
+        'SELECT id FROM attendance WHERE employee_id = $1 AND date = $2',
         [employee_id, date]
       );
 
       if (existing.rows.length > 0) {
-        const { rows } = await db.query(
+        const { rows } = await client.query(
           `UPDATE attendance SET
             status = $1, ot_hours = $2, outstanding_advance = $3, advance_taken = $4, advance_paid = $5,
             bulk_advance = $6, bulk_advance_taken = $7, bulk_advance_paid = $8
@@ -246,7 +249,7 @@ router.post('/bulk', async (req, res) => {
         );
         results.push(rows[0]);
       } else {
-        const { rows } = await db.query(
+        const { rows } = await client.query(
           `INSERT INTO attendance (
             employee_id, employee_name, sector, date, status, ot_hours,
             outstanding_advance, advance_taken, advance_paid,
@@ -272,10 +275,14 @@ router.post('/bulk', async (req, res) => {
       }
     }
 
+    await client.query('COMMIT');
     res.json(results);
   } catch (err) {
-    console.error(err);
+    await client.query('ROLLBACK');
+    console.error('Error bulk updating attendance:', err);
     res.status(500).json({ message: 'Error bulk updating attendance' });
+  } finally {
+    client.release();
   }
 });
 

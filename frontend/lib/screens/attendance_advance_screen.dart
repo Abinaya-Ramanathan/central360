@@ -477,7 +477,10 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   }
 
   Future<void> _downloadAdvanceDetailsPDF() async {
-    if (_filteredAdvanceDetails.isEmpty) {
+    // Use ALL data, ignore search + filters
+    final dataToUse = _advanceDetails;
+
+    if (dataToUse.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No data available to download'),
@@ -529,7 +532,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
 
     try {
       await PdfGenerator.generateAdvanceDetailsPDF(
-        advanceData: _filteredAdvanceDetails,
+        advanceData: dataToUse,
         fileName: fileName,
       );
 

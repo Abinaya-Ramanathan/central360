@@ -320,7 +320,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       // For multiple months, we'll filter on the frontend
       // since the backend only supports single month filter
       // Pass null to backend when multiple months are selected, filter locally instead
-      String? monthFilter = null; // Always pass null, filter on frontend for multiple months
+      String? monthFilter; // Always pass null, filter on frontend for multiple months
       
       final credits = await ApiService.getCreditDetailsFromSales(
         sector: widget.selectedSector,
@@ -370,7 +370,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                     final year = int.tryParse(parts[0]);
                     final month = int.tryParse(parts[1]);
                     if (year != null && month != null) {
-                      dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                      dateStr = '$year-${month.toString().padLeft(2, '0')}';
                     } else {
                       return false;
                     }
@@ -768,7 +768,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                   final year = int.tryParse(parts[0]);
                   final month = int.tryParse(parts[1]);
                   if (year != null && month != null) {
-                    dateStr = '${year}-${month.toString().padLeft(2, '0')}';
+                    dateStr = '$year-${month.toString().padLeft(2, '0')}';
                   } else {
                     return false;
                   }
@@ -886,13 +886,13 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
               TextFormField(
                 controller: nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Name *',
+                  labelText: 'Name',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<bool>(
-                value: companyStaff,
+                initialValue: companyStaff,
                 decoration: const InputDecoration(
                   labelText: 'Company Staff',
                   border: OutlineInputBorder(),
@@ -984,12 +984,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           ),
           FilledButton(
             onPressed: () {
-              if (nameController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Name is required')),
-                );
-                return;
-              }
               if (productController.text.trim().isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Product Name is required')),
@@ -1051,7 +1045,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
       final record = {
         'sector_code': widget.selectedSector,
-        'name': name,
+        'name': name.isEmpty ? null : name,
         'contact_number': contact.isEmpty ? null : contact,
         'address': address.isEmpty ? null : address,
         'product_name': productName,
@@ -1145,12 +1139,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     if (!_controllersSales.containsKey(index)) return;
 
     final controllers = _controllersSales[index]!;
-    if (controllers['name']!.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name is required'), backgroundColor: Colors.red),
-      );
-      return;
-    }
     if (controllers['product_name']!.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Product Name is required'), backgroundColor: Colors.red),
@@ -1232,7 +1220,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       final updatedRecord = {
         'id': recordId,
         'sector_code': record['sector_code'] ?? widget.selectedSector,
-        'name': controllers['name']!.text.trim(),
+        'name': controllers['name']!.text.trim().isEmpty ? null : controllers['name']!.text.trim(),
         'contact_number': controllers['contact_number']!.text.trim().isEmpty
             ? null
             : controllers['contact_number']!.text.trim(),
@@ -1825,7 +1813,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                   SizedBox(
                     width: 150,
                     child: DropdownButtonFormField<String?>(
-                      value: _selectedCompanyStaffFilterCredit,
+                      initialValue: _selectedCompanyStaffFilterCredit,
                       decoration: InputDecoration(
                         labelText: 'Company Staff',
                         border: OutlineInputBorder(
@@ -2647,11 +2635,10 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   }
 
   Future<void> _downloadCurrentPageData() async {
-    // Ensure filters are applied before download
-    // This ensures _filteredCreditData is up-to-date with current filter selections
-    _filterCreditData(_creditSearchController.text);
-    
-    if (_filteredCreditData.isEmpty) {
+    // Use ALL data, ignore search + filters
+    final dataToUse = _creditData;
+
+    if (dataToUse.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No data available to download.\nFiltered: ${_filteredCreditData.length}, All: ${_creditData.length}\nMonth Filter: ${_selectedMonthsCredit.isEmpty ? "None" : _selectedMonthsCredit.join(", ")}\nCompany Staff: ${_selectedCompanyStaffFilterCredit ?? "All"}'),
@@ -2707,6 +2694,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       // This is the data that's currently visible on the page after all filters are applied
       print('Download: _filteredCreditData.length = ${_filteredCreditData.length}');
       print('Download: _creditData.length = ${_creditData.length}');
+      print('Download: Using ${dataToUse.length} records for PDF');
       print('Download: _selectedMonthsCredit = $_selectedMonthsCredit');
       print('Download: _selectedCompanyStaffFilterCredit = $_selectedCompanyStaffFilterCredit (type: ${_selectedCompanyStaffFilterCredit.runtimeType})');
       print('Download: _creditSearchController.text = ${_creditSearchController.text}');
@@ -2716,38 +2704,23 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         final companyStaffValues = _creditData.map((r) => r['company_staff']).toSet();
         print('Download: company_staff values in _creditData: $companyStaffValues');
       }
-      if (_filteredCreditData.isNotEmpty) {
-        final companyStaffValues = _filteredCreditData.map((r) => r['company_staff']).toSet();
-        print('Download: company_staff values in _filteredCreditData: $companyStaffValues');
+      if (dataToUse.isNotEmpty) {
+        final companyStaffValues = dataToUse.map((r) => r['company_staff']).toSet();
+        print('Download: company_staff values in dataToUse: $companyStaffValues');
       }
-      
-      if (_filteredCreditData.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('No data available to download. Filtered: ${_filteredCreditData.length}, All: ${_creditData.length}'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        setState(() => _isGeneratingPDF = false);
-        return;
-      }
-
-      print('Download: Using ${_filteredCreditData.length} records for PDF (exactly what is displayed on the page)');
       
       // Debug: Print first record to see structure
-      if (_filteredCreditData.isNotEmpty) {
-        print('Download: First record keys: ${_filteredCreditData.first.keys.toList()}');
-        print('Download: First record sale_date: ${_filteredCreditData.first['sale_date']}');
-        print('Download: First record id: ${_filteredCreditData.first['id']}');
+      if (dataToUse.isNotEmpty) {
+        print('Download: First record keys: ${dataToUse.first.keys.toList()}');
+        print('Download: First record sale_date: ${dataToUse.first['sale_date']}');
+        print('Download: First record id: ${dataToUse.first['id']}');
       }
 
       // Collect all data including payment rows and calculate total
       final List<Map<String, dynamic>> allRowsForPDF = [];
       double totalOverallBalance = 0.0;
 
-      for (var record in _filteredCreditData) {
+      for (var record in dataToUse) {
         if (record.isEmpty || record['id'] == null) {
           print('Download: Skipping invalid record: $record');
           continue;

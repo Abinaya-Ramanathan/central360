@@ -2,6 +2,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -12,6 +13,37 @@ import '../config/env_config.dart';
 import 'format_utils.dart';
 
 class PdfGenerator {
+  // Helper function to load TTF font for Unicode support
+  static Future<pw.Font> _loadUnicodeFont() async {
+    try {
+      print('PDF Generator: Attempting to load Roboto-Regular.ttf...');
+      final fontData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+      print('PDF Generator: Successfully loaded Roboto-Regular.ttf (${fontData.lengthInBytes} bytes)');
+      final font = pw.Font.ttf(fontData);
+      print('PDF Generator: Created TTF font object: $font');
+      return font;
+    } catch (e) {
+      print('ERROR: Could not load TTF font: $e');
+      print('Falling back to Courier font (will have limited Unicode support)');
+      return pw.Font.courier();
+    }
+  }
+
+  static Future<pw.Font> _loadUnicodeFontBold() async {
+    try {
+      print('PDF Generator: Attempting to load Roboto-Bold.ttf...');
+      final fontData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+      print('PDF Generator: Successfully loaded Roboto-Bold.ttf (${fontData.lengthInBytes} bytes)');
+      final font = pw.Font.ttf(fontData);
+      print('PDF Generator: Created TTF bold font object: $font');
+      return font;
+    } catch (e) {
+      print('ERROR: Could not load TTF bold font: $e');
+      print('Falling back to Courier font (will have limited Unicode support)');
+      return pw.Font.courier();
+    }
+  }
+
   // Helper function to sanitize filename by replacing invalid characters
   static String _sanitizeFileName(String fileName) {
     // Replace forward slashes and backslashes with dashes (common in dates)
@@ -44,6 +76,16 @@ class PdfGenerator {
   static String _formatAmountForPDF(double? amount) {
     if (amount == null) return '';
     return 'Rs.${amount.toStringAsFixed(2)}';
+  }
+
+  // Helper function to safely parse amounts from any type (String, num, or null)
+  static double _parseAmountValue(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value) ?? 0.0;
+    }
+    return 0.0;
   }
 
   static Future<void> generateAndDownloadCateringPDF({
@@ -905,7 +947,16 @@ class PdfGenerator {
     }
     
     final pdf = pw.Document();
+
+    // Load Unicode-capable fonts BEFORE adding page
+    final unicodeFont = await _loadUnicodeFont();
+    final unicodeFontBold = await _loadUnicodeFontBold();
+    print('PDF Generator: Loaded unicodeFont=${unicodeFont.runtimeType}, unicodeFontBold=${unicodeFontBold.runtimeType}');
     
+    final headerStyle = pw.TextStyle(font: unicodeFontBold, fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.black);
+    final cellStyle = pw.TextStyle(font: unicodeFont, fontSize: 10, color: PdfColors.black);
+    print('PDF Generator: Created styles with fonts');
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4.landscape,
@@ -915,19 +966,19 @@ class PdfGenerator {
           // Build table rows list inside build callback
           final List<pw.TableRow> tableRows = [];
           
-          // Add header row
+          // Add header row (use Unicode-capable font)
           tableRows.add(
             pw.TableRow(
               decoration: const pw.BoxDecoration(color: PdfColors.grey300),
               children: [
-                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Product', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Balance Paid', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Balance Paid Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Overall Balance', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Date', style: headerStyle)),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Name', style: headerStyle)),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Product', style: headerStyle)),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: headerStyle)),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Balance Paid', style: headerStyle)),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Balance Paid Date', style: headerStyle)),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Overall Balance', style: headerStyle)),
+                pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Details', style: headerStyle)),
               ],
             ),
           );
@@ -955,26 +1006,26 @@ class PdfGenerator {
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
                         child: pw.Text(
                           'TOTAL',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+                          style: pw.TextStyle(font: unicodeFontBold, fontWeight: pw.FontWeight.bold, fontSize: 14, color: PdfColors.black),
                         ),
                       ),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
                         child: pw.Text(
                           _formatAmountForPDF(overallBalance),
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+                          style: pw.TextStyle(font: unicodeFontBold, fontWeight: pw.FontWeight.bold, fontSize: 14, color: PdfColors.black),
                         ),
                       ),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
                     ],
                   ),
                 );
@@ -985,25 +1036,25 @@ class PdfGenerator {
                 tableRows.add(
                   pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('', style: cellStyle)),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(_formatAmountForPDF(balancePaid)),
+                        child: pw.Text(_formatAmountForPDF(balancePaid), style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(balancePaidDateStr),
+                        child: pw.Text(balancePaidDateStr, style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(_formatAmountForPDF(overallBalance)),
+                        child: pw.Text(_formatAmountForPDF(overallBalance), style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(record['details']?.toString() ?? ''),
+                        child: pw.Text(record['details']?.toString() ?? '', style: cellStyle),
                       ),
                     ],
                   ),
@@ -1013,41 +1064,48 @@ class PdfGenerator {
                 final saleDateStr = _formatDateForPDF(record['sale_date']);
                 final balancePaidDateStr = _formatDateForPDF(record['balance_paid_date']);
                 
+                print('PDF DEBUG - Main row: date=$saleDateStr, name=${record['name']}, amount=$creditAmount');
+                
+                final nameText = record['name']?.toString() ?? '';
+                final productText = record['product_name']?.toString() ?? '';
+                final amountText = _formatAmountForPDF(creditAmount);
+                print('PDF DEBUG - Cell texts: nameText="$nameText", productText="$productText", amountText="$amountText"');
+                
                 tableRows.add(
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.blue200),
                     children: [
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(saleDateStr),
+                        child: pw.Text(saleDateStr, style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(record['name']?.toString() ?? ''),
+                        child: pw.Text(record['name']?.toString() ?? '', style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(record['product_name']?.toString() ?? ''),
+                        child: pw.Text(record['product_name']?.toString() ?? '', style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(_formatAmountForPDF(creditAmount)),
+                        child: pw.Text(_formatAmountForPDF(creditAmount), style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(_formatAmountForPDF(balancePaid)),
+                        child: pw.Text(_formatAmountForPDF(balancePaid), style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(balancePaidDateStr),
+                        child: pw.Text(balancePaidDateStr, style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(_formatAmountForPDF(overallBalance)),
+                        child: pw.Text(_formatAmountForPDF(overallBalance), style: cellStyle),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8), 
-                        child: pw.Text(record['details']?.toString() ?? ''),
+                        child: pw.Text(record['details']?.toString() ?? '', style: cellStyle),
                       ),
                     ],
                   ),
@@ -1082,32 +1140,33 @@ class PdfGenerator {
               children: [
                 pw.Text(
                   'Customer Credit Details Statement',
-                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(font: unicodeFontBold, fontSize: 20, fontWeight: pw.FontWeight.bold),
                 ),
                 pw.SizedBox(height: 20),
-                creditData.isEmpty || tableRows.isEmpty
+                tableRows.isEmpty
                     ? pw.Padding(
                         padding: const pw.EdgeInsets.all(20),
                         child: pw.Text(
-                          creditData.isEmpty 
-                              ? 'No data available'
-                              : 'Error: Table rows not generated properly',
+                          'No credit data available for the selected filters',
                           style: pw.TextStyle(fontSize: 14, fontStyle: pw.FontStyle.italic),
                         ),
                       )
-                    : pw.Table(
-                        border: pw.TableBorder.all(),
-                        columnWidths: {
-                          0: const pw.FlexColumnWidth(1.2), // Date
-                          1: const pw.FlexColumnWidth(1.5), // Name
-                          2: const pw.FlexColumnWidth(1.5), // Product
-                          3: const pw.FlexColumnWidth(1.2), // Credit Amount
-                          4: const pw.FlexColumnWidth(1.2), // Balance Paid
-                          5: const pw.FlexColumnWidth(1.2), // Balance Paid Date
-                          6: const pw.FlexColumnWidth(1.2), // Overall Balance
-                          7: const pw.FlexColumnWidth(2.0), // Details
-                        },
-                        children: tableRows,
+                    : pw.SizedBox(
+                        width: double.infinity,
+                        child: pw.Table(
+                          border: pw.TableBorder.all(),
+                          columnWidths: {
+                            0: const pw.FlexColumnWidth(1.2), // Date
+                            1: const pw.FlexColumnWidth(1.5), // Name
+                            2: const pw.FlexColumnWidth(1.5), // Product
+                            3: const pw.FlexColumnWidth(1.2), // Credit Amount
+                            4: const pw.FlexColumnWidth(1.2), // Balance Paid
+                            5: const pw.FlexColumnWidth(1.2), // Balance Paid Date
+                            6: const pw.FlexColumnWidth(1.2), // Overall Balance
+                            7: const pw.FlexColumnWidth(2.0), // Details
+                          },
+                          children: tableRows,
+                        ),
                       ),
               ],
             ),
@@ -1557,6 +1616,11 @@ class PdfGenerator {
     required DateTime toDate,
   }) async {
     final pdf = pw.Document();
+    // Load Unicode-capable fonts for PDF text rendering
+    final ttf = await PdfGoogleFonts.notoSansRegular();
+    final ttfBold = await PdfGoogleFonts.notoSansBold();
+    final headerStyle = pw.TextStyle(font: ttfBold, fontSize: 12);
+    final cellStyle = pw.TextStyle(font: ttf, fontSize: 10);
     final dateFormat = DateFormat('dd/MM/yyyy');
     
     pdf.addPage(
@@ -1570,12 +1634,12 @@ class PdfGenerator {
               children: [
                 pw.Text(
                   'Credit Details Statement',
-                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(font: ttfBold, fontSize: 20),
                 ),
                 pw.SizedBox(height: 10),
                 pw.Text(
                   'From: ${dateFormat.format(fromDate)} To: ${dateFormat.format(toDate)}',
-                  style: const pw.TextStyle(fontSize: 12),
+                  style: pw.TextStyle(font: ttf, fontSize: 12),
                 ),
                 pw.SizedBox(height: 20),
                 pw.Table(
@@ -1584,12 +1648,12 @@ class PdfGenerator {
                     pw.TableRow(
                       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
                       children: [
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Shop Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Purchase Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Amount Settled', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Pending Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Date', style: headerStyle)),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Shop Name', style: headerStyle)),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Purchase Details', style: headerStyle)),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Credit Amount', style: headerStyle)),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Amount Settled', style: headerStyle)),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Pending Amount', style: headerStyle)),
                       ],
                     ),
                     ...creditData.map((record) {
@@ -1599,12 +1663,12 @@ class PdfGenerator {
                       
                       return pw.TableRow(
                         children: [
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['credit_date'] != null ? FormatUtils.formatDateDisplay(DateTime.parse(record['credit_date'])) : '')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['purchase_details']?.toString() ?? '')),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(creditAmount.toStringAsFixed(2))),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(amountSettled.toStringAsFixed(2))),
-                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(pendingAmount.toStringAsFixed(2))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['credit_date'] != null ? FormatUtils.formatDateDisplay(DateTime.parse(record['credit_date'])) : '', style: cellStyle)),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['name']?.toString() ?? '', style: cellStyle)),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(record['purchase_details']?.toString() ?? '', style: cellStyle)),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(creditAmount.toStringAsFixed(2), style: cellStyle)),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(amountSettled.toStringAsFixed(2), style: cellStyle)),
+                          pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(pendingAmount.toStringAsFixed(2), style: cellStyle)),
                         ],
                       );
                     }),
@@ -1620,6 +1684,173 @@ class PdfGenerator {
     final fileName = _sanitizeFileName('Credit_Details_${dateFormat.format(fromDate)}_to_${dateFormat.format(toDate)}.pdf');
     final filePath = await _savePdfToDownloads(pdf, fileName);
     return filePath;
+  }
+
+  // Generate Overall Income/Expense PDF
+  static Future<void> generateOverallIncomeExpenseReport({
+    required List<Map<String, dynamic>> data,
+    required List<DateTime> selectedDates,
+    required List<String> selectedMonths,
+  }) async {
+    final pdf = pw.Document();
+    final dateFormat = DateFormat('dd-MM-yyyy');
+    final monthFormat = DateFormat('MMM yyyy');
+
+    // Load Unicode-capable fonts
+    final unicodeFont = await _loadUnicodeFont();
+    final unicodeFontBold = await _loadUnicodeFontBold();
+    print('PDF Generator (Overall Income/Expense): Loaded fonts - unicodeFont=${unicodeFont.runtimeType}, unicodeFontBold=${unicodeFontBold.runtimeType}');
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+                pw.Text(
+                  'Overall Income and Expense Report',
+                  style: pw.TextStyle(
+                    font: unicodeFontBold,
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.black,
+                  ),
+                ),
+              pw.SizedBox(height: 20),
+              // Selected Dates
+              if (selectedDates.isNotEmpty) ...[
+                pw.Text(
+                  'Selected Dates:',
+                  style: pw.TextStyle(font: unicodeFontBold, fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                ),
+                pw.SizedBox(height: 5),
+                pw.Text(
+                  selectedDates.map((d) => dateFormat.format(d)).join(', '),
+                  style: pw.TextStyle(font: unicodeFont, fontSize: 12, color: PdfColors.black),
+                ),
+                pw.SizedBox(height: 10),
+              ],
+              // Selected Months
+              if (selectedMonths.isNotEmpty) ...[
+                pw.Text(
+                  'Selected Months:',
+                  style: pw.TextStyle(font: unicodeFontBold, fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                ),
+                pw.SizedBox(height: 5),
+                pw.Text(
+                  selectedMonths.join(', '),
+                  style: pw.TextStyle(font: unicodeFont, fontSize: 12, color: PdfColors.black),
+                ),
+                pw.SizedBox(height: 20),
+              ],
+              // Table
+              pw.Table(
+                border: pw.TableBorder.all(),
+                children: [
+                  // Header Row
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Sector Name',
+                          style: pw.TextStyle(font: unicodeFontBold, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Total Income',
+                          style: pw.TextStyle(font: unicodeFontBold, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                          textAlign: pw.TextAlign.right,
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Total Expense',
+                          style: pw.TextStyle(font: unicodeFontBold, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                          textAlign: pw.TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Data Rows
+                  ...data.map((item) {
+                    final totalIncome = _parseAmountValue(item['total_income']);
+                    final totalExpense = _parseAmountValue(item['total_expense']);
+                    return pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text(item['sector_name']?.toString() ?? '', style: pw.TextStyle(font: unicodeFont, color: PdfColors.black)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text(
+                            'Rs${totalIncome.toStringAsFixed(2)}',
+                            style: pw.TextStyle(font: unicodeFont, color: PdfColors.black),
+                            textAlign: pw.TextAlign.right,
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text(
+                            'Rs${totalExpense.toStringAsFixed(2)}',
+                            style: pw.TextStyle(font: unicodeFont, color: PdfColors.black),
+                            textAlign: pw.TextAlign.right,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                  // Grand Total Row
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Grand Total',
+                          style: pw.TextStyle(font: unicodeFontBold, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Rs${data.fold<double>(0, (sum, item) => sum + _parseAmountValue(item['total_income'])).toStringAsFixed(2)}',
+                          style: pw.TextStyle(font: unicodeFontBold, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                          textAlign: pw.TextAlign.right,
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Rs${data.fold<double>(0, (sum, item) => sum + _parseAmountValue(item['total_expense'])).toStringAsFixed(2)}',
+                          style: pw.TextStyle(font: unicodeFontBold, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                          textAlign: pw.TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final dateStr = selectedDates.isNotEmpty
+        ? '${dateFormat.format(selectedDates.first)}_to_${dateFormat.format(selectedDates.last)}'
+        : '';
+    final monthStr = selectedMonths.isNotEmpty ? selectedMonths.join('_') : '';
+    final fileName = _sanitizeFileName(
+      'Overall_Income_Expense_${dateStr}_${monthStr}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    );
+    await _savePdfToDownloads(pdf, fileName);
   }
 }
 

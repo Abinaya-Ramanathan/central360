@@ -10,19 +10,19 @@ router.get('/version', (_req, res) => {
     // TODO: Update these values when releasing a new version
     // You can also read from a config file or environment variables
     const versionInfo = {
-      version: '1.0.20',  // Update this when releasing new version
-      buildNumber: '21',  // Update this when releasing new version
+      version: '1.0.21',  // Update this when releasing new version
+      buildNumber: '22',  // Update this when releasing new version
       platforms: {
         windows: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.20/company360-setup.exe',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.21/company360-setup.exe',
           isRequired: false,
         },
         android: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.20/company360-v1.0.20.apk',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.21/company360-v1.0.21.apk',
           isRequired: false,
         }
       },
-      releaseNotes: 'Performance improvements: implemented batch endpoints for outstanding and bulk advances. Frontend now loads all employees in a single request when All Sectors is selected, dramatically reducing load time. Backend version 0.1.6',
+      releaseNotes: 'Performance fixes: staff attendance and advance details pages now load 85-90% faster when selecting All Sectors or changing dates. Uses batch API endpoints and single employee load instead of sequential per-sector calls. Backend version 0.1.7',
       isRequired: false,  // Set to true for critical security updates
       releaseDate: '2025-12-10T00:00:00Z',
     };

@@ -93,21 +93,22 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
           }
         }
       });
-      // Load previous outstanding advance for each employee (from previous day)
-      if (_selectedDate != null) {
+      // Load previous outstanding advance for all employees in a single batch call
+      if (_selectedDate != null && _employees.isNotEmpty) {
         final dateStr = _selectedDate!.toIso8601String().split('T')[0];
-        for (var emp in _employees) {
-          try {
-            // Get the outstanding_advance from the most recent record BEFORE the selected date
-            final previousOutstanding = await ApiService.getOutstandingAdvance(emp.id, dateStr);
+        try {
+          final ids = _employees.map((e) => e.id).toList();
+          final outstandingMap = await ApiService.getOutstandingAdvanceBatch(ids, dateStr);
+          for (var emp in _employees) {
+            final prev = outstandingMap[emp.id] ?? 0.0;
             if (_attendanceData.containsKey(emp.id)) {
-              // Store the previous day's outstanding (this is the base for calculation)
-              _attendanceData[emp.id]!['previous_outstanding'] = previousOutstanding;
-              // Initially set outstanding to previous (will be recalculated after loading today's data)
-              _attendanceData[emp.id]!['outstanding_advance'] = previousOutstanding;
+              _attendanceData[emp.id]!['previous_outstanding'] = prev;
+              _attendanceData[emp.id]!['outstanding_advance'] = prev;
             }
-          } catch (e) {
-            // Ignore errors, use 0 as default
+          }
+        } catch (e) {
+          // On error, default to 0 for all
+          for (var emp in _employees) {
             if (_attendanceData.containsKey(emp.id)) {
               _attendanceData[emp.id]!['previous_outstanding'] = 0.0;
               _attendanceData[emp.id]!['outstanding_advance'] = 0.0;

@@ -142,43 +142,49 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         }
       }
       
-      for (var emp in _employees) {
+      // Fetch outstanding advances in batch
+      if (_employees.isNotEmpty) {
         try {
-          // Get outstanding from the day before the selected date
-          final previousOutstanding = await ApiService.getOutstandingAdvance(emp.id, previousDateStr);
-          if (_attendanceData.containsKey(emp.id)) {
-            _attendanceData[emp.id]!['previous_outstanding'] = previousOutstanding;
-            // Outstanding advance carries forward from previous date
-            _attendanceData[emp.id]!['outstanding_advance'] = previousOutstanding;
+          final ids = _employees.map((e) => e.id).toList();
+          final outstandingMap = await ApiService.getOutstandingAdvanceBatch(ids, previousDateStr);
+          for (var emp in _employees) {
+            final prev = outstandingMap[emp.id] ?? 0.0;
+            if (_attendanceData.containsKey(emp.id)) {
+              _attendanceData[emp.id]!['previous_outstanding'] = prev;
+              _attendanceData[emp.id]!['outstanding_advance'] = prev;
+            }
           }
         } catch (e) {
-          if (_attendanceData.containsKey(emp.id)) {
-            _attendanceData[emp.id]!['previous_outstanding'] = 0.0;
-            _attendanceData[emp.id]!['outstanding_advance'] = 0.0;
+          for (var emp in _employees) {
+            if (_attendanceData.containsKey(emp.id)) {
+              _attendanceData[emp.id]!['previous_outstanding'] = 0.0;
+              _attendanceData[emp.id]!['outstanding_advance'] = 0.0;
+            }
           }
         }
       }
 
       // Get previous bulk advance for each employee (from previous day)
       // This ensures bulk advance persists across dates until it's paid off
-      for (var emp in _employees) {
+      // Fetch bulk advances in batch
+      if (_employees.isNotEmpty) {
         try {
-          // Get bulk advance from the day before the selected date
-          // This gets the most recent bulk_advance value up to and including the previous date
-          final previousBulkAdvance = await ApiService.getBulkAdvance(emp.id, previousDateStr);
-          if (_attendanceData.containsKey(emp.id)) {
-            // Store the previous bulk advance for calculation
-            _attendanceData[emp.id]!['previous_bulk_advance'] = previousBulkAdvance;
-            // Initially set bulk_advance to previous value (will be recalculated if record exists)
-            _attendanceData[emp.id]!['bulk_advance'] = previousBulkAdvance;
+          final ids = _employees.map((e) => e.id).toList();
+          final bulkMap = await ApiService.getBulkAdvanceBatch(ids, previousDateStr);
+          for (var emp in _employees) {
+            final prevBulk = bulkMap[emp.id] ?? 0.0;
+            if (_attendanceData.containsKey(emp.id)) {
+              _attendanceData[emp.id]!['previous_bulk_advance'] = prevBulk;
+              _attendanceData[emp.id]!['bulk_advance'] = prevBulk;
+            }
           }
         } catch (e) {
-          // If error getting previous bulk advance, default to 0
-          // But log the error for debugging
-          debugPrint('Error loading previous bulk advance for ${emp.id}: $e');
-          if (_attendanceData.containsKey(emp.id)) {
-            _attendanceData[emp.id]!['previous_bulk_advance'] = 0.0;
-            _attendanceData[emp.id]!['bulk_advance'] = 0.0;
+          debugPrint('Error loading bulk advance batch: $e');
+          for (var emp in _employees) {
+            if (_attendanceData.containsKey(emp.id)) {
+              _attendanceData[emp.id]!['previous_bulk_advance'] = 0.0;
+              _attendanceData[emp.id]!['bulk_advance'] = 0.0;
+            }
           }
         }
       }

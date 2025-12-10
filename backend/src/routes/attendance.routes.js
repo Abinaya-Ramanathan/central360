@@ -157,6 +157,87 @@ router.get('/outstanding/:employeeId/:date', async (req, res) => {
   }
 });
 
+// Batch endpoint: Get latest outstanding advance for multiple employees before a given date
+// Expects JSON body: { employeeIds: ["1","2",...], date: "YYYY-MM-DD" }
+router.post('/outstanding-batch', async (req, res) => {
+  try {
+    const { employeeIds, date } = req.body;
+    if (!Array.isArray(employeeIds) || !date) {
+      return res.status(400).json({ message: 'employeeIds (array) and date are required' });
+    }
+
+    // Use a single query with window function to pick for each employee:
+    // prefer the most recent record with outstanding_advance > 0, otherwise the most recent record
+    const query = `WITH ranked AS (
+      SELECT employee_id, outstanding_advance, date,
+        ROW_NUMBER() OVER (
+          PARTITION BY employee_id
+          ORDER BY (CASE WHEN (outstanding_advance IS NOT NULL AND outstanding_advance > 0) THEN 0 ELSE 1 END), date DESC
+        ) as rn
+      FROM attendance
+      WHERE employee_id = ANY($1) AND date <= $2::date
+    )
+    SELECT employee_id, outstanding_advance FROM ranked WHERE rn = 1`;
+
+    const { rows } = await db.query(query, [employeeIds, date]);
+
+    // Build a map of employeeId -> outstanding_advance
+    const resultMap = {};
+    for (const r of rows) {
+      resultMap[r.employee_id.toString()] = parseFloat(r.outstanding_advance) || 0;
+    }
+
+    // Ensure all requested employeeIds are present in the response (default to 0)
+    for (const id of employeeIds) {
+      if (!Object.prototype.hasOwnProperty.call(resultMap, id.toString())) {
+        resultMap[id.toString()] = 0;
+      }
+    }
+
+    res.json(resultMap);
+  } catch (err) {
+    console.error('Error fetching outstanding advance batch:', err);
+    res.status(500).json({ message: 'Error fetching outstanding advances' });
+  }
+});
+
+// Batch endpoint: Get latest bulk advance for multiple employees before a given date
+// Expects JSON body: { employeeIds: ["1","2",...], date: "YYYY-MM-DD" }
+router.post('/bulk-advance-batch', async (req, res) => {
+  try {
+    const { employeeIds, date } = req.body;
+    if (!Array.isArray(employeeIds) || !date) {
+      return res.status(400).json({ message: 'employeeIds (array) and date are required' });
+    }
+
+    const query = `WITH ranked AS (
+      SELECT employee_id, bulk_advance, date,
+        ROW_NUMBER() OVER (
+          PARTITION BY employee_id
+          ORDER BY (CASE WHEN (bulk_advance IS NOT NULL AND bulk_advance > 0) THEN 0 ELSE 1 END), date DESC
+        ) as rn
+      FROM attendance
+      WHERE employee_id = ANY($1) AND date <= $2::date
+    )
+    SELECT employee_id, bulk_advance FROM ranked WHERE rn = 1`;
+
+    const { rows } = await db.query(query, [employeeIds, date]);
+    const resultMap = {};
+    for (const r of rows) {
+      resultMap[r.employee_id.toString()] = parseFloat(r.bulk_advance) || 0;
+    }
+    for (const id of employeeIds) {
+      if (!Object.prototype.hasOwnProperty.call(resultMap, id.toString())) {
+        resultMap[id.toString()] = 0;
+      }
+    }
+    res.json(resultMap);
+  } catch (err) {
+    console.error('Error fetching bulk advance batch:', err);
+    res.status(500).json({ message: 'Error fetching bulk advances' });
+  }
+});
+
 // Get latest bulk advance for an employee before a given date
 // This gets the bulk_advance from the most recent attendance record up to and including the given date
 // It prioritizes records with non-zero bulk_advance to ensure advances persist until paid off

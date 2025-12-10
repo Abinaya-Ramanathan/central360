@@ -258,6 +258,46 @@ class ApiService {
     return 0.0; // Return 0 if no previous record found
   }
 
+  // Batch get outstanding advances for multiple employees for a date
+  // Returns a map of employeeId -> outstanding amount
+  static Future<Map<String, double>> getOutstandingAdvanceBatch(List<String> employeeIds, String date) async {
+    final uri = Uri.parse('$baseUrl/attendance/outstanding-batch');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'employeeIds': employeeIds, 'date': date}),
+    );
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      final Map<String, double> result = {};
+      data.forEach((k, v) {
+        result[k] = (v as num?)?.toDouble() ?? 0.0;
+      });
+      return result;
+    }
+    // On failure, return zeroes for all provided ids (caller should handle)
+    return { for (var id in employeeIds) id: 0.0 };
+  }
+
+  // Batch get bulk advances for multiple employees for a date
+  static Future<Map<String, double>> getBulkAdvanceBatch(List<String> employeeIds, String date) async {
+    final uri = Uri.parse('$baseUrl/attendance/bulk-advance-batch');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'employeeIds': employeeIds, 'date': date}),
+    );
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      final Map<String, double> result = {};
+      data.forEach((k, v) {
+        result[k] = (v as num?)?.toDouble() ?? 0.0;
+      });
+      return result;
+    }
+    return { for (var id in employeeIds) id: 0.0 };
+  }
+
   static Future<double> getBulkAdvance(String employeeId, String date) async {
     final response = await http.get(
       Uri.parse('$baseUrl/attendance/bulk-advance/$employeeId/$date'),

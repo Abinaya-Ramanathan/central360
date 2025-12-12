@@ -373,37 +373,93 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
         ),
         child: Column(
           children: [
-            // Search Bar
+            // Search Bar and Add Employee Button
             Container(
               padding: const EdgeInsets.all(16.0),
               color: Colors.grey.shade100,
-              child: StatefulBuilder(
-                builder: (context, setState) {
-                  return TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      labelText: 'Search by Sector or Name',
-                      hintText: 'Enter sector or name to search',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {}); // Update UI to hide clear button
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: StatefulBuilder(
+                      builder: (context, setState) {
+                        return TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            labelText: 'Search by Sector or Name',
+                            hintText: 'Enter sector or name to search',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {}); // Update UI to hide clear button
+                                    },
+                                  )
+                                : null,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            _filterEmployees();
+                            setState(() {}); // Update UI to show/hide clear button
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  if (_isAdmin || widget.isMainAdmin) ...[
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final result = await showDialog<Employee>(
+                          context: context,
+                          builder: (context) => const AddEmployeeDialog(),
+                        );
+                        if (result != null) {
+                          try {
+                            await ApiService.createEmployee(result);
+                            // Reload all employees from server to ensure consistency
+                            await _loadEmployees();
+                            _filterEmployees(); // Refresh filtered list
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Employee added successfully'),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            // Extract error message without "Exception: " prefix
+                            String errorMessage = e.toString().replaceFirst('Exception: ', '');
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(errorMessage),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 4),
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Employee'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
-                    onChanged: (value) {
-                      _filterEmployees();
-                      setState(() {}); // Update UI to show/hide clear button
-                    },
-                  );
-                },
+                  ],
+                ],
               ),
             ),
             // Employee Table
@@ -643,48 +699,6 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
           ],
         ),
       ),
-      floatingActionButton: _isAdmin || widget.isMainAdmin
-          ? FloatingActionButton.extended(
-              onPressed: () async {
-                final result = await showDialog<Employee>(
-                  context: context,
-                  builder: (context) => const AddEmployeeDialog(),
-                );
-                if (result != null) {
-                  try {
-                    await ApiService.createEmployee(result);
-                    // Reload all employees from server to ensure consistency
-                    await _loadEmployees();
-                    _filterEmployees(); // Refresh filtered list
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Employee added successfully'),
-                          backgroundColor: Colors.green,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    // Extract error message without "Exception: " prefix
-                    String errorMessage = e.toString().replaceFirst('Exception: ', '');
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(errorMessage),
-                          backgroundColor: Colors.red,
-                          duration: const Duration(seconds: 4),
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-              backgroundColor: Colors.blue.shade700,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Employee'),
-            )
-          : null,
     );
   }
 }

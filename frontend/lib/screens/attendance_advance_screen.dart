@@ -6,7 +6,6 @@ import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
-import '../utils/pdf_generator.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -33,9 +32,9 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   List<Map<String, dynamic>> _advanceDetails = [];
   List<Map<String, dynamic>> _filteredAdvanceDetails = [];
   final TextEditingController _advanceSearchController = TextEditingController();
-  Set<String> _selectedMonthsAdvance = {}; // Set of 'YYYY-MM' strings for multiple month selection
+  DateTime? _fromDateAdvance;
+  DateTime? _toDateAdvance;
   bool _isLoadingAdvance = false;
-  bool _isGeneratingPDF = false;
   bool _sortAscendingAdvance = true; // Sort direction for Sector column
   List<Map<String, dynamic>> _rentVehicles = [];
   bool _isLoadingRentVehicles = false;
@@ -320,12 +319,41 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     setState(() {
       List<Map<String, dynamic>> filtered = List.from(_advanceDetails);
       
-      // Apply month filter if months are selected
-      if (_selectedMonthsAdvance.isNotEmpty && _selectedDate != null) {
-        final dateStr = '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}';
-        if (!_selectedMonthsAdvance.contains(dateStr)) {
-          filtered = []; // No data if selected date is not in selected months
-        }
+      // Apply date range filter if dates are selected
+      if (_fromDateAdvance != null || _toDateAdvance != null) {
+        filtered = filtered.where((detail) {
+          // Get the date from the record - this might be in different formats
+          final dateValue = detail['date'] ?? detail['attendance_date'];
+          if (dateValue == null) return false;
+          
+          DateTime? recordDate;
+          try {
+            if (dateValue is DateTime) {
+              recordDate = dateValue;
+            } else if (dateValue is String) {
+              String dateStr = dateValue;
+              if (dateStr.contains('T')) {
+                dateStr = dateStr.split('T')[0];
+              }
+              if (dateStr.contains(' ')) {
+                dateStr = dateStr.split(' ')[0];
+              }
+              recordDate = DateTime.tryParse(dateStr);
+            }
+          } catch (e) {
+            return false;
+          }
+          
+          if (recordDate == null) return false;
+          
+          final recordDateOnly = DateTime(recordDate.year, recordDate.month, recordDate.day);
+          final fromDateOnly = _fromDateAdvance != null ? DateTime(_fromDateAdvance!.year, _fromDateAdvance!.month, _fromDateAdvance!.day) : null;
+          final toDateOnly = _toDateAdvance != null ? DateTime(_toDateAdvance!.year, _toDateAdvance!.month, _toDateAdvance!.day) : null;
+          
+          if (fromDateOnly != null && recordDateOnly.isBefore(fromDateOnly)) return false;
+          if (toDateOnly != null && recordDateOnly.isAfter(toDateOnly)) return false;
+          return true;
+        }).toList();
       }
       
       // Apply search filter
@@ -341,225 +369,37 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     });
   }
 
-  Future<void> _showMonthYearPickerAdvance() async {
-    final now = DateTime.now();
-    int selectedYear = now.year;
-    Set<String> tempSelectedMonths = Set.from(_selectedMonthsAdvance);
-    
-    final result = await showDialog<Set<String>>(
+  Future<void> _selectFromDateAdvance() async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Select Months'),
-          content: SingleChildScrollView(
-            child: SizedBox(
-              width: 400,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Year selector
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.chevron_left),
-                        onPressed: () {
-                          setDialogState(() {
-                            selectedYear--;
-                          });
-                        },
-                      ),
-                      Text(
-                        selectedYear.toString(),
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.chevron_right),
-                        onPressed: () {
-                          setDialogState(() {
-                            selectedYear++;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Month grid
-                  SizedBox(
-                    height: 280,
-                    child: GridView.builder(
-                      shrinkWrap: false,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: 2.5,
-                      ),
-                      itemCount: 12,
-                      itemBuilder: (context, index) {
-                        final month = index + 1;
-                        final monthKey = '$selectedYear-${month.toString().padLeft(2, '0')}';
-                        final isSelected = tempSelectedMonths.contains(monthKey);
-                        final monthNames = [
-                          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-                        ];
-                        
-                        return InkWell(
-                          onTap: () {
-                            setDialogState(() {
-                              if (isSelected) {
-                                tempSelectedMonths.remove(monthKey);
-                              } else {
-                                tempSelectedMonths.add(monthKey);
-                              }
-                            });
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: isSelected ? Colors.blue.shade700 : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isSelected ? Colors.blue.shade900 : Colors.grey.shade400,
-                                width: 2,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                monthNames[index],
-                                style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.black87,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Clear all button
-                  if (tempSelectedMonths.isNotEmpty)
-                    TextButton(
-                      onPressed: () {
-                        setDialogState(() {
-                          tempSelectedMonths.clear();
-                        });
-                      },
-                      child: const Text('Clear All'),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, tempSelectedMonths),
-              child: const Text('Apply'),
-            ),
-          ],
-        ),
-      ),
+      initialDate: _fromDateAdvance ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
     );
-    
-    if (result != null) {
+    if (picked != null) {
       setState(() {
-        _selectedMonthsAdvance = result;
-        _filterAdvanceData(_advanceSearchController.text);
+        _fromDateAdvance = picked;
       });
+      _filterAdvanceData(_advanceSearchController.text);
     }
   }
 
-  Future<void> _downloadAdvanceDetailsPDF() async {
-    // Use ALL data, ignore search + filters
-    final dataToUse = _advanceDetails;
-
-    if (dataToUse.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No data available to download'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    // Show filename input dialog
-    final fileNameController = TextEditingController();
-    final fileName = await showDialog<String>(
+  Future<void> _selectToDateAdvance() async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Enter File Name'),
-          content: TextField(
-            controller: fileNameController,
-            decoration: const InputDecoration(
-              labelText: 'File Name',
-              hintText: 'Enter file name (without .pdf)',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (fileNameController.text.trim().isNotEmpty) {
-                  Navigator.of(context).pop(fileNameController.text.trim());
-                }
-              },
-              child: const Text('Download PDF'),
-            ),
-          ],
-        );
-      },
+      initialDate: _toDateAdvance ?? (_fromDateAdvance ?? DateTime.now()),
+      firstDate: _fromDateAdvance ?? DateTime(2000),
+      lastDate: DateTime(2100),
     );
-
-    if (fileName == null || fileName.isEmpty) {
-      return; // User cancelled
-    }
-
-    setState(() => _isGeneratingPDF = true);
-
-    try {
-      await PdfGenerator.generateAdvanceDetailsPDF(
-        advanceData: dataToUse,
-        fileName: fileName,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('PDF saved successfully to Downloads folder'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error generating PDF: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isGeneratingPDF = false);
-      }
+    if (picked != null) {
+      setState(() {
+        _toDateAdvance = picked;
+      });
+      _filterAdvanceData(_advanceSearchController.text);
     }
   }
+
+
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -680,7 +520,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
           // Staff Attendance Entry Tab
           Column(
             children: [
-              // Date Selection
+              // Date Selection and Edit Button in same row
               Container(
                 padding: const EdgeInsets.all(16.0),
                 color: Colors.grey.shade100,
@@ -708,6 +548,19 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                         ),
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    FilledButton.icon(
+                      onPressed: _isEditMode ? _saveEmployeeAttendanceAction : () => setState(() => _isEditMode = true),
+                      icon: Icon(_isEditMode ? Icons.save : Icons.edit),
+                      label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -728,32 +581,12 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                   },
                 ),
               ),
-              // Edit/Save Attendance Button
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: FilledButton.icon(
-                    onPressed: _isEditMode ? _saveEmployeeAttendanceAction : () => setState(() => _isEditMode = true),
-                    icon: Icon(_isEditMode ? Icons.save : Icons.edit),
-                    label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
           // Vehicle Attendance Entry Tab
           Column(
             children: [
-              // Date Selection
+              // Date Selection and Edit Button in same row
               Container(
                 padding: const EdgeInsets.all(16.0),
                 color: Colors.grey.shade100,
@@ -778,6 +611,19 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                               color: _selectedDate != null ? Colors.black : Colors.grey,
                             ),
                           ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    FilledButton.icon(
+                      onPressed: _isEditMode ? _saveVehicleAttendance : () => setState(() => _isEditMode = true),
+                      icon: Icon(_isEditMode ? Icons.save : Icons.edit),
+                      label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.teal.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
@@ -889,26 +735,6 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                             ),
                           ),
               ),
-              // Edit/Save Attendance Button
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: FilledButton.icon(
-                    onPressed: _isEditMode ? _saveVehicleAttendance : () => setState(() => _isEditMode = true),
-                    icon: Icon(_isEditMode ? Icons.save : Icons.edit),
-                    label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
           // Advance Details Tab
@@ -970,82 +796,6 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                                   },
                                 );
                               },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Month/Year Picker Button
-                          SizedBox(
-                            width: 180,
-                            height: 56,
-                            child: OutlinedButton.icon(
-                              onPressed: _showMonthYearPickerAdvance,
-                              icon: const Icon(Icons.calendar_today),
-                              label: Text(
-                                _selectedMonthsAdvance.isEmpty
-                                    ? 'Select Months'
-                                    : _selectedMonthsAdvance.length == 1
-                                        ? _selectedMonthsAdvance.first
-                                        : '${_selectedMonthsAdvance.length} Months',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                side: BorderSide(color: _selectedMonthsAdvance.isEmpty ? Colors.grey : Colors.blue),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Download Button
-                          SizedBox(
-                            width: 200,
-                            height: 56,
-                            child: ElevatedButton.icon(
-                              onPressed: _isGeneratingPDF ? null : _downloadAdvanceDetailsPDF,
-                              icon: _isGeneratingPDF
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Icon(Icons.download),
-                              label: Text(_isGeneratingPDF ? 'Generating...' : 'Download Current Page Data'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.shade700,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Notes Section (Compact)
-                          SizedBox(
-                            width: 300,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.blue.shade200),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 16),
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: Text(
-                                      'Downloads only searched/filtered data currently displayed on the page.',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.blue.shade900,
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ),
                           ),
                         ],

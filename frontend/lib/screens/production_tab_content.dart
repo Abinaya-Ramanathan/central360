@@ -7,12 +7,16 @@ class ProductionTabContent extends StatefulWidget {
   final String? selectedSector;
   final DateTime? selectedDate;
   final bool isAdmin;
+  final VoidCallback? onEditPressed;
+  final TextEditingController? searchController;
 
   const ProductionTabContent({
     super.key,
     this.selectedSector,
     this.selectedDate,
     this.isAdmin = false,
+    this.onEditPressed,
+    this.searchController,
   });
 
   @override
@@ -24,7 +28,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   List<Map<String, dynamic>> _productionData = [];
   List<Map<String, dynamic>> _filteredProductionData = [];
   bool _isLoading = false;
-  final TextEditingController _searchController = TextEditingController();
+  late final TextEditingController _searchController;
   bool _sortAscending = true; // Sort direction for Sector column
   final Map<String, String?> _productionUnits = {}; // Store unit for each product
 
@@ -33,7 +37,10 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_filterProductionData);
+    _searchController = widget.searchController ?? TextEditingController();
+    if (widget.searchController == null) {
+      _searchController.addListener(_filterProductionData);
+    }
     _loadSectors();
     if (widget.selectedDate != null) {
       if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
@@ -44,7 +51,10 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
 
   @override
   void dispose() {
-    _searchController.dispose();
+    // Only dispose if we created the controller ourselves
+    if (widget.searchController == null) {
+      _searchController.dispose();
+    }
     super.dispose();
   }
 
@@ -264,6 +274,10 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
     if (value.isEmpty) return 0;
     final parsed = int.tryParse(value);
     return parsed ?? 0;
+  }
+
+  void showEditDialog() {
+    _showEditProductionDialog();
   }
 
   Future<void> _showEditProductionDialog() async {
@@ -588,31 +602,6 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
 
     return Column(
       children: [
-        // Search Bar
-        Container(
-          padding: const EdgeInsets.all(16.0),
-          color: Colors.grey.shade100,
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search by product name...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-          ),
-        ),
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -696,23 +685,6 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                         ),
                       ),
                     ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _showEditProductionDialog,
-              icon: const Icon(Icons.edit),
-              label: const Text('Edit Production Details', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
         ),
       ],
     );

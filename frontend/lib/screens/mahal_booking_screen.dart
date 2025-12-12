@@ -40,6 +40,8 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
   String? _selectedBookingId; // For linking tables
   bool _isLoading = false;
   bool _sortByDateDesc = true; // true for descending (newest first), false for ascending
+  DateTime? _fromDateEvent; // From date for Event Details filter
+  DateTime? _toDateEvent; // To date for Event Details filter
   
   // Search controllers
   final TextEditingController _mahalDetailSearchController = TextEditingController();
@@ -50,11 +52,17 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
   // Mahal Vessels state
   final Map<int, bool> _editModeVessels = {};
   final Map<int, Map<String, dynamic>> _vesselControllers = {};
+  
+  // Event Details edit state for Final Settlement Amount
+  final Map<String, bool> _editModeEvent = {}; // key = bookingId
+  final Map<String, TextEditingController> _finalSettlementControllers = {}; // key = bookingId
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _fromDateEvent = DateTime.now();
+    _toDateEvent = DateTime.now();
     _loadSectors();
     _loadAllData();
   }
@@ -72,6 +80,9 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
           controller.dispose();
         }
       }
+    }
+    for (var controller in _finalSettlementControllers.values) {
+      controller.dispose();
     }
     super.dispose();
   }
@@ -108,6 +119,24 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
 
       if (mounted) {
         setState(() {
+          // Clean up any edit modes and controllers for events that no longer exist
+          final currentBookingIds = eventDetails
+              .where((e) => e.bookingId != null)
+              .map((e) => e.bookingId!)
+              .toSet();
+          
+          // Remove edit modes for events that no longer exist
+          _editModeEvent.removeWhere((bookingId, _) => !currentBookingIds.contains(bookingId));
+          
+          // Dispose and remove controllers for events that no longer exist
+          _finalSettlementControllers.removeWhere((bookingId, controller) {
+            if (!currentBookingIds.contains(bookingId)) {
+              controller.dispose();
+              return true;
+            }
+            return false;
+          });
+          
           _eventDetails = eventDetails;
           _cateringDetails = cateringDetails;
           _expenseDetails = expenseDetails;
@@ -279,12 +308,25 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
       ).toList();
     }
     
+    // Apply date range filter
+    if (_fromDateEvent != null || _toDateEvent != null) {
+      filteredEvents = filteredEvents.where((event) {
+        final eventDateOnly = DateTime(event.eventDate.year, event.eventDate.month, event.eventDate.day);
+        final fromDateOnly = _fromDateEvent != null ? DateTime(_fromDateEvent!.year, _fromDateEvent!.month, _fromDateEvent!.day) : null;
+        final toDateOnly = _toDateEvent != null ? DateTime(_toDateEvent!.year, _toDateEvent!.month, _toDateEvent!.day) : null;
+        
+        if (fromDateOnly != null && eventDateOnly.isBefore(fromDateOnly)) return false;
+        if (toDateOnly != null && eventDateOnly.isAfter(toDateOnly)) return false;
+        return true;
+      }).toList();
+    }
+    
     // Sort by Event Date (newest first)
     filteredEvents.sort((a, b) => b.eventDate.compareTo(a.eventDate));
 
     return Column(
       children: [
-        // Search fields
+        // Search fields and Date filters
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.grey.shade100,
@@ -331,6 +373,122 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                   onChanged: (_) => setState(() {}),
                 ),
               ),
+              const SizedBox(width: 12),
+              // From Date Picker
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 160,
+                    height: 56,
+                    child: InkWell(
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: _fromDateEvent ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _fromDateEvent = picked;
+                          });
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'From Date',
+                          prefixIcon: const Icon(Icons.calendar_today, size: 18),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        child: Text(
+                          _fromDateEvent != null
+                              ? _fromDateEvent!.toIso8601String().split('T')[0]
+                              : 'From Date',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_fromDateEvent != null)
+                    IconButton(
+                      icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _fromDateEvent = null;
+                        });
+                      },
+                      tooltip: 'Clear From Date',
+                    ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              // To Date Picker
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 160,
+                    height: 56,
+                    child: InkWell(
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: _toDateEvent ?? (_fromDateEvent ?? DateTime.now()),
+                          firstDate: _fromDateEvent ?? DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _toDateEvent = picked;
+                          });
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'To Date',
+                          prefixIcon: const Icon(Icons.calendar_today, size: 18),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        child: Text(
+                          _toDateEvent != null
+                              ? _toDateEvent!.toIso8601String().split('T')[0]
+                              : 'To Date',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_toDateEvent != null)
+                    IconButton(
+                      icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _toDateEvent = null;
+                        });
+                      },
+                      tooltip: 'Clear To Date',
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              // Add Event Details Button
+              ElevatedButton.icon(
+                onPressed: widget.selectedSector == null ? null : _addEvent,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Event Details', style: TextStyle(fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple.shade700,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
             ],
           ),
         ),
@@ -372,12 +530,14 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                         const DataColumn(label: Text('Food Service')),
                         const DataColumn(label: Text('Settlement Status')),
                         const DataColumn(label: Text('Details')),
+                        const DataColumn(label: Text('Final Settlement Amount')),
                         const DataColumn(label: Text('Action')),
                       ],
-                      rows: (filteredEvents..sort((a, b) {
-                        final comparison = a.eventDate.compareTo(b.eventDate);
-                        return _sortByDateDesc ? -comparison : comparison;
-                      })).map((event) {
+                      rows: [
+                        ...(filteredEvents..sort((a, b) {
+                          final comparison = a.eventDate.compareTo(b.eventDate);
+                          return _sortByDateDesc ? -comparison : comparison;
+                        })).map((event) {
                         final isSelected = event.bookingId == _selectedBookingId;
                         return DataRow(
                           color: isSelected ? WidgetStateProperty.all(Colors.yellow.shade100) : null,
@@ -410,20 +570,96 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                                 ),
                               ),
                             ),
+                            // Final Settlement Amount - editable
+                            DataCell(
+                              event.bookingId != null && 
+                              _editModeEvent[event.bookingId] == true &&
+                              _finalSettlementControllers.containsKey(event.bookingId) &&
+                              _finalSettlementControllers[event.bookingId] != null
+                                  ? SizedBox(
+                                      width: 150,
+                                      child: TextFormField(
+                                        controller: _finalSettlementControllers[event.bookingId]!,
+                                        decoration: const InputDecoration(
+                                          border: OutlineInputBorder(),
+                                          isDense: true,
+                                          prefixText: '₹',
+                                        ),
+                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      ),
+                                    )
+                                  : Text(
+                                      event.finalSettlementAmount != null
+                                          ? '₹${event.finalSettlementAmount?.toStringAsFixed(2) ?? '0.00'}'
+                                          : 'N/A',
+                                      style: const TextStyle(color: Colors.black87),
+                                    ),
+                            ),
                             DataCell(
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewEvent(event)),
                                   IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), onPressed: () => _editEvent(event)),
-                                  if (widget.isMainAdmin)
+                                  if (event.bookingId != null)
+                                    if (_editModeEvent[event.bookingId] == true)
+                                      ...[
+                                        IconButton(
+                                          icon: const Icon(Icons.save, color: Colors.green, size: 20),
+                                          tooltip: 'Save',
+                                          onPressed: () => _saveFinalSettlementAmount(event),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
+                                          tooltip: 'Cancel',
+                                          onPressed: () => _cancelEditFinalSettlementAmount(event.bookingId!),
+                                        ),
+                                      ]
+                                    else
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_note, color: Colors.orange, size: 20),
+                                        tooltip: 'Edit Final Settlement',
+                                        onPressed: () => _toggleEditFinalSettlementAmount(event),
+                                      ),
+                                  if (widget.isMainAdmin && event.bookingId != null)
                                     IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () => _deleteEvent(event.bookingId!)),
                                 ],
                               ),
                             ),
                           ],
                         );
-                      }).toList(),
+                      }),
+                        // Total Row
+                        DataRow(
+                          color: WidgetStateProperty.all(Colors.blue.shade50),
+                          cells: [
+                            DataCell(
+                              Text(
+                                'Total (${filteredEvents.where((e) => e.bookingId != null).length})',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                            ),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            const DataCell(Text('')),
+                            DataCell(
+                              Text(
+                                '₹${filteredEvents.fold<double>(0.0, (sum, event) => sum + (event.finalSettlementAmount ?? 0.0)).toStringAsFixed(2)}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
+                              ),
+                            ),
+                            const DataCell(Text('')),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -614,6 +850,12 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
   }
 
   Future<void> _addEvent() async {
+    if (widget.selectedSector == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot add: Sector is not selected'), backgroundColor: Colors.red),
+      );
+      return;
+    }
     final result = await showDialog<MahalBooking>(
       context: context,
       builder: (context) => AddMahalBookingDialog(selectedSector: widget.selectedSector!),
@@ -716,6 +958,12 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
   }
 
   Future<void> _editEvent(MahalBooking event) async {
+    if (widget.selectedSector == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot edit: Sector is not selected'), backgroundColor: Colors.red),
+      );
+      return;
+    }
     final result = await showDialog<MahalBooking>(
       context: context,
       builder: (context) => AddMahalBookingDialog(selectedSector: widget.selectedSector!, booking: event),
@@ -924,20 +1172,37 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
     
     return Column(
       children: [
-        // Search field
+        // Search field and Add Vessel Details button
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.grey.shade100,
-          child: TextField(
-            controller: _vesselMahalDetailSearchController,
-            decoration: InputDecoration(
-              labelText: 'Search Mahal Detail',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-            onChanged: (_) => setState(() {}),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _vesselMahalDetailSearchController,
+                  decoration: InputDecoration(
+                    labelText: 'Search Mahal Detail',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: widget.selectedSector == null ? null : _addMahalVessel,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Vessel Details', style: TextStyle(fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple.shade700,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -1067,23 +1332,6 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                   ),
                 ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _addMahalVessel,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Mahal Items', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.purple.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -1193,6 +1441,79 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
             SnackBar(content: Text('Error deleting vessel: $e'), backgroundColor: Colors.red),
           );
         }
+      }
+    }
+  }
+
+  void _toggleEditFinalSettlementAmount(MahalBooking event) {
+    if (event.bookingId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot edit: Booking ID is missing'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    setState(() {
+      if (_editModeEvent[event.bookingId] == true) {
+        _cancelEditFinalSettlementAmount(event.bookingId!);
+      } else {
+        _editModeEvent[event.bookingId!] = true;
+        _finalSettlementControllers[event.bookingId!] = TextEditingController(
+          text: event.finalSettlementAmount?.toStringAsFixed(2) ?? '',
+        );
+      }
+    });
+  }
+
+  void _cancelEditFinalSettlementAmount(String bookingId) {
+    setState(() {
+      _editModeEvent[bookingId] = false;
+      if (_finalSettlementControllers.containsKey(bookingId)) {
+        _finalSettlementControllers[bookingId]!.dispose();
+        _finalSettlementControllers.remove(bookingId);
+      }
+    });
+  }
+
+  Future<void> _saveFinalSettlementAmount(MahalBooking event) async {
+    if (event.bookingId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot save: Booking ID is missing'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    try {
+      final controller = _finalSettlementControllers[event.bookingId];
+      if (controller == null) return;
+
+      final finalSettlementAmountText = controller.text.trim();
+      final finalSettlementAmount = finalSettlementAmountText.isEmpty
+          ? null
+          : double.tryParse(finalSettlementAmountText);
+
+      if (finalSettlementAmountText.isNotEmpty && finalSettlementAmount == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid amount'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      // Update the event with the new final settlement amount
+      final updatedEvent = event.copyWith(finalSettlementAmount: finalSettlementAmount);
+      await ApiService.updateMahalBooking(updatedEvent);
+
+      _cancelEditFinalSettlementAmount(event.bookingId!);
+      await _loadAllData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Final settlement amount saved successfully'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving final settlement amount: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }

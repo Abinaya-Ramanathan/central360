@@ -13,6 +13,7 @@ class MahalBooking {
   final double? advanceReceived;
   final double? quotedAmount;
   final double? amountReceived;
+  final double? finalSettlementAmount;
   final String? orderStatus;
   final String? details;
 
@@ -31,6 +32,7 @@ class MahalBooking {
     this.advanceReceived,
     this.quotedAmount,
     this.amountReceived,
+    this.finalSettlementAmount,
     this.orderStatus,
     this.details,
   });
@@ -51,6 +53,7 @@ class MahalBooking {
       'advance_received': advanceReceived,
       'quoted_amount': quotedAmount,
       'amount_received': amountReceived,
+      'final_settlement_amount': finalSettlementAmount,
       'order_status': orderStatus,
       'details': details,
     };
@@ -72,6 +75,7 @@ class MahalBooking {
       advanceReceived: _parseDouble(json['advance_received']),
       quotedAmount: _parseDouble(json['quoted_amount']),
       amountReceived: _parseDouble(json['amount_received']),
+      finalSettlementAmount: _parseDouble(json['final_settlement_amount']),
       orderStatus: json['order_status'] as String?,
       details: json['details'] as String?,
     );
@@ -100,6 +104,7 @@ class MahalBooking {
     double? advanceReceived,
     double? quotedAmount,
     double? amountReceived,
+    double? finalSettlementAmount,
     String? orderStatus,
     String? details,
   }) {
@@ -118,6 +123,7 @@ class MahalBooking {
       advanceReceived: advanceReceived ?? this.advanceReceived,
       quotedAmount: quotedAmount ?? this.quotedAmount,
       amountReceived: amountReceived ?? this.amountReceived,
+      finalSettlementAmount: finalSettlementAmount ?? this.finalSettlementAmount,
       orderStatus: orderStatus ?? this.orderStatus,
       details: details ?? this.details,
     );

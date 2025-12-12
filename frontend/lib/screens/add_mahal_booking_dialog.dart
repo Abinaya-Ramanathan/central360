@@ -27,6 +27,7 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
   final _eventTimingController = TextEditingController();
   final _eventDateController = TextEditingController();
   final _detailsController = TextEditingController();
+  final _finalSettlementAmountController = TextEditingController();
 
   String? _selectedMahalDetail;
   String? _selectedFoodService;
@@ -60,6 +61,7 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
       _clientAddressController.text = widget.booking!.clientAddress ?? '';
       _selectedOrderStatus = widget.booking!.orderStatus ?? 'open';
       _detailsController.text = widget.booking!.details ?? '';
+      _finalSettlementAmountController.text = widget.booking!.finalSettlementAmount?.toStringAsFixed(2) ?? '';
     } else {
       _selectedOrderStatus = 'open';
     }
@@ -75,6 +77,7 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
     _eventTimingController.dispose();
     _eventDateController.dispose();
     _detailsController.dispose();
+    _finalSettlementAmountController.dispose();
     super.dispose();
   }
 
@@ -156,6 +159,9 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
         details: _detailsController.text.trim().isEmpty
             ? null
             : _detailsController.text.trim(),
+        finalSettlementAmount: _finalSettlementAmountController.text.trim().isEmpty
+            ? null
+            : double.tryParse(_finalSettlementAmountController.text.trim()),
       );
 
       if (widget.booking != null) {
@@ -467,6 +473,33 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                     setState(() {
                       _selectedOrderStatus = value;
                     });
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Final Settlement Amount
+                TextFormField(
+                  controller: _finalSettlementAmountController,
+                  decoration: InputDecoration(
+                    labelText: 'Final Settlement Amount',
+                    hintText: 'Enter final settlement amount',
+                    prefixIcon: const Icon(Icons.currency_rupee, color: Colors.purple),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.purple, width: 2),
+                    ),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value != null && value.trim().isNotEmpty) {
+                      final amount = double.tryParse(value.trim());
+                      if (amount == null) {
+                        return 'Please enter a valid amount';
+                      }
+                    }
+                    return null;
                   },
                 ),
                 const SizedBox(height: 24),

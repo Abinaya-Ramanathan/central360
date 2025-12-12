@@ -3,7 +3,6 @@ import 'employee_details_screen.dart';
 import 'maintenance_issue_screen.dart';
 import 'mahal_booking_screen.dart';
 import 'sales_credit_details_screen.dart';
-import 'company_purchase_credit_details_screen.dart';
 import 'vehicle_driver_license_screen.dart';
 import 'attendance_advance_screen.dart';
 import '../models/sector.dart';
@@ -16,7 +15,6 @@ import 'update_dialog.dart';
 import '../services/update_service.dart';
 import 'new_entry_screen.dart';
 import 'ingredients_details_screen.dart';
-import 'daily_income_expense_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -321,7 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               if (_isAdmin)
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 50,
+                                  height: 42,
                                   child: ElevatedButton.icon(
                                     onPressed: () {
                                       Navigator.push(
@@ -335,58 +333,63 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       );
                                     },
-                                    icon: const Icon(Icons.people),
+                                    icon: const Icon(Icons.people, size: 18),
                                     label: const Text(
                                       'Employee Details',
-                                      style: TextStyle(fontSize: 16),
+                                      style: TextStyle(fontSize: 14),
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.blue.shade700,
                                       foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                     ),
                                   ),
                                 ),
                               // Show Employee Details only for Admin
-                              if (_isAdmin) const SizedBox(height: 16),
-                              // Attendance and Advance Details - available for all users
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AttendanceAdvanceScreen(
-                                          username: widget.username,
-                                          selectedSector: _selectedSector,
-                                          isAdmin: _isAdmin,
+                              if (_isAdmin) const SizedBox(height: 10),
+                              // Attendance and Advance Details - available for all users except SSMMC
+                              if (_selectedSector != 'SSMMC') ...[
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 42,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => AttendanceAdvanceScreen(
+                                            username: widget.username,
+                                            selectedSector: _selectedSector,
+                                            isAdmin: _isAdmin,
+                                          ),
                                         ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.event_available, size: 18),
+                                    label: const Text(
+                                      'Attendance and Advance Details',
+                                      style: TextStyle(fontSize: 14),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green.shade700,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.event_available),
-                                  label: const Text(
-                                    'Attendance and Advance Details',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green.shade700,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
                                 ),
-                              ),
+                                const SizedBox(height: 10),
+                              ],
                               // Maintenance Issue Report - available for all users
-                              const SizedBox(height: 16),
+                              if (_selectedSector != 'SSMMC') const SizedBox(height: 10),
                               SizedBox(
                                 width: double.infinity,
-                                height: 50,
+                                height: 42,
                                 child: ElevatedButton.icon(
                                   onPressed: () {
                                     Navigator.push(
@@ -400,25 +403,26 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     );
                                   },
-                                  icon: const Icon(Icons.build),
+                                  icon: const Icon(Icons.build, size: 18),
                                   label: const Text(
                                     'Maintenance Issue Report',
-                                    style: TextStyle(fontSize: 16),
+                                    style: TextStyle(fontSize: 14),
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.teal.shade700,
                                     foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                   ),
                                 ),
                               ),
                               // Sales and Credit Details - available for all users
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 10),
                               SizedBox(
                                 width: double.infinity,
-                                height: 50,
+                                height: 42,
                                 child: ElevatedButton.icon(
                                   onPressed: () {
                                     Navigator.push(
@@ -432,89 +436,61 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     );
                                   },
-                                  icon: const Icon(Icons.credit_card),
+                                  icon: const Icon(Icons.credit_card, size: 18),
                                   label: const Text(
-                                    'Sales and Credit details of Customer',
-                                    style: TextStyle(fontSize: 16),
+                                    'Sales Purchase and Credit Details',
+                                    style: TextStyle(fontSize: 14),
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.indigo.shade700,
                                     foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                   ),
                                 ),
                               ),
-                              // Company Purchase and Credit Details - available for all users
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => CompanyPurchaseCreditDetailsScreen(
-                                          username: widget.username,
-                                          selectedSector: _selectedSector,
-                                          isMainAdmin: _isMainAdmin,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.shopping_cart),
-                                  label: const Text(
-                                    'Company Purchase and Credit Details',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.purple.shade700,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Stock Management - available for all users
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => StockManagementScreen(
-                                          username: widget.username,
-                                          selectedSector: _selectedSector,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.warehouse),
-                                  label: const Text(
-                                    'Daily Production and Stock Management',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.amber.shade700,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Mahal Booking Details - for SSMMC sector or All Sectors (admin only)
-                              if ((_selectedSector == 'SSMMC' || (_selectedSector == null && _isAdmin))) ...[
-                                const SizedBox(height: 16),
+                              // Stock Management - available for all users except SSMMC
+                              if (_selectedSector != 'SSMMC') ...[
+                                const SizedBox(height: 10),
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 50,
+                                  height: 42,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => StockManagementScreen(
+                                            username: widget.username,
+                                            selectedSector: _selectedSector,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.warehouse, size: 18),
+                                    label: const Text(
+                                      'Daily Production and Stock Management',
+                                      style: TextStyle(fontSize: 14),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.amber.shade700,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              // Mahal Booking Details - for SSMMC sector or All Sectors (admin only)
+                              if ((_selectedSector == 'SSMMC' || (_selectedSector == null && _isAdmin))) ...[
+                                const SizedBox(height: 10),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 42,
                                   child: ElevatedButton.icon(
                                     onPressed: () {
                                       Navigator.push(
@@ -528,16 +504,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       );
                                     },
-                                    icon: const Icon(Icons.event_seat),
+                                    icon: const Icon(Icons.event_seat, size: 18),
                                     label: const Text(
                                       'Mahal Booking and Catering Orders Details',
-                                      style: TextStyle(fontSize: 16),
+                                      style: TextStyle(fontSize: 14),
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.purple.shade700,
                                       foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                     ),
                                   ),
@@ -545,10 +522,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                               // Vehicle Driver License and Oil Service Details - for All Sectors (admin) or SSBM sector
                               if ((_selectedSector == null && _isAdmin) || _selectedSector == 'SSBM') ...[
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 10),
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 50,
+                                  height: 42,
                                   child: ElevatedButton.icon(
                                     onPressed: () {
                                       Navigator.push(
@@ -562,68 +539,28 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       );
                                     },
-                                    icon: const Icon(Icons.drive_eta),
+                                    icon: const Icon(Icons.drive_eta, size: 18),
                                     label: const Text(
                                       'Vehicle and Driver Details',
-                                      style: TextStyle(fontSize: 16),
+                                      style: TextStyle(fontSize: 14),
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.deepOrange.shade700,
                                       foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                     ),
                                   ),
                                 ),
                               ],
-                              // Daily Income and Expense Details - available for all users
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    if (_selectedSector == null && !_isAdmin) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Please select a sector first'),
-                                          backgroundColor: Colors.orange,
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => DailyIncomeExpenseScreen(
-                                          username: widget.username,
-                                          selectedSector: _selectedSector,
-                                          isMainAdmin: _isMainAdmin,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.account_balance_wallet),
-                                  label: const Text(
-                                    'Daily Income and Expense Details',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.teal.shade700,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ),
                               // Ingredients Details - visible for admin when sector is SSC or All Sectors
                               if (_isAdmin && (_selectedSector == 'SSC' || _selectedSector == null)) ...[
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 10),
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 50,
+                                  height: 42,
                                   child: ElevatedButton.icon(
                                     onPressed: () {
                                       Navigator.push(
@@ -636,16 +573,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       );
                                     },
-                                    icon: const Icon(Icons.restaurant_menu),
+                                    icon: const Icon(Icons.restaurant_menu, size: 18),
                                     label: const Text(
                                       'Ingredients Details',
-                                      style: TextStyle(fontSize: 16),
+                                      style: TextStyle(fontSize: 14),
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.brown.shade700,
                                       foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                     ),
                                   ),

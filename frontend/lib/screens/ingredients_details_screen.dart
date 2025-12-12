@@ -204,63 +204,62 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
   Widget _buildExistingIngredientsTab() {
     return Column(
       children: [
-        // Search Bar
+        // Search Bar and Add Button in same row
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.grey.shade100,
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Search by Menu...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        setState(() {
-                          _searchQuery = '';
-                        });
-                        _loadIngredients();
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
-              _loadIngredients();
-            },
-          ),
-        ),
-        // Add Ingredients Button
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                final result = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => const AddIngredientDialog(),
-                );
-                if (result == true) {
-                  _loadIngredients();
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add Ingredients'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.brown.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search by Menu...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                              _loadIngredients();
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                    _loadIngredients();
+                  },
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => const AddIngredientDialog(),
+                  );
+                  if (result == true) {
+                    _loadIngredients();
+                  }
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Ingredients'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.brown.shade700,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         // Ingredients List
@@ -766,51 +765,53 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  // Menu Name Input
-                  TextField(
-                    controller: _checkMenuController,
-                    decoration: const InputDecoration(
-                      labelText: 'Menu Name',
-                      hintText: 'Enter menu name (e.g., Sambar)',
-                      prefixIcon: Icon(Icons.restaurant_menu),
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Quantity Input
-                  TextField(
-                    controller: _checkQuantityController,
-                    decoration: const InputDecoration(
-                      labelText: 'Quantity',
-                      hintText: 'Enter quantity (e.g., 5)',
-                      prefixIcon: Icon(Icons.numbers),
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  // Check Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: _isChecking ? null : _checkIngredients,
-                      icon: _isChecking
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.search),
-                      label: Text(_isChecking ? 'Checking...' : 'Check Ingredients'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.brown.shade700,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  // Menu Name, Quantity, and Check Button in same row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _checkMenuController,
+                          decoration: const InputDecoration(
+                            labelText: 'Menu Name',
+                            hintText: 'Enter menu name (e.g., Sambar)',
+                            prefixIcon: Icon(Icons.restaurant_menu),
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _checkQuantityController,
+                          decoration: const InputDecoration(
+                            labelText: 'Quantity',
+                            hintText: 'Enter quantity (e.g., 5)',
+                            prefixIcon: Icon(Icons.numbers),
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: _isChecking ? null : _checkIngredients,
+                        icon: _isChecking
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.search),
+                        label: Text(_isChecking ? 'Checking...' : 'Check Ingredients'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.brown.shade700,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -842,15 +843,6 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Original Members Count: ${_checkedIngredientMenu!['members_count'] ?? 0}',
-                                style: const TextStyle(fontSize: 14, color: Colors.grey),
-                              ),
-                              Text(
-                                'Requested Quantity: ${_checkQuantityController.text}',
-                                style: const TextStyle(fontSize: 14, color: Colors.grey),
-                              ),
                             ],
                           ),
                         ),
@@ -881,11 +873,6 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Original: ${_formatQuantityWithUnit(ing['original_quantity'] as num, ing['unit'] as String)}',
-                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -899,11 +886,6 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
                                       fontWeight: FontWeight.bold,
                                       color: Colors.brown.shade700,
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '× (${_checkQuantityController.text} / ${_checkedIngredientMenu!['members_count'] ?? 1})',
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                                   ),
                                 ],
                               ),

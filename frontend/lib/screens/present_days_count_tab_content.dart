@@ -17,8 +17,8 @@ class PresentDaysCountTabContent extends StatefulWidget {
 }
 
 class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent> {
-  int? _selectedMonth;
-  List<DateTime> _selectedDates = [];
+  DateTime? _fromDatePresent;
+  DateTime? _toDatePresent;
   List<Employee> _employees = [];
   Map<String, double> _presentDaysCount = {}; // Map of employee_id to present days count (supports 0.5 for halfday)
   Map<String, double> _totalOtHours = {}; // Map of employee_id to total OT hours
@@ -31,7 +31,8 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
   @override
   void initState() {
     super.initState();
-    _selectedMonth = DateTime.now().month;
+    _fromDatePresent = DateTime.now();
+    _toDatePresent = DateTime.now();
     if (widget.selectedSector != null || widget.isAdmin) {
       _loadEmployees();
       _loadRentVehicles();
@@ -167,85 +168,54 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
     }
   }
 
-  Future<void> _selectMonth() async {
-    final int? picked = await showDialog<int>(
+
+  Future<void> _selectFromDatePresent() async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Month'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: 12,
-            itemBuilder: (context, index) {
-              final monthNumber = index + 1;
-              final monthNames = [
-                'January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December'
-              ];
-              return ListTile(
-                title: Text(monthNames[index]),
-                selected: monthNumber == _selectedMonth,
-                onTap: () => Navigator.pop(context, monthNumber),
-              );
-            },
-          ),
-        ),
-      ),
+      initialDate: _fromDatePresent ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
     );
     if (picked != null) {
       setState(() {
-        _selectedMonth = picked;
-        _selectedDates = []; // Clear selected dates when month changes
-        _presentDaysCount = {for (var emp in _employees) emp.id: 0.0}; // Reset counts
-        _totalOtHours = {for (var emp in _employees) emp.id: 0.0}; // Reset OT hours
-        _rentVehiclePresentDaysCount = {for (var vehicle in _rentVehicles) vehicle['id'] as int: 0.0}; // Reset rent vehicle counts
-        _miningActivityTotals = {for (var activity in _miningActivities) activity['id'] as int: 0.0}; // Reset mining activity totals
+        _fromDatePresent = picked;
       });
+      if (_fromDatePresent != null && _toDatePresent != null) {
+        _calculatePresentDaysCount();
+      }
     }
   }
 
-  Future<void> _selectDates() async {
-    if (_selectedMonth == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a month first'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    // Calculate the year (use current year or let user select)
-    final now = DateTime.now();
-    final year = now.year;
-    
-    // Calculate number of days in selected month
-    final daysInMonth = DateTime(year, _selectedMonth! + 1, 0).day;
-
-    // Show dialog to select multiple dates
-    final List<DateTime>? pickedDates = await showDialog<List<DateTime>>(
+  Future<void> _selectToDatePresent() async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      builder: (context) => _DateRangePickerDialog(
-        month: _selectedMonth!,
-        year: year,
-        daysInMonth: daysInMonth,
-        initiallySelectedDates: _selectedDates,
-      ),
+      initialDate: _toDatePresent ?? (_fromDatePresent ?? DateTime.now()),
+      firstDate: _fromDatePresent ?? DateTime(2000),
+      lastDate: DateTime(2100),
     );
-
-    if (pickedDates != null) {
+    if (picked != null) {
       setState(() {
-        _selectedDates = List.from(pickedDates)..sort(); // Sort dates
+        _toDatePresent = picked;
       });
-      // Calculate present days count for selected dates
-      await _calculatePresentDaysCount();
+      if (_fromDatePresent != null && _toDatePresent != null) {
+        _calculatePresentDaysCount();
+      }
     }
   }
 
   Future<void> _calculatePresentDaysCount() async {
-    if (_selectedDates.isEmpty) {
+    if (_fromDatePresent == null || _toDatePresent == null) {
       return;
+    }
+
+    // Generate list of dates between from and to date
+    final List<DateTime> dateRange = [];
+    var currentDate = DateTime(_fromDatePresent!.year, _fromDatePresent!.month, _fromDatePresent!.day);
+    final endDate = DateTime(_toDatePresent!.year, _toDatePresent!.month, _toDatePresent!.day);
+    
+    while (currentDate.isBefore(endDate) || currentDate.isAtSameMomentAs(endDate)) {
+      dateRange.add(DateTime(currentDate.year, currentDate.month, currentDate.day));
+      currentDate = currentDate.add(const Duration(days: 1));
     }
 
     // Ensure employees and vehicles are loaded before calculating
@@ -280,8 +250,8 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
       _rentVehiclePresentDaysCount = {for (var vehicle in _rentVehicles) vehicle['id'] as int: 0.0};
       _miningActivityTotals = {for (var activity in _miningActivities) activity['id'] as int: 0.0};
 
-      // Query attendance for each selected date
-      for (var date in _selectedDates) {
+      // Query attendance for each date in range
+      for (var date in dateRange) {
         final dateStr = date.toIso8601String().split('T')[0];
         
         try {
@@ -413,68 +383,94 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
 
   @override
   Widget build(BuildContext context) {
-    final monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-
     return Column(
       children: [
-        // Month and Date Selection
+        // From Date and To Date Selection
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.grey.shade100,
           child: Row(
             children: [
               Expanded(
-                child: InkWell(
-                  onTap: _selectMonth,
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Select Month',
-                      prefixIcon: const Icon(Icons.calendar_month),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: _selectFromDatePresent,
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'From Date',
+                            prefixIcon: const Icon(Icons.calendar_today),
+                            suffixIcon: _fromDatePresent != null
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 18, color: Colors.red),
+                                    onPressed: () {
+                                      setState(() {
+                                        _fromDatePresent = null;
+                                      });
+                                    },
+                                  )
+                                : null,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _fromDatePresent != null
+                                ? _fromDatePresent!.toIso8601String().split('T')[0]
+                                : 'From Date',
+                            style: TextStyle(
+                              color: _fromDatePresent != null ? Colors.black : Colors.grey,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    child: Text(
-                      _selectedMonth != null
-                          ? monthNames[_selectedMonth! - 1]
-                          : 'Select Month',
-                      style: TextStyle(
-                        color: _selectedMonth != null ? Colors.black : Colors.grey,
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
-                child: InkWell(
-                  onTap: _selectDates,
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Select Dates',
-                      prefixIcon: const Icon(Icons.calendar_today),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: _selectToDatePresent,
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'To Date',
+                            prefixIcon: const Icon(Icons.calendar_today),
+                            suffixIcon: _toDatePresent != null
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 18, color: Colors.red),
+                                    onPressed: () {
+                                      setState(() {
+                                        _toDatePresent = null;
+                                      });
+                                    },
+                                  )
+                                : null,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _toDatePresent != null
+                                ? _toDatePresent!.toIso8601String().split('T')[0]
+                                : 'To Date',
+                            style: TextStyle(
+                              color: _toDatePresent != null ? Colors.black : Colors.grey,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    child: Text(
-                      _selectedDates.isEmpty
-                          ? 'Select Dates'
-                          : _selectedDates.length == 1
-                              ? '${_selectedDates.first.day}/${_selectedDates.first.month}/${_selectedDates.first.year}'
-                              : '${_selectedDates.first.day}/${_selectedDates.first.month} - ${_selectedDates.last.day}/${_selectedDates.last.month} (${_selectedDates.length})',
-                      style: TextStyle(
-                        color: _selectedDates.isNotEmpty ? Colors.black : Colors.grey,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
               ),
-              if (_selectedDates.isNotEmpty)
+              if (_fromDatePresent != null && _toDatePresent != null)
                 Padding(
                   padding: const EdgeInsets.only(left: 8.0),
                   child: IconButton(

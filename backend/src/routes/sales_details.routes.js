@@ -131,9 +131,10 @@ router.post('/', async (req, res) => {
       company_staff,
     } = req.body;
 
-    if (!sector_code || !product_name || !quantity || !sale_date) {
+    // Only sector_code and sale_date are required; all other fields are optional
+    if (!sector_code || !sale_date) {
       return res.status(400).json({
-        message: 'Sector code, product name, quantity, and sale date are required'
+        message: 'Sector code and sale date are required'
       });
     }
 
@@ -167,8 +168,8 @@ router.post('/', async (req, res) => {
           name || null,
           contact_number || null,
           address || null,
-          product_name,
-          quantity,
+          product_name || null,
+          quantity || null,
           amount_received || 0,
           credit_amount || 0,
           amount_pending,
@@ -200,8 +201,8 @@ router.post('/', async (req, res) => {
           name || null,
           contact_number || null,
           address || null,
-          product_name,
-          quantity,
+          product_name || null,
+          quantity || null,
           amount_received || 0,
           credit_amount || 0,
           amount_pending,

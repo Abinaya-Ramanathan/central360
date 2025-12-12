@@ -37,6 +37,8 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   bool _isEditModeOverall = false;
   bool _isAdmin = false;
   String _searchQuery = '';
+  final TextEditingController _productionSearchController = TextEditingController();
+  final GlobalKey<State<ProductionTabContent>> _productionTabKey = GlobalKey<State<ProductionTabContent>>();
   bool _sortAscendingDaily = true; // Sort direction for Sector column in Daily Stock
   bool _sortAscendingOverall = true; // Sort direction for Sector column in Overall Stock
   final Map<String, TextEditingController> _dailyQuantityControllers = {};
@@ -73,6 +75,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   @override
   void dispose() {
     _tabController.dispose();
+    _productionSearchController.dispose();
     for (var controller in _dailyQuantityControllers.values) {
       controller.dispose();
     }
@@ -737,37 +740,79 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           // Production Tab
           Column(
             children: [
-              // Date Selection
+              // Search, Date, and Edit Button in same row
               Container(
                 padding: const EdgeInsets.all(16.0),
                 color: Colors.grey.shade100,
-                child: InkWell(
-                  onTap: _selectDate,
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Select Date',
-                      prefixIcon: const Icon(Icons.calendar_today),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _productionSearchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search by product name...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
                       ),
                     ),
-                    child: Text(
-                      _selectedDate != null
-                          ? _selectedDate!.toIso8601String().split('T')[0]
-                          : 'Select Date',
-                      style: TextStyle(
-                        color: _selectedDate != null ? Colors.black : Colors.grey,
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 160,
+                      child: InkWell(
+                        onTap: _selectDate,
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Select Date',
+                            prefixIcon: const Icon(Icons.calendar_today),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _selectedDate != null
+                                ? _selectedDate!.toIso8601String().split('T')[0]
+                                : 'Select Date',
+                            style: TextStyle(
+                              color: _selectedDate != null ? Colors.black : Colors.grey,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : () {
+                        // Trigger edit in ProductionTabContent
+                        final state = _productionTabKey.currentState;
+                        if (state != null) {
+                          // Use dynamic to call the method since the state class is private
+                          (state as dynamic).showEditDialog();
+                        }
+                      },
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Edit', style: TextStyle(fontSize: 16)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               // Production Tab Content
               Expanded(
                 child: ProductionTabContent(
+                  key: _productionTabKey,
                   selectedSector: widget.selectedSector,
                   selectedDate: _selectedDate,
                   isAdmin: _isAdmin,
+                  searchController: _productionSearchController,
                 ),
               ),
             ],
@@ -775,50 +820,92 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           // Daily Stock Tab
           Column(
             children: [
-              // Date Selection
+              // Search, Date, and Edit Button in same row
               Container(
                 padding: const EdgeInsets.all(16),
                 color: Colors.grey.shade100,
-                child: Column(
+                child: Row(
                   children: [
-                    InkWell(
-                      onTap: _selectDate,
-                      child: InputDecorator(
+                    Expanded(
+                      child: TextField(
                         decoration: InputDecoration(
-                          labelText: 'Select Date',
-                          prefixIcon: const Icon(Icons.calendar_today),
+                          hintText: 'Search by Item Name, Vehicle Type, or Part Number',
+                          prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          filled: true,
+                          fillColor: Colors.white,
                         ),
-                        child: Text(
-                          _selectedDate != null
-                              ? DateFormat('dd/MM/yyyy').format(_selectedDate!)
-                              : 'Select Date',
-                          style: TextStyle(
-                            color: _selectedDate != null ? Colors.black : Colors.grey,
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 160,
+                      child: InkWell(
+                        onTap: _selectDate,
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Select Date',
+                            prefixIcon: const Icon(Icons.calendar_today),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _selectedDate != null
+                                ? DateFormat('dd/MM/yyyy').format(_selectedDate!)
+                                : 'Select Date',
+                            style: TextStyle(
+                              color: _selectedDate != null ? Colors.black : Colors.grey,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    // Search Bar
-                    TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search by Item Name, Vehicle Type, or Part Number',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 12),
+                    if (_isEditModeDaily)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : () {
+                              setState(() {
+                                _isEditModeDaily = false;
+                              });
+                            },
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : _saveDailyStock,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Save'),
+                          ),
+                        ],
+                      )
+                    else
+                      ElevatedButton.icon(
+                        onPressed: _isLoading ? null : () {
+                          setState(() {
+                            _isEditModeDaily = true;
+                          });
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber.shade700,
+                          foregroundColor: Colors.white,
                         ),
-                        filled: true,
-                        fillColor: Colors.white,
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                    ),
                   ],
                 ),
               ),
@@ -953,24 +1040,51 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                           ),
                         ),
               ),
-              // Edit Button
+            ],
+          ),
+          // Overall Stock Tab
+          Column(
+            children: [
+              // Search, Edit, and Statement Buttons in same row
               Container(
                 padding: const EdgeInsets.all(16),
-                child: _isEditModeDaily
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                color: Colors.grey.shade100,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search by Item Name, Vehicle Type, or Part Number',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    if (_isEditModeOverall)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           ElevatedButton(
                             onPressed: _isLoading ? null : () {
                               setState(() {
-                                _isEditModeDaily = false;
+                                _isEditModeOverall = false;
                               });
                             },
                             child: const Text('Cancel'),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 8),
                           ElevatedButton(
-                            onPressed: _isLoading ? null : _saveDailyStock,
+                            onPressed: _isLoading ? null : _saveOverallStock,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
@@ -979,44 +1093,36 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                           ),
                         ],
                       )
-                    : ElevatedButton.icon(
-                        onPressed: _isLoading ? null : () {
-                          setState(() {
-                            _isEditModeDaily = true;
-                          });
-                        },
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Edit'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber.shade700,
-                          foregroundColor: Colors.white,
-                        ),
+                    else
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _isLoading ? null : () {
+                              setState(() {
+                                _isEditModeOverall = true;
+                              });
+                            },
+                            icon: const Icon(Icons.edit),
+                            label: const Text('Edit'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber.shade700,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: _isLoading ? null : _generateStatement,
+                            icon: const Icon(Icons.description),
+                            label: const Text('Statement'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.brown.shade700,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
-              ),
-            ],
-          ),
-          // Overall Stock Tab
-          Column(
-            children: [
-              // Search Bar
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: Colors.grey.shade100,
-                child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search by Item Name, Vehicle Type, or Part Number',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
+                  ],
                 ),
               ),
               // Overall Stock Table
@@ -1355,61 +1461,6 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                           ),
                         ),
               ),
-              // Edit and Statement Buttons
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: _isEditModeOverall
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ElevatedButton(
-                            onPressed: _isLoading ? null : () {
-                              setState(() {
-                                _isEditModeOverall = false;
-                              });
-                            },
-                            child: const Text('Cancel'),
-                          ),
-                          const SizedBox(width: 16),
-                          ElevatedButton(
-                            onPressed: _isLoading ? null : _saveOverallStock,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Save'),
-                          ),
-                        ],
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _isLoading ? null : () {
-                              setState(() {
-                                _isEditModeOverall = true;
-                              });
-                            },
-                            icon: const Icon(Icons.edit),
-                            label: const Text('Edit'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.amber.shade700,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          ElevatedButton.icon(
-                            onPressed: _isLoading ? null : _generateStatement,
-                            icon: const Icon(Icons.description),
-                            label: const Text('Statement'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.brown.shade700,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
             ],
           ),
         ],
@@ -1480,9 +1531,24 @@ class _StatementDialogState extends State<_StatementDialog> {
               decoration: InputDecoration(
                 labelText: 'From Date *',
                 hintText: 'Select Date',
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.calendar_today),
-                  onPressed: _selectFromDate,
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_fromDate != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            _fromDate = null;
+                          });
+                        },
+                        tooltip: 'Clear From Date',
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.calendar_today),
+                      onPressed: _selectFromDate,
+                    ),
+                  ],
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1498,9 +1564,24 @@ class _StatementDialogState extends State<_StatementDialog> {
               decoration: InputDecoration(
                 labelText: 'To Date *',
                 hintText: 'Select Date',
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.calendar_today),
-                  onPressed: _selectToDate,
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_toDate != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            _toDate = null;
+                          });
+                        },
+                        tooltip: 'Clear To Date',
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.calendar_today),
+                      onPressed: _selectToDate,
+                    ),
+                  ],
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),

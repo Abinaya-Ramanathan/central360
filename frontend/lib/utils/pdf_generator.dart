@@ -1849,5 +1849,464 @@ class PdfGenerator {
     );
     await _savePdfToDownloads(pdf, fileName);
   }
+
+  // Generate Sales Credit Details PDF from currently visible table data
+  // Helper function to safely convert values to string and remove newlines
+  static String _safeText(dynamic value) {
+    if (value == null) return '';
+    return value.toString().replaceAll('\n', ' ').replaceAll('\r', ' ').trim();
+  }
+
+  static Future<String> generateSalesCreditDetailsPDFFromTable({
+    required List<Map<String, dynamic>> creditData,
+    required Map<int, List<Map<String, dynamic>>> balancePayments,
+    required bool showSector,
+    Map<String, String>? sectorNameMap,
+    String? fileName,
+  }) async {
+    print('PDF Generator: generateSalesCreditDetailsPDFFromTable called');
+    print('PDF Generator: creditData.length = ${creditData.length}');
+    print('PDF Generator: balancePayments.length = ${balancePayments.length}');
+    print('PDF Generator: showSector = $showSector');
+    
+    if (creditData.isEmpty) {
+      print('PDF Generator: WARNING - creditData is empty!');
+    } else {
+      print('PDF Generator: First record keys: ${creditData.first.keys.toList()}');
+      print('PDF Generator: First record: ${creditData.first}');
+    }
+    
+    final pdf = pw.Document();
+    
+    // Load Unicode-capable fonts
+    final unicodeFont = await _loadUnicodeFont();
+    final unicodeFontBold = await _loadUnicodeFontBold();
+    
+    final headerStyle = pw.TextStyle(font: unicodeFontBold, fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.black);
+    final cellStyle = pw.TextStyle(font: unicodeFont, fontSize: 9, color: PdfColors.black);
+    final boldCellStyle = pw.TextStyle(font: unicodeFontBold, fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.black);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (pw.Context context) {
+          print('PDF Generator: Building PDF page, creditData.length = ${creditData.length}');
+          final List<pw.TableRow> tableRows = [];
+          
+          // Build header row
+          final List<pw.Widget> headerCells = [];
+          if (showSector) {
+            headerCells.add(pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Sector', style: headerStyle)));
+          }
+          headerCells.addAll([
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Name', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Company Staff', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Contact', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Address', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Product', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Quantity', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Amount Pending', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Credit Date', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Balance Paid', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Balance Date', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Overall Balance', style: headerStyle)),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Details', style: headerStyle)),
+          ]);
+          
+          // Verify header has correct number of cells
+          final expectedHeaderCells = showSector ? 13 : 12;
+          if (headerCells.length != expectedHeaderCells) {
+            print('PDF Generator: ERROR - Header has ${headerCells.length} cells, expected $expectedHeaderCells');
+            while (headerCells.length < expectedHeaderCells) {
+              headerCells.add(pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('MISSING', style: headerStyle)));
+            }
+          }
+          
+          print('PDF Generator: Header row has ${headerCells.length} cells');
+          
+          tableRows.add(
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+              children: headerCells,
+            ),
+          );
+          
+          // Build data rows
+          double totalOverallBalance = 0.0;
+          
+          print('PDF Generator: Starting to build ${creditData.length} data rows');
+          for (var record in creditData) {
+            try {
+              print('PDF Generator: Processing record: $record');
+              final recordIdValue = record['id'];
+              print('PDF Generator: recordIdValue = $recordIdValue (type: ${recordIdValue.runtimeType})');
+              
+              int? recordId;
+              if (recordIdValue is int) {
+                recordId = recordIdValue;
+              } else if (recordIdValue is String) {
+                recordId = int.tryParse(recordIdValue);
+              } else if (recordIdValue != null) {
+                recordId = int.tryParse(recordIdValue.toString());
+              }
+              
+              if (recordId == null) {
+                print('PDF Generator: WARNING - record has no valid id, skipping. Record: $record');
+                continue;
+              }
+              
+              print('PDF Generator: Using recordId = $recordId');
+              final amountPending = _parseAmountValue(record['amount_pending']);
+              print('PDF Generator: amountPending = $amountPending');
+              final saleDateStr = _formatDateForPDF(record['sale_date']);
+              print('PDF Generator: saleDateStr = $saleDateStr');
+              final payments = balancePayments[recordId] ?? [];
+              print('PDF Generator: payments.length = ${payments.length}');
+              
+              // Calculate total paid and overall balance
+              double totalPaid = 0.0;
+              for (var payment in payments) {
+                totalPaid += _parseAmountValue(payment['balance_paid']);
+              }
+              final overallBalance = amountPending - totalPaid;
+              totalOverallBalance += overallBalance;
+              
+              // Get last payment date
+              String balancePaidDateStr = 'N/A';
+              if (payments.isNotEmpty && payments.last['balance_paid_date'] != null) {
+                balancePaidDateStr = _formatDateForPDF(payments.last['balance_paid_date']);
+              }
+              
+              // Build main row cells
+              List<pw.Widget> rowCells = [];
+              if (showSector) {
+                final sectorCode = record['sector_code']?.toString() ?? '';
+                final sectorName = sectorNameMap?[sectorCode] ?? sectorCode;
+                rowCells.add(pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_safeText(sectorName), style: cellStyle),
+                ));
+              }
+              rowCells.addAll([
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_safeText(record['name']), style: cellStyle),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(
+                    (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? 'Yes' : 'No',
+                    style: cellStyle,
+                  ),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_safeText(record['contact_number']) == '' ? 'N/A' : _safeText(record['contact_number']), style: cellStyle),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_safeText(record['address']) == '' ? 'N/A' : _safeText(record['address']), style: cellStyle),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_safeText(record['product_name']), style: cellStyle),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_safeText(record['quantity']), style: cellStyle),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(
+                    _formatAmountForPDF(amountPending),
+                    style: boldCellStyle.copyWith(color: PdfColors.red),
+                  ),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_safeText(saleDateStr), style: cellStyle),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_formatAmountForPDF(totalPaid), style: cellStyle),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_safeText(balancePaidDateStr), style: cellStyle),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(
+                    _formatAmountForPDF(overallBalance),
+                    style: boldCellStyle.copyWith(color: overallBalance > 0 ? PdfColors.red : PdfColors.green),
+                  ),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(_safeText(record['details']), style: cellStyle),
+                ),
+              ]);
+              
+              // CRITICAL: Ensure we have the EXACT correct number of cells
+              // PDF tables REQUIRE all rows to have the same cell count
+              final expectedCells = showSector ? 13 : 12;
+              if (rowCells.length != expectedCells) {
+                print('PDF Generator: ERROR - Row has ${rowCells.length} cells, expected $expectedCells for recordId $recordId');
+                // Pad or trim to match expected count - this is CRITICAL
+                while (rowCells.length < expectedCells) {
+                  rowCells.add(pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)));
+                }
+                if (rowCells.length > expectedCells) {
+                  rowCells = rowCells.sublist(0, expectedCells);
+                }
+                print('PDF Generator: Fixed row to have ${rowCells.length} cells');
+              }
+              
+              // Verify cell count matches exactly
+              if (rowCells.length != expectedCells) {
+                print('PDF Generator: CRITICAL ERROR - Row still has ${rowCells.length} cells after fix!');
+                // Force fix by recreating with exact count
+                final fixedCells = <pw.Widget>[];
+                for (int i = 0; i < expectedCells; i++) {
+                  if (i < rowCells.length) {
+                    fixedCells.add(rowCells[i]);
+                  } else {
+                    fixedCells.add(pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)));
+                  }
+                }
+                rowCells = fixedCells;
+              }
+              
+              tableRows.add(
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.blue200),
+                  children: rowCells,
+                ),
+              );
+              
+              print('PDF Generator: Successfully added main row for recordId $recordId with ${rowCells.length} cells. Total rows now: ${tableRows.length}');
+              
+              // Add payment sub-rows if any
+              for (var payment in payments) {
+                final paymentBalancePaid = _parseAmountValue(payment['balance_paid']);
+                final paymentDate = _formatDateForPDF(payment['balance_paid_date']);
+                final paymentDetails = _safeText(payment['details']);
+                
+                List<pw.Widget> paymentCells = [];
+                final expectedPaymentCells = showSector ? 13 : 12;
+                
+                if (showSector) {
+                  paymentCells.add(pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)));
+                }
+                paymentCells.addAll([
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Name
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Company Staff
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Contact
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Address
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Product
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Quantity
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Amount Pending
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Credit Date
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(6),
+                    child: pw.Text(_formatAmountForPDF(paymentBalancePaid), style: cellStyle),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(6),
+                    child: pw.Text(_safeText(paymentDate), style: cellStyle),
+                  ),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Overall Balance
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(6),
+                    child: pw.Text(_safeText(paymentDetails), style: cellStyle),
+                  ),
+                ]);
+                
+                // CRITICAL: Ensure payment row has EXACT correct number of cells
+                if (paymentCells.length != expectedPaymentCells) {
+                  print('PDF Generator: ERROR - Payment row has ${paymentCells.length} cells, expected $expectedPaymentCells');
+                  while (paymentCells.length < expectedPaymentCells) {
+                    paymentCells.add(pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)));
+                  }
+                  if (paymentCells.length > expectedPaymentCells) {
+                    paymentCells = paymentCells.sublist(0, expectedPaymentCells);
+                  }
+                }
+                
+                tableRows.add(
+                  pw.TableRow(
+                    children: paymentCells,
+                  ),
+                );
+              }
+            } catch (e, stackTrace) {
+              print('PDF Generator: ERROR generating PDF row: $e');
+              print('PDF Generator: Stack trace: $stackTrace');
+              print('PDF Generator: Problematic record: $record');
+              // Continue to next record instead of breaking
+            }
+          }
+          
+          print('PDF Generator: Built ${tableRows.length} data rows before adding total (should be ${creditData.length + 1} if all succeeded)');
+          print('PDF Generator: Total overall balance: $totalOverallBalance');
+          
+          // Add total row - CRITICAL: Must have EXACT same cell count as other rows
+          List<pw.Widget> totalCells = [];
+          final expectedTotalCells = showSector ? 13 : 12;
+          
+          if (showSector) {
+            totalCells.add(pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)));
+          }
+          totalCells.addAll([
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(6),
+              child: pw.Text(
+                'TOTAL (${creditData.length})',
+                style: boldCellStyle,
+              ),
+            ),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Company Staff
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Contact
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Address
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Product
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Quantity
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Amount Pending
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Credit Date
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Balance Paid
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Balance Date
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(6),
+              child: pw.Text(
+                _formatAmountForPDF(totalOverallBalance),
+                style: boldCellStyle.copyWith(color: totalOverallBalance > 0 ? PdfColors.red : PdfColors.green),
+              ),
+            ),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)), // Details
+          ]);
+          
+          // CRITICAL: Verify total row has exact cell count
+          if (totalCells.length != expectedTotalCells) {
+            print('PDF Generator: ERROR - Total row has ${totalCells.length} cells, expected $expectedTotalCells');
+            while (totalCells.length < expectedTotalCells) {
+              totalCells.add(pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('', style: cellStyle)));
+            }
+            if (totalCells.length > expectedTotalCells) {
+              totalCells = totalCells.sublist(0, expectedTotalCells);
+            }
+          }
+          
+          tableRows.add(
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+              children: totalCells,
+            ),
+          );
+          
+          // Final verification: All rows must have same cell count
+          final firstRowCellCount = tableRows.isNotEmpty ? tableRows.first.children.length : 0;
+          bool allRowsMatch = true;
+          for (int i = 0; i < tableRows.length; i++) {
+            if (tableRows[i].children.length != firstRowCellCount) {
+              print('PDF Generator: CRITICAL ERROR - Row $i has ${tableRows[i].children.length} cells, but first row has $firstRowCellCount');
+              allRowsMatch = false;
+            }
+          }
+          if (allRowsMatch) {
+            print('PDF Generator: SUCCESS - All ${tableRows.length} rows have exactly $firstRowCellCount cells each');
+          } else {
+            print('PDF Generator: CRITICAL ERROR - Row cell counts do not match! Table will not render!');
+          }
+          
+          print('PDF Generator: Final tableRows.length = ${tableRows.length}');
+          print('PDF Generator: creditData.length = ${creditData.length}');
+          print('PDF Generator: Will show table: ${tableRows.length > 1}');
+          
+          // Calculate expected rows: 1 header + N data rows + 1 total = N + 2
+          final expectedRows = creditData.length + 2;
+          final hasDataRows = tableRows.length > 2; // More than just header + total
+          
+          print('PDF Generator: Expected rows: $expectedRows, Actual rows: ${tableRows.length}, Has data: $hasDataRows');
+          
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(20),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Sales Credit Details',
+                  style: pw.TextStyle(font: unicodeFontBold, fontSize: 18, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 10),
+                // Debug info
+                pw.Text(
+                  'Records: ${creditData.length} | Table Rows: ${tableRows.length} | Balance Payments: ${balancePayments.length}',
+                  style: pw.TextStyle(font: unicodeFont, fontSize: 8, color: PdfColors.grey),
+                ),
+                pw.SizedBox(height: 20),
+                // Test: Show a simple table first to verify rendering works
+                if (tableRows.isNotEmpty)
+                  pw.Text(
+                    'Table Debug: ${tableRows.length} rows, Header cells: ${tableRows.first.children.length}, First data row cells: ${tableRows.length > 1 ? tableRows[1].children.length : 0}',
+                    style: pw.TextStyle(font: unicodeFont, fontSize: 8, color: PdfColors.grey),
+                  ),
+                pw.SizedBox(height: 10),
+                // Always show table if we have rows, even if it's just header + total
+                tableRows.length > 1
+                    ? pw.Table(
+                        border: pw.TableBorder.all(color: PdfColors.black, width: 1),
+                        defaultColumnWidth: const pw.FlexColumnWidth(1.0),
+                        columnWidths: showSector
+                            ? {
+                                0: const pw.FlexColumnWidth(0.8), // Sector
+                                1: const pw.FlexColumnWidth(1.2), // Name
+                                2: const pw.FlexColumnWidth(0.8), // Company Staff
+                                3: const pw.FlexColumnWidth(1.0), // Contact
+                                4: const pw.FlexColumnWidth(1.5), // Address
+                                5: const pw.FlexColumnWidth(1.0), // Product
+                                6: const pw.FlexColumnWidth(0.8), // Quantity
+                                7: const pw.FlexColumnWidth(1.0), // Amount Pending
+                                8: const pw.FlexColumnWidth(1.0), // Credit Date
+                                9: const pw.FlexColumnWidth(1.0), // Balance Paid
+                                10: const pw.FlexColumnWidth(1.0), // Balance Date
+                                11: const pw.FlexColumnWidth(1.0), // Overall Balance
+                                12: const pw.FlexColumnWidth(1.5), // Details
+                              }
+                            : {
+                                0: const pw.FlexColumnWidth(1.2), // Name
+                                1: const pw.FlexColumnWidth(0.8), // Company Staff
+                                2: const pw.FlexColumnWidth(1.0), // Contact
+                                3: const pw.FlexColumnWidth(1.5), // Address
+                                4: const pw.FlexColumnWidth(1.0), // Product
+                                5: const pw.FlexColumnWidth(0.8), // Quantity
+                                6: const pw.FlexColumnWidth(1.0), // Amount Pending
+                                7: const pw.FlexColumnWidth(1.0), // Credit Date
+                                8: const pw.FlexColumnWidth(1.0), // Balance Paid
+                                9: const pw.FlexColumnWidth(1.0), // Balance Date
+                                10: const pw.FlexColumnWidth(1.0), // Overall Balance
+                                11: const pw.FlexColumnWidth(1.5), // Details
+                              },
+                        children: tableRows,
+                      )
+                    : pw.Padding(
+                        padding: const pw.EdgeInsets.all(20),
+                        child: pw.Text(
+                          'No data to display. creditData.length=${creditData.length}, tableRows.length=${tableRows.length}',
+                          style: pw.TextStyle(fontSize: 12, fontStyle: pw.FontStyle.italic),
+                        ),
+                      ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    
+    final defaultFileName = 'Sales_Credit_Details.pdf';
+    final finalFileName = fileName != null 
+        ? _sanitizeFileName('$fileName.pdf')
+        : _sanitizeFileName(defaultFileName);
+    final filePath = await _savePdfToDownloads(pdf, finalFileName);
+    return filePath;
+  }
 }
 

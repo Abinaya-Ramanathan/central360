@@ -1,11 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
 import '../utils/ui_helpers.dart';
 import '../utils/pdf_generator.dart';
+import '../config/env_config.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -34,13 +39,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   DateTime? _selectedDate;
   List<Map<String, dynamic>> _salesData = [];
   bool _isLoadingSales = false;
-  bool _isGeneratingPDF = false;
   final Map<int, bool> _editModeSales = {};
   final Map<int, Map<String, TextEditingController>> _controllersSales = {};
   final Map<int, bool> _companyStaffValues = {}; // Store company_staff values for editing
   bool _salesSectorSortAscending = true; // Sort direction for Sector column in Sales Details
   
-  // Credit Details Tab State
+  // Customer Credit Details Tab State
   List<Map<String, dynamic>> _creditData = [];
   List<Map<String, dynamic>> _filteredCreditData = [];
   bool _isLoadingCredit = false;
@@ -48,7 +52,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   bool _creditDateSortAscending = true; // true = ascending (oldest first), false = descending (newest first)
   bool _creditSectorSortAscending = true; // Sort direction for Sector column in Credit Details
   String? _selectedCompanyStaffFilterCredit; // null, 'true', or 'false' for Customer Credit Details tab
-  Set<String> _selectedMonthsCredit = {}; // Set of 'YYYY-MM' strings for multiple month selection
+  DateTime? _fromDateCredit; // From date for Sales Credit Details filter
+  DateTime? _toDateCredit; // To date for Sales Credit Details filter
   final Map<int, bool> _editModeCredit = {}; // Track which rows are in edit mode (key = record ID)
   final Map<int, TextEditingController> _balancePaidControllers = {}; // Controllers for Balance Paid field (key = record ID or payment ID)
   final Map<int, DateTime?> _balancePaidDates = {}; // Selected dates for Balance Paid Date (key = record ID or payment ID)
@@ -58,21 +63,78 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   final Map<String, TextEditingController> _newPaymentControllers = {}; // Controllers for new payment rows (key = "saleId_new")
   final Map<String, DateTime?> _newPaymentDates = {}; // Dates for new payment rows (key = "saleId_new")
   final Map<String, TextEditingController> _newPaymentDetailsControllers = {}; // Details controllers for new payment rows (key = "saleId_new")
+  
+  // Purchase Details Tab State
+  DateTime? _selectedDatePurchase; // Separate date for purchase details
+  List<Map<String, dynamic>> _purchaseData = [];
+  bool _isLoadingPurchase = false;
+  final Map<int, bool> _editModePurchase = {};
+  final Map<int, Map<String, TextEditingController>> _controllersPurchase = {};
+  final Map<int, List<Map<String, dynamic>>> _purchasePhotos = {}; // Store photos for each purchase
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _purchasesSectorSortAscending = true; // Sort direction for Sector column in Purchase Details
+  
+  // Company Credit Details Tab State (from purchases)
+  List<Map<String, dynamic>> _companyCreditData = [];
+  List<Map<String, dynamic>> _filteredCompanyCreditData = [];
+  bool _isLoadingCompanyCredit = false;
+  final TextEditingController _companyCreditSearchController = TextEditingController();
+  DateTime? _fromDateCompanyCredit; // From date for Purchase Credit Details filter
+  DateTime? _toDateCompanyCredit; // To date for Purchase Credit Details filter
+  bool _companyCreditDateSortAscending = true; // true = ascending (oldest first), false = descending (newest first)
+  bool _companyCreditSectorSortAscending = true; // Sort direction for Sector column in Company Credit Details
+  final Map<int, bool> _editModeCompanyCredit = {}; // Track which rows are in edit mode (key = record ID)
+  final Map<int, TextEditingController> _companyBalancePaidControllers = {}; // Controllers for Balance Paid field (key = record ID or payment ID)
+  final Map<int, DateTime?> _companyBalancePaidDates = {}; // Selected dates for Balance Paid Date (key = record ID or payment ID)
+  final Map<int, TextEditingController> _companyDetailsControllers = {}; // Controllers for Details field (key = record ID or payment ID)
+  final Map<int, List<Map<String, dynamic>>> _companyCreditPhotos = {}; // Store photos for credit records
+  final Map<int, List<Map<String, dynamic>>> _companyBalancePayments = {}; // Store balance payments for each credit record (key = purchase_id)
+  final Map<int, bool> _addingNewCompanyPayment = {}; // Track if a new payment row is being added (key = purchase_id)
+  final Map<String, TextEditingController> _newCompanyPaymentControllers = {}; // Controllers for new payment rows (key = "purchaseId_new")
+  final Map<String, DateTime?> _newCompanyPaymentDates = {}; // Dates for new payment rows (key = "purchaseId_new")
+  final Map<String, TextEditingController> _newCompanyPaymentDetailsControllers = {}; // Details controllers for new payment rows (key = "purchaseId_new")
+  
+  // Overall Summary Tab State
+  DateTime? _fromDate;
+  DateTime? _toDate;
+  List<Map<String, dynamic>> _allSalesDataForSummary = [];
+  List<Map<String, dynamic>> _allPurchaseDataForSummary = [];
+  bool _isLoadingSummary = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _isAdmin = AuthService.isAdmin;
     _selectedDate = DateTime.now();
+    _selectedDatePurchase = DateTime.now();
+    _fromDate = DateTime.now();
+    _toDate = DateTime.now();
+    _fromDateCredit = DateTime.now();
+    _toDateCredit = DateTime.now();
+    _fromDateCompanyCredit = DateTime.now();
+    _toDateCompanyCredit = DateTime.now();
     _loadSectors();
     _loadSalesData();
     _loadCreditData();
+    _loadPurchaseData();
+    _loadCompanyCreditData();
     
-    // Reload credit data when switching to Credit Details tab
+    // Reload data when switching tabs
     _tabController.addListener(() {
-      if (_tabController.index == 1 && !_tabController.indexIsChanging) {
-        _loadCreditData();
+      if (!_tabController.indexIsChanging) {
+        if (_tabController.index == 0) {
+          _loadSalesData(); // Sales Details - reload when switching to this tab
+        } else if (_tabController.index == 1) {
+          _loadCreditData(); // Sales Credit Details
+        } else if (_tabController.index == 2) {
+          _loadPurchaseData(); // Purchase Details
+        } else if (_tabController.index == 3) {
+          _loadCompanyCreditData(); // Purchase Credit Details
+        } else if (_tabController.index == 4) {
+          // Overall Summary tab - load all data for date range filtering
+          _loadAllDataForSummary();
+        }
       }
     });
   }
@@ -96,6 +158,26 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       controller.dispose();
     }
     for (var controller in _newPaymentDetailsControllers.values) {
+      controller.dispose();
+    }
+    // Purchase Details cleanup
+    for (var controllers in _controllersPurchase.values) {
+      for (var controller in controllers.values) {
+        controller.dispose();
+      }
+    }
+    // Company Credit Details cleanup
+    _companyCreditSearchController.dispose();
+    for (var controller in _companyBalancePaidControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _companyDetailsControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _newCompanyPaymentControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _newCompanyPaymentDetailsControllers.values) {
       controller.dispose();
     }
     super.dispose();
@@ -123,138 +205,32 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     return sector.name;
   }
 
-  Future<void> _showMonthYearPickerCredit() async {
-    final now = DateTime.now();
-    int selectedYear = now.year;
-    Set<String> tempSelectedMonths = Set.from(_selectedMonthsCredit);
-    
-    final result = await showDialog<Set<String>>(
+  Future<void> _selectFromDateCredit() async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Select Months'),
-          content: SingleChildScrollView(
-            child: SizedBox(
-              width: 400,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Year selector
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.chevron_left),
-                        onPressed: () {
-                          setDialogState(() {
-                            selectedYear--;
-                          });
-                        },
-                      ),
-                      Text(
-                        selectedYear.toString(),
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.chevron_right),
-                        onPressed: () {
-                          setDialogState(() {
-                            selectedYear++;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Month grid
-                  SizedBox(
-                    height: 280,
-                    child: GridView.builder(
-                      shrinkWrap: false,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: 2.5,
-                      ),
-                      itemCount: 12,
-                      itemBuilder: (context, index) {
-                        final month = index + 1;
-                        final monthKey = '$selectedYear-${month.toString().padLeft(2, '0')}';
-                        final isSelected = tempSelectedMonths.contains(monthKey);
-                        final monthNames = [
-                          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-                        ];
-                        
-                        return InkWell(
-                          onTap: () {
-                            setDialogState(() {
-                              if (isSelected) {
-                                tempSelectedMonths.remove(monthKey);
-                              } else {
-                                tempSelectedMonths.add(monthKey);
-                              }
-                            });
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: isSelected ? Colors.blue.shade700 : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isSelected ? Colors.blue.shade900 : Colors.grey.shade400,
-                                width: 2,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                monthNames[index],
-                                style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.black87,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Clear all button
-                  if (tempSelectedMonths.isNotEmpty)
-                    TextButton(
-                      onPressed: () {
-                        setDialogState(() {
-                          tempSelectedMonths.clear();
-                        });
-                      },
-                      child: const Text('Clear All'),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, tempSelectedMonths),
-              child: const Text('Apply'),
-            ),
-          ],
-        ),
-      ),
+      initialDate: _fromDateCredit ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
     );
-    
-    if (result != null) {
+    if (picked != null) {
       setState(() {
-        _selectedMonthsCredit = result;
+        _fromDateCredit = picked;
       });
-      // Apply filter with current search query to preserve both month and search filters
+      _filterCreditData(_creditSearchController.text);
+    }
+  }
+
+  Future<void> _selectToDateCredit() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _toDateCredit ?? (_fromDateCredit ?? DateTime.now()),
+      firstDate: _fromDateCredit ?? DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _toDateCredit = picked;
+      });
       _filterCreditData(_creditSearchController.text);
     }
   }
@@ -340,55 +316,23 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         // Store all credits (with company staff filter applied from backend) in _creditData
         _creditData = List.from(credits);
         
-        // Apply all filters (month, search) to get the final filtered data
+        // Apply all filters (date range, search) to get the final filtered data
         // Start with the data that already has company staff filter applied
         List<Map<String, dynamic>> finalFiltered = List.from(credits);
         
-        // Apply month filter if months are selected
-        if (_selectedMonthsCredit.isNotEmpty) {
+        // Apply date range filter if dates are selected
+        if (_fromDateCredit != null || _toDateCredit != null) {
           finalFiltered = finalFiltered.where((record) {
-            final saleDate = record['sale_date'];
+            final saleDate = _parseDateFromRecord(record['sale_date']);
             if (saleDate == null) return false;
             
-            String dateStr;
-            try {
-              if (saleDate is DateTime) {
-                dateStr = '${saleDate.year}-${saleDate.month.toString().padLeft(2, '0')}';
-              } else if (saleDate is String) {
-                String dateString = saleDate;
-                if (dateString.contains('T')) {
-                  dateString = dateString.split('T')[0];
-                }
-                if (dateString.contains(' ')) {
-                  dateString = dateString.split(' ')[0];
-                }
-                
-                final parsed = DateTime.tryParse(dateString);
-                if (parsed == null) {
-                  final parts = dateString.split('-');
-                  if (parts.length >= 2) {
-                    final year = int.tryParse(parts[0]);
-                    final month = int.tryParse(parts[1]);
-                    if (year != null && month != null) {
-                      dateStr = '$year-${month.toString().padLeft(2, '0')}';
-                    } else {
-                      return false;
-                    }
-                  } else {
-                    return false;
-                  }
-                } else {
-                  dateStr = '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}';
-                }
-              } else {
-                return false;
-              }
-            } catch (e) {
-              print('Error parsing sale_date: $saleDate, error: $e');
-              return false;
-            }
+            final saleDateOnly = DateTime(saleDate.year, saleDate.month, saleDate.day);
+            final fromDateOnly = _fromDateCredit != null ? DateTime(_fromDateCredit!.year, _fromDateCredit!.month, _fromDateCredit!.day) : null;
+            final toDateOnly = _toDateCredit != null ? DateTime(_toDateCredit!.year, _toDateCredit!.month, _toDateCredit!.day) : null;
             
-            return _selectedMonthsCredit.contains(dateStr);
+            if (fromDateOnly != null && saleDateOnly.isBefore(fromDateOnly)) return false;
+            if (toDateOnly != null && saleDateOnly.isAfter(toDateOnly)) return false;
+            return true;
           }).toList();
         }
         
@@ -741,51 +685,19 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     setState(() {
       List<Map<String, dynamic>> filtered = List.from(_creditData);
       
-      // Apply month filter if months are selected
-      if (_selectedMonthsCredit.isNotEmpty) {
+      // Apply date range filter if dates are selected
+      if (_fromDateCredit != null || _toDateCredit != null) {
         filtered = filtered.where((record) {
-          final saleDate = record['sale_date'];
+          final saleDate = _parseDateFromRecord(record['sale_date']);
           if (saleDate == null) return false;
           
-          String dateStr;
-          try {
-            if (saleDate is DateTime) {
-              dateStr = '${saleDate.year}-${saleDate.month.toString().padLeft(2, '0')}';
-            } else if (saleDate is String) {
-              // Handle different date formats from PostgreSQL
-              String dateString = saleDate;
-              if (dateString.contains('T')) {
-                dateString = dateString.split('T')[0];
-              }
-              if (dateString.contains(' ')) {
-                dateString = dateString.split(' ')[0];
-              }
-              
-              final parsed = DateTime.tryParse(dateString);
-              if (parsed == null) {
-                final parts = dateString.split('-');
-                if (parts.length >= 2) {
-                  final year = int.tryParse(parts[0]);
-                  final month = int.tryParse(parts[1]);
-                  if (year != null && month != null) {
-                    dateStr = '$year-${month.toString().padLeft(2, '0')}';
-                  } else {
-                    return false;
-                  }
-                } else {
-                  return false;
-                }
-              } else {
-                dateStr = '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}';
-              }
-            } else {
-              return false;
-            }
-          } catch (e) {
-            return false;
-          }
+          final saleDateOnly = DateTime(saleDate.year, saleDate.month, saleDate.day);
+          final fromDateOnly = _fromDateCredit != null ? DateTime(_fromDateCredit!.year, _fromDateCredit!.month, _fromDateCredit!.day) : null;
+          final toDateOnly = _toDateCredit != null ? DateTime(_toDateCredit!.year, _toDateCredit!.month, _toDateCredit!.day) : null;
           
-          return _selectedMonthsCredit.contains(dateStr);
+          if (fromDateOnly != null && saleDateOnly.isBefore(fromDateOnly)) return false;
+          if (toDateOnly != null && saleDateOnly.isAfter(toDateOnly)) return false;
+          return true;
         }).toList();
       }
       
@@ -929,7 +841,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
               TextFormField(
                 controller: productController,
                 decoration: const InputDecoration(
-                  labelText: 'Product Name *',
+                  labelText: 'Product Name',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -937,7 +849,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
               TextFormField(
                 controller: quantityController,
                 decoration: const InputDecoration(
-                  labelText: 'Quantity *',
+                  labelText: 'Quantity',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -984,18 +896,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           ),
           FilledButton(
             onPressed: () {
-              if (productController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Product Name is required')),
-                );
-                return;
-              }
-              if (quantityController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Quantity is required')),
-                );
-                return;
-              }
               Navigator.pop(context, true);
             },
             child: const Text('Add'),
@@ -1043,26 +943,39 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     setState(() => _isLoadingSales = true);
     try {
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
-      final record = {
-        'sector_code': widget.selectedSector,
+      
+      // All fields except sector_code and sale_date are optional
+      final recordToSave = {
+        'sector_code': widget.selectedSector ?? '',
         'name': name.isEmpty ? null : name,
         'contact_number': contact.isEmpty ? null : contact,
         'address': address.isEmpty ? null : address,
-        'product_name': productName,
-        'quantity': quantity,
+        'product_name': productName.isEmpty ? null : productName, // Optional field
+        'quantity': quantity.isEmpty ? null : quantity, // Optional field
         'amount_received': amountReceived,
         'credit_amount': creditAmount,
         'sale_date': dateStr,
         'company_staff': companyStaff,
       };
 
-      await ApiService.saveSalesDetails(record);
+      await ApiService.saveSalesDetails(recordToSave);
+      
+      // Add a small delay to ensure backend has committed the transaction
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Reload sales data to show the newly added record
       await _loadSalesData();
-      await _loadCreditData(); // Reload credit data as well
+      
+      // Also reload credit data as it might be affected
+      await _loadCreditData();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sales details added successfully')),
+          const SnackBar(
+            content: Text('Sales details added successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -1139,18 +1052,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     if (!_controllersSales.containsKey(index)) return;
 
     final controllers = _controllersSales[index]!;
-    if (controllers['product_name']!.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Product Name is required'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-    if (controllers['quantity']!.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Quantity is required'), backgroundColor: Colors.red),
-      );
-      return;
-    }
+    // All fields are optional - no validation required
 
     setState(() => _isLoadingSales = true);
     try {
@@ -1227,8 +1129,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         'address': controllers['address']!.text.trim().isEmpty
             ? null
             : controllers['address']!.text.trim(),
-        'product_name': controllers['product_name']!.text.trim(),
-        'quantity': controllers['quantity']!.text.trim(),
+        'product_name': controllers['product_name']!.text.trim().isEmpty ? null : controllers['product_name']!.text.trim(),
+        'quantity': controllers['quantity']!.text.trim().isEmpty ? null : controllers['quantity']!.text.trim(),
         'amount_received': _parseDecimal(controllers['amount_received']!.text),
         'credit_amount': newCreditAmount,
         'sale_date': saleDateToUse, // Use selected date - this becomes the Credit Taken Date
@@ -1325,7 +1227,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sales and Credit details of Customer'),
+        title: const Text('Sales Purchase and Credit Details'),
         backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
         bottom: TabBar(
@@ -1333,9 +1235,13 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.orange,
+          isScrollable: true,
           tabs: const [
             Tab(text: 'Sales Details'),
-            Tab(text: 'Customer Credit Details'),
+            Tab(text: 'Sales Credit Details'),
+            Tab(text: 'Purchase Details'),
+            Tab(text: 'Purchase Credit Details'),
+            Tab(text: 'Overall Summary'),
           ],
         ),
         actions: [
@@ -1429,8 +1335,14 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         children: [
           // Sales Details Tab
           _buildSalesDetailsTab(),
-          // Credit Details Tab
+          // Sales Credit Details Tab
           _buildCreditDetailsTab(),
+          // Purchase Details Tab
+          _buildPurchaseDetailsTab(),
+          // Purchase Credit Details Tab
+          _buildCompanyCreditDetailsTab(),
+          // Overall Income Expense and Credit Details Tab
+          _buildOverallIncomeExpenseTab(),
         ],
       ),
     );
@@ -1439,7 +1351,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   Widget _buildSalesDetailsTab() {
     return Column(
       children: [
-        // Date Selection
+        // Date Selection and Add Sales Button
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.grey.shade100,
@@ -1461,6 +1373,20 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                           ? _selectedDate!.toIso8601String().split('T')[0]
                           : 'Select Date',
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              SizedBox(
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoadingSales ? null : _showAddSalesDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Sales Details', style: TextStyle(fontSize: 16)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
@@ -1526,14 +1452,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 const DataColumn(label: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Amount Received', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Credit Amount', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Amount Pending', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
                               rows: _salesData.asMap().entries.map((entry) {
                                 final index = entry.key;
                                 final record = entry.value;
                                 final isEditMode = _editModeSales[index] == true;
-                                final amountPending = _parseDecimal(record['amount_pending']);
 
                                 return DataRow(
                                   cells: [
@@ -1678,15 +1602,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                           : Text('₹${_parseDecimal(record['credit_amount']).toStringAsFixed(2)}'),
                                     ),
                                     DataCell(
-                                      Text(
-                                        '₹${amountPending.toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: amountPending > 0 ? Colors.red : Colors.green,
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
                                       isEditMode
                                           ? Row(
                                               mainAxisSize: MainAxisSize.min,
@@ -1725,24 +1640,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                               }).toList(),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-        ),
-        // Add Sales Button
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _isLoadingSales ? null : _showAddSalesDialog,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Sales Details', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),
@@ -1761,12 +1658,18 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           color: Colors.grey.shade100,
           child: Column(
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
+                  const Text(
                     'Customer with outstanding credit',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.download, size: 24),
+                    tooltip: 'Download PDF',
+                    onPressed: _isLoadingCredit ? null : _downloadCreditDetailsPDF,
+                    color: Colors.blue.shade700,
                   ),
                 ],
               ),
@@ -1835,80 +1738,86 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Month/Year Picker Button
+                  // From Date Picker
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                   SizedBox(
-                    width: 180,
+                        width: 160,
                     height: 56,
-                    child: OutlinedButton.icon(
-                      onPressed: _showMonthYearPickerCredit,
-                      icon: const Icon(Icons.calendar_today),
-                      label: Text(
-                        _selectedMonthsCredit.isEmpty
-                            ? 'Select Months'
-                            : _selectedMonthsCredit.length == 1
-                                ? _selectedMonthsCredit.first
-                                : '${_selectedMonthsCredit.length} Months',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
+                        child: InkWell(
+                          onTap: _selectFromDateCredit,
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'From Date',
+                              prefixIcon: const Icon(Icons.calendar_today, size: 18),
+                              border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        side: BorderSide(color: _selectedMonthsCredit.isEmpty ? Colors.grey : Colors.blue),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Download Button
-                  SizedBox(
-                    width: 200,
-                    height: 56,
-                    child: ElevatedButton.icon(
-                      onPressed: _isGeneratingPDF ? null : _downloadCurrentPageData,
-                      icon: _isGeneratingPDF
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.download),
-                      label: Text(_isGeneratingPDF ? 'Generating...' : 'Download Current Page Data'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Notes Section (Compact)
-                  SizedBox(
-                    width: 300,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 16),
-                          const SizedBox(width: 6),
-                          Flexible(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
                             child: Text(
-                              'Downloads only searched/filtered data currently displayed on the page.',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.blue.shade900,
-                                height: 1.3,
+                              _fromDateCredit != null
+                                  ? _fromDateCredit!.toIso8601String().split('T')[0]
+                                  : 'From Date',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_fromDateCredit != null)
+                        IconButton(
+                          icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                          onPressed: () {
+                            setState(() {
+                              _fromDateCredit = null;
+                            });
+                            _filterCreditData(_creditSearchController.text);
+                          },
+                          tooltip: 'Clear From Date',
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                  // To Date Picker
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                  SizedBox(
+                        width: 160,
+                        height: 56,
+                        child: InkWell(
+                          onTap: _selectToDateCredit,
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'To Date',
+                              prefixIcon: const Icon(Icons.calendar_today, size: 18),
+                              border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            child: Text(
+                              _toDateCredit != null
+                                  ? _toDateCredit!.toIso8601String().split('T')[0]
+                                  : 'To Date',
+                              style: const TextStyle(fontSize: 14),
                               ),
                             ),
                           ),
-                        ],
                       ),
-                    ),
+                      if (_toDateCredit != null)
+                        IconButton(
+                          icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                          onPressed: () {
+                            setState(() {
+                              _toDateCredit = null;
+                            });
+                            _filterCreditData(_creditSearchController.text);
+                          },
+                          tooltip: 'Clear To Date',
+                        ),
+                    ],
                   ),
                   ],
                 ),
@@ -2634,256 +2543,2232 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     );
   }
 
-  Future<void> _downloadCurrentPageData() async {
-    // Use ALL data, ignore search + filters
-    final dataToUse = _creditData;
 
-    if (dataToUse.isEmpty) {
+  // ========== Purchase Details Methods ==========
+  
+  Future<void> _selectDatePurchase() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDatePurchase ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDatePurchase = picked;
+      });
+      _loadPurchaseData();
+    }
+  }
+
+  Future<void> _loadPurchaseData() async {
+    if (widget.selectedSector == null && !_isAdmin) return;
+    if (_selectedDatePurchase == null) return;
+
+    setState(() => _isLoadingPurchase = true);
+    try {
+      final dateStr = _selectedDatePurchase!.toIso8601String().split('T')[0];
+
+      final purchases = await ApiService.getCompanyPurchaseDetails(
+        sector: widget.selectedSector,
+        date: dateStr,
+      );
+      
+      if (purchases.isEmpty) {
+        final allPurchases = await ApiService.getCompanyPurchaseDetails(
+          sector: widget.selectedSector,
+        );
+        final filteredPurchases = allPurchases.where((p) {
+          final purchaseDate = p['purchase_date']?.toString().split('T')[0].split(' ')[0] ?? '';
+          return purchaseDate == dateStr;
+        }).toList();
+        if (filteredPurchases.isNotEmpty) {
+          setState(() {
+            _purchaseData = filteredPurchases;
+            _editModePurchase.clear();
+            for (var controllers in _controllersPurchase.values) {
+              for (var controller in controllers.values) {
+                controller.dispose();
+              }
+            }
+            _controllersPurchase.clear();
+            _purchasePhotos.clear();
+            for (var purchase in filteredPurchases) {
+              final purchaseId = purchase['id'];
+              if (purchaseId != null) {
+                _purchasePhotos[purchaseId] = List<Map<String, dynamic>>.from(purchase['photos'] ?? []);
+              }
+            }
+          });
+          return;
+        }
+      }
+
+      setState(() {
+        _purchaseData = purchases;
+        _editModePurchase.clear();
+        for (var controllers in _controllersPurchase.values) {
+          for (var controller in controllers.values) {
+            controller.dispose();
+          }
+        }
+        _controllersPurchase.clear();
+        _purchasePhotos.clear();
+        for (var purchase in purchases) {
+          final purchaseId = purchase['id'];
+          if (purchaseId != null) {
+            _purchasePhotos[purchaseId] = List<Map<String, dynamic>>.from(purchase['photos'] ?? []);
+          }
+        }
+      });
+    } catch (e) {
+      if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No data available to download.\nFiltered: ${_filteredCreditData.length}, All: ${_creditData.length}\nMonth Filter: ${_selectedMonthsCredit.isEmpty ? "None" : _selectedMonthsCredit.join(", ")}\nCompany Staff: ${_selectedCompanyStaffFilterCredit ?? "All"}'),
+          SnackBar(content: Text('Error loading purchases data: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingPurchase = false);
+      }
+    }
+  }
+
+  Future<void> _showAddPurchaseDialog() async {
+    if (widget.selectedSector == null && !_isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a sector from Home page')),
+      );
+      return;
+    }
+
+    if (_selectedDatePurchase == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a date')),
+      );
+      return;
+    }
+
+    final itemNameController = TextEditingController();
+    final shopNameController = TextEditingController();
+    final purchaseDetailsController = TextEditingController();
+    final purchaseAmountController = TextEditingController();
+    final amountPaidController = TextEditingController();
+    final creditController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Purchase Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: itemNameController,
+            decoration: const InputDecoration(
+                  labelText: 'Item Name',
+              border: OutlineInputBorder(),
+            ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: shopNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Shop Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: purchaseDetailsController,
+                decoration: const InputDecoration(
+                  labelText: 'Purchase Details',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: purchaseAmountController,
+                decoration: const InputDecoration(
+                  labelText: 'Purchase Amount',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: amountPaidController,
+                decoration: const InputDecoration(
+                  labelText: 'Amount Paid',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: creditController,
+                decoration: const InputDecoration(
+                  labelText: 'Credit',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+              ),
+            ],
+          ),
+          ),
+          actions: [
+            TextButton(
+            onPressed: () {
+              itemNameController.dispose();
+              shopNameController.dispose();
+              purchaseDetailsController.dispose();
+              purchaseAmountController.dispose();
+              amountPaidController.dispose();
+              creditController.dispose();
+              Navigator.pop(context, false);
+            },
+              child: const Text('Cancel'),
+            ),
+          FilledButton(
+              onPressed: () {
+              Navigator.pop(context, true);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await _saveNewPurchase(
+        itemName: itemNameController.text.trim(),
+        shopName: shopNameController.text.trim(),
+        purchaseDetails: purchaseDetailsController.text.trim(),
+        purchaseAmount: FormatUtils.parseDecimal(purchaseAmountController.text),
+        amountPaid: FormatUtils.parseDecimal(amountPaidController.text),
+        credit: FormatUtils.parseDecimal(creditController.text),
+      );
+    }
+
+    itemNameController.dispose();
+    shopNameController.dispose();
+    purchaseDetailsController.dispose();
+    purchaseAmountController.dispose();
+    amountPaidController.dispose();
+    creditController.dispose();
+  }
+
+  Future<void> _saveNewPurchase({
+    required String itemName,
+    required String shopName,
+    required String purchaseDetails,
+    required double purchaseAmount,
+    required double amountPaid,
+    required double credit,
+  }) async {
+    if (widget.selectedSector == null && !_isAdmin) return;
+    if (_selectedDatePurchase == null) return;
+
+    setState(() => _isLoadingPurchase = true);
+    try {
+      final dateStr = _selectedDatePurchase!.toIso8601String().split('T')[0];
+      final record = {
+        'sector_code': widget.selectedSector,
+        'item_name': itemName.isEmpty ? null : itemName,
+        'shop_name': shopName.isEmpty ? null : shopName,
+        'purchase_details': purchaseDetails.isEmpty ? null : purchaseDetails,
+        'purchase_amount': purchaseAmount,
+        'amount_paid': amountPaid,
+        'credit': credit,
+        'purchase_date': dateStr,
+      };
+
+      await ApiService.saveCompanyPurchaseDetails(record);
+      await _loadPurchaseData();
+      await _loadCompanyCreditData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Purchase details added successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error adding purchase details: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingPurchase = false);
+      }
+    }
+  }
+
+  Future<void> _toggleEditModePurchase(int index) async {
+    setState(() {
+      if (_editModePurchase[index] == true) {
+        if (_controllersPurchase.containsKey(index)) {
+          for (var controller in _controllersPurchase[index]!.values) {
+            controller.dispose();
+          }
+          _controllersPurchase.remove(index);
+        }
+        _editModePurchase[index] = false;
+      } else {
+        final record = _purchaseData[index];
+        _controllersPurchase[index] = {
+          'item_name': TextEditingController(text: record['item_name']?.toString() ?? ''),
+          'shop_name': TextEditingController(text: record['shop_name']?.toString() ?? ''),
+          'purchase_details': TextEditingController(text: record['purchase_details']?.toString() ?? ''),
+          'purchase_amount': TextEditingController(text: FormatUtils.parseDecimal(record['purchase_amount']).toStringAsFixed(2)),
+          'amount_paid': TextEditingController(text: FormatUtils.parseDecimal(record['amount_paid']).toStringAsFixed(2)),
+          'credit': TextEditingController(text: FormatUtils.parseDecimal(record['credit']).toStringAsFixed(2)),
+        };
+        _editModePurchase[index] = true;
+      }
+    });
+  }
+
+  Future<void> _savePurchaseRecord(int index) async {
+    final record = _purchaseData[index];
+    final recordId = record['id'] as int?;
+    if (recordId == null) return;
+
+    setState(() => _isLoadingPurchase = true);
+    try {
+      final updatedRecord = {
+        'id': recordId,
+        'sector_code': widget.selectedSector,
+        'item_name': _controllersPurchase[index]!['item_name']!.text.trim().isEmpty ? null : _controllersPurchase[index]!['item_name']!.text.trim(),
+        'shop_name': _controllersPurchase[index]!['shop_name']!.text.trim().isEmpty ? null : _controllersPurchase[index]!['shop_name']!.text.trim(),
+        'purchase_details': _controllersPurchase[index]!['purchase_details']!.text.trim().isEmpty ? null : _controllersPurchase[index]!['purchase_details']!.text.trim(),
+        'purchase_amount': FormatUtils.parseDecimal(_controllersPurchase[index]!['purchase_amount']!.text),
+        'amount_paid': FormatUtils.parseDecimal(_controllersPurchase[index]!['amount_paid']!.text),
+        'credit': FormatUtils.parseDecimal(_controllersPurchase[index]!['credit']!.text),
+        'purchase_date': _selectedDatePurchase!.toIso8601String().split('T')[0],
+      };
+
+      await ApiService.saveCompanyPurchaseDetails(updatedRecord);
+      await _loadPurchaseData();
+      await _loadCompanyCreditData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Purchase details saved successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving purchases details: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingPurchase = false);
+      }
+    }
+  }
+
+  Future<void> _deletePurchaseRecord(int index) async {
+    final record = _purchaseData[index];
+    final recordId = record['id'] as int?;
+    if (recordId == null) return;
+
+    final confirmed = await UIHelpers.showDeleteConfirmationDialog(
+      context: context,
+      itemName: record['item_name']?.toString() ?? 'purchase',
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoadingPurchase = true);
+    try {
+      await ApiService.deleteCompanyPurchaseDetails(recordId.toString());
+      await _loadPurchaseData();
+      await _loadCompanyCreditData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Purchase record deleted successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting purchase record: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingPurchase = false);
+      }
+    }
+  }
+
+  String _getImageUrl(String imageUrl) {
+    if (imageUrl.startsWith('http')) {
+      return imageUrl;
+    }
+    return '${EnvConfig.apiBaseUrl}$imageUrl';
+  }
+
+  Widget _buildPhotoCellPurchase(int purchaseId, List<Map<String, dynamic>> photos, bool isEditMode) {
+    if (photos.isEmpty) {
+      return const SizedBox(width: 150, height: 60, child: Center(child: Text('No images', style: TextStyle(fontSize: 12))));
+    }
+    
+    return SizedBox(
+      width: 150,
+      height: 60,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...photos.map((photo) {
+              final imageUrl = photo['image_url'] as String? ?? '';
+              final photoId = photo['id'] as int?;
+              final fullUrl = _getImageUrl(imageUrl);
+              
+              return Padding(
+                padding: const EdgeInsets.only(right: 4.0),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => Dialog(
+                            child: Stack(
+                              children: [
+                                Image.network(
+                                  fullUrl,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Center(
+                                      child: Icon(Icons.broken_image, size: 50),
+                                    );
+                                  },
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  },
+                                ),
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: IconButton(
+                                    icon: const Icon(Icons.close, color: Colors.white),
+                                    onPressed: () => Navigator.pop(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.network(
+                            fullUrl,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                            },
+                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 30),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (isEditMode && photoId != null)
+                      Positioned(
+                        top: -3,
+                        right: -3,
+                        child: GestureDetector(
+                          onTap: () => _deletePhotoPurchase(photoId, purchaseId),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(3),
+                            child: const Icon(Icons.close, color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadPhotosPurchase(int purchaseId) async {
+    try {
+      List<XFile> images = [];
+      
+      if (kIsWeb) {
+        images = await _imagePicker.pickMultiImage();
+      } else if (Platform.isAndroid || Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        images = await _imagePicker.pickMultiImage();
+      } else {
+        images = await _imagePicker.pickMultiImage();
+      }
+
+      if (images.isEmpty) return;
+
+      setState(() => _isLoadingPurchase = true);
+      
+      List<File> files = [];
+      for (var xFile in images) {
+        if (!kIsWeb) {
+          files.add(File(xFile.path));
+        }
+      }
+
+      if (files.isEmpty) {
+        setState(() => _isLoadingPurchase = false);
+        return;
+      }
+
+      final uploadedPhotos = await ApiService.uploadCompanyPurchasePhotos(
+        purchaseId: purchaseId,
+        photoFiles: files,
+      );
+
+      await _loadPurchaseData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${uploadedPhotos.length} photo(s) uploaded successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading photos: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingPurchase = false);
+      }
+    }
+  }
+
+  Future<void> _deletePhotoPurchase(int photoId, int purchaseId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Photo'),
+        content: const Text('Are you sure you want to delete this photo?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoadingPurchase = true);
+    try {
+      await ApiService.deleteCompanyPurchasePhoto(photoId);
+      await _loadPurchaseData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo deleted successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting photo: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingPurchase = false);
+      }
+    }
+  }
+
+  Widget _buildPurchaseDetailsTab() {
+    return Column(
+      children: [
+        // Date Selection and Add Purchase Button
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          color: Colors.grey.shade100,
+          child: Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: _selectDatePurchase,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Select Date',
+                      prefixIcon: const Icon(Icons.calendar_today),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      _selectedDatePurchase != null
+                          ? _selectedDatePurchase!.toIso8601String().split('T')[0]
+                          : 'Select Date',
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              SizedBox(
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoadingPurchase ? null : _showAddPurchaseDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Purchase Details', style: TextStyle(fontSize: 16)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _isLoadingPurchase
+              ? const Center(child: CircularProgressIndicator())
+              : _purchaseData.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No purchases data available',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: DataTable(
+                              columnSpacing: 20,
+                              columns: [
+                                if (widget.selectedSector == null && _isAdmin)
+                                  DataColumn(
+                                    label: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        IconButton(
+                                          icon: Icon(
+                                            _purchasesSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                            size: 16,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              _purchasesSectorSortAscending = !_purchasesSectorSortAscending;
+                                              _purchaseData.sort((a, b) {
+                                                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                                                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                                                return _purchasesSectorSortAscending
+                                                    ? aName.compareTo(bName)
+                                                    : bName.compareTo(aName);
+                                              });
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Shop Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Purchase Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Amount Paid', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Credit', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Bill Image', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                              ],
+                              rows: _purchaseData.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final record = entry.value;
+                                final isEditMode = _editModePurchase[index] == true;
+                                final purchaseId = record['id'] as int?;
+                                final photos = purchaseId != null ? (_purchasePhotos[purchaseId] ?? []) : <Map<String, dynamic>>[];
+
+                                return DataRow(
+                                  cells: [
+                                    if (widget.selectedSector == null && _isAdmin)
+                                      DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
+                                    DataCell(
+                                      isEditMode && _controllersPurchase.containsKey(index)
+                                          ? SizedBox(
+                                              width: 150,
+                                              child: TextFormField(
+                                                controller: _controllersPurchase[index]!['item_name'],
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  isDense: true,
+                                                ),
+                                              ),
+                                            )
+                                          : Text(record['item_name']?.toString() ?? ''),
+                                    ),
+                                    DataCell(
+                                      isEditMode && _controllersPurchase.containsKey(index)
+                                          ? SizedBox(
+                                              width: 150,
+                                              child: TextFormField(
+                                                controller: _controllersPurchase[index]!['shop_name'],
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  isDense: true,
+                                                ),
+                                              ),
+                                            )
+                                          : Text(record['shop_name']?.toString() ?? ''),
+                                    ),
+                                    DataCell(
+                                      SizedBox(
+                                        width: 200,
+                                        child: isEditMode && _controllersPurchase.containsKey(index)
+                                            ? TextFormField(
+                                                controller: _controllersPurchase[index]!['purchase_details'],
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  isDense: true,
+                                                ),
+                                                maxLines: 2,
+                                              )
+                                            : Text(
+                                                record['purchase_details']?.toString() ?? '',
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      isEditMode && _controllersPurchase.containsKey(index)
+                                          ? SizedBox(
+                                              width: 120,
+                                              child: TextFormField(
+                                                controller: _controllersPurchase[index]!['purchase_amount'],
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  isDense: true,
+                                                ),
+                                                keyboardType: TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                                ],
+                                              ),
+                                            )
+                                          : Text('₹${FormatUtils.parseDecimal(record['purchase_amount']).toStringAsFixed(2)}'),
+                                    ),
+                                    DataCell(
+                                      isEditMode && _controllersPurchase.containsKey(index)
+                                          ? SizedBox(
+                                              width: 120,
+                                              child: TextFormField(
+                                                controller: _controllersPurchase[index]!['amount_paid'],
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  isDense: true,
+                                                ),
+                                                keyboardType: TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                                ],
+                                              ),
+                                            )
+                                          : Text('₹${FormatUtils.parseDecimal(record['amount_paid']).toStringAsFixed(2)}'),
+                                    ),
+                                    DataCell(
+                                      isEditMode && _controllersPurchase.containsKey(index)
+                                          ? SizedBox(
+                                              width: 120,
+                                              child: TextFormField(
+                                                controller: _controllersPurchase[index]!['credit'],
+                                                decoration: const InputDecoration(
+                                                  border: OutlineInputBorder(),
+                                                  isDense: true,
+                                                ),
+                                                keyboardType: TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                                ],
+                                              ),
+                                            )
+                                          : Text('₹${FormatUtils.parseDecimal(record['credit']).toStringAsFixed(2)}'),
+                                    ),
+                                    DataCell(
+                                      purchaseId != null
+                                          ? ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 150,
+                                                maxHeight: 60,
+                                              ),
+                                              child: _buildPhotoCellPurchase(purchaseId, photos, isEditMode),
+                                            )
+                                          : const SizedBox(width: 150, height: 60),
+                                    ),
+                                    DataCell(
+                                      isEditMode
+                                          ? Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.save, color: Colors.green, size: 20),
+                                                  tooltip: 'Save',
+                                                  onPressed: () => _savePurchaseRecord(index),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
+                                                  tooltip: 'Cancel',
+                                                  onPressed: () => _toggleEditModePurchase(index),
+                                                ),
+                                              ],
+                                            )
+                                          : Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                                  tooltip: 'Edit',
+                                                  onPressed: () => _toggleEditModePurchase(index),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.upload, color: Colors.orange, size: 20),
+                                                  tooltip: 'Upload Photos',
+                                                  onPressed: purchaseId != null ? () => _uploadPhotosPurchase(purchaseId) : null,
+                                                ),
+                                                if (widget.isMainAdmin)
+                                                  IconButton(
+                                                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                                    tooltip: 'Delete',
+                                                    onPressed: () => _deletePurchaseRecord(index),
+                                                  ),
+                                              ],
+                                            ),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+        ),
+      ],
+    );
+  }
+
+  // ========== Company Credit Details Methods ==========
+  
+  Future<void> _loadCompanyCreditData() async {
+    if (widget.selectedSector == null && !_isAdmin) return;
+
+    setState(() => _isLoadingCompanyCredit = true);
+    try {
+      final credits = await ApiService.getCreditDetailsFromCompanyPurchases(
+        sector: widget.selectedSector,
+      );
+
+      setState(() {
+        _companyCreditData = credits;
+        _filteredCompanyCreditData = List.from(credits);
+        _companyCreditPhotos.clear();
+        _companyBalancePayments.clear();
+        for (var credit in credits) {
+          final creditId = credit['id'];
+          if (creditId != null) {
+            _companyCreditPhotos[creditId] = List<Map<String, dynamic>>.from(credit['photos'] ?? []);
+            _companyBalancePayments[creditId] = List<Map<String, dynamic>>.from(credit['balance_payments'] ?? []);
+          }
+        }
+        _sortCompanyCreditData();
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading credit data: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingCompanyCredit = false);
+      }
+    }
+  }
+
+  void _filterCompanyCreditData(String query) {
+    setState(() {
+      List<Map<String, dynamic>> filtered = List.from(_companyCreditData);
+      
+      // Apply date range filter if dates are selected
+      if (_fromDateCompanyCredit != null || _toDateCompanyCredit != null) {
+        filtered = filtered.where((record) {
+          final purchaseDate = _parseDateFromRecord(record['purchase_date']);
+          if (purchaseDate == null) return false;
+          
+          final purchaseDateOnly = DateTime(purchaseDate.year, purchaseDate.month, purchaseDate.day);
+          final fromDateOnly = _fromDateCompanyCredit != null ? DateTime(_fromDateCompanyCredit!.year, _fromDateCompanyCredit!.month, _fromDateCompanyCredit!.day) : null;
+          final toDateOnly = _toDateCompanyCredit != null ? DateTime(_toDateCompanyCredit!.year, _toDateCompanyCredit!.month, _toDateCompanyCredit!.day) : null;
+          
+          if (fromDateOnly != null && purchaseDateOnly.isBefore(fromDateOnly)) return false;
+          if (toDateOnly != null && purchaseDateOnly.isAfter(toDateOnly)) return false;
+          return true;
+        }).toList();
+      }
+      
+      if (query.isNotEmpty) {
+        final searchQuery = query.toLowerCase();
+        filtered = filtered.where((record) {
+          final itemName = (record['item_name']?.toString() ?? '').toLowerCase();
+          final shopName = (record['shop_name']?.toString() ?? '').toLowerCase();
+          return itemName.contains(searchQuery) || shopName.contains(searchQuery);
+        }).toList();
+      }
+      
+      _filteredCompanyCreditData = filtered;
+      _sortCompanyCreditData();
+    });
+  }
+
+  void _sortCompanyCreditData() {
+    _filteredCompanyCreditData.sort((a, b) {
+      final dateAValue = a['purchase_date'];
+      final dateBValue = b['purchase_date'];
+      
+      DateTime? dateA;
+      DateTime? dateB;
+      
+      if (dateAValue != null) {
+        try {
+          if (dateAValue is DateTime) {
+            dateA = dateAValue;
+          } else if (dateAValue is String) {
+            final dateStr = dateAValue.split('T')[0].split(' ')[0];
+            dateA = DateTime.tryParse(dateStr);
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+      
+      if (dateBValue != null) {
+        try {
+          if (dateBValue is DateTime) {
+            dateB = dateBValue;
+          } else if (dateBValue is String) {
+            final dateStr = dateBValue.split('T')[0].split(' ')[0];
+            dateB = DateTime.tryParse(dateStr);
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+      
+      if (dateA != null && dateB != null) {
+        final dateComparison = dateA.compareTo(dateB);
+        return _companyCreditDateSortAscending ? dateComparison : -dateComparison;
+      }
+      if (dateA != null) return -1;
+      if (dateB != null) return 1;
+      return 0;
+    });
+  }
+
+  Future<void> _selectFromDateCompanyCredit() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _fromDateCompanyCredit ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _fromDateCompanyCredit = picked;
+      });
+      _filterCompanyCreditData(_companyCreditSearchController.text);
+    }
+  }
+
+  Future<void> _selectToDateCompanyCredit() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _toDateCompanyCredit ?? (_fromDateCompanyCredit ?? DateTime.now()),
+      firstDate: _fromDateCompanyCredit ?? DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _toDateCompanyCredit = picked;
+      });
+      _filterCompanyCreditData(_companyCreditSearchController.text);
+    }
+  }
+
+  void _toggleEditModeCompanyCredit(int recordId) {
+    setState(() {
+      if (_editModeCompanyCredit[recordId] == true) {
+        if (_companyBalancePaidControllers.containsKey(recordId)) {
+          _companyBalancePaidControllers[recordId]!.dispose();
+          _companyBalancePaidControllers.remove(recordId);
+        }
+        if (_companyDetailsControllers.containsKey(recordId)) {
+          _companyDetailsControllers[recordId]!.dispose();
+          _companyDetailsControllers.remove(recordId);
+        }
+        _companyBalancePaidDates.remove(recordId);
+        _editModeCompanyCredit[recordId] = false;
+      } else {
+        final record = _filteredCompanyCreditData.firstWhere(
+          (r) => r['id'] == recordId,
+          orElse: () => {},
+        );
+        if (record.isNotEmpty) {
+          final payments = _companyBalancePayments[recordId] ?? [];
+          double totalBalancePaid = 0;
+        for (var payment in payments) {
+            totalBalancePaid += FormatUtils.parseDecimal(payment['balance_paid']);
+          }
+          _companyBalancePaidControllers[recordId] = TextEditingController(
+            text: totalBalancePaid.toStringAsFixed(2),
+          );
+          
+          if (payments.isNotEmpty && payments.last['balance_paid_date'] != null) {
+            _companyBalancePaidDates[recordId] = FormatUtils.parseDate(payments.last['balance_paid_date']);
+          } else {
+            _companyBalancePaidDates[recordId] = null;
+          }
+          
+          _companyDetailsControllers[recordId] = TextEditingController(
+            text: record['details']?.toString() ?? '',
+          );
+          
+          _editModeCompanyCredit[recordId] = true;
+        }
+      }
+    });
+  }
+
+  void _addNewCompanyPaymentRow(int purchaseId) {
+    setState(() {
+      _addingNewCompanyPayment[purchaseId] = true;
+      final key = '${purchaseId}_new';
+      _newCompanyPaymentControllers[key] = TextEditingController();
+      _newCompanyPaymentDates[key] = null;
+      _newCompanyPaymentDetailsControllers[key] = TextEditingController();
+    });
+  }
+
+  void _cancelNewCompanyPaymentRow(int purchaseId) {
+    setState(() {
+      _addingNewCompanyPayment[purchaseId] = false;
+      final key = '${purchaseId}_new';
+      if (_newCompanyPaymentControllers.containsKey(key)) {
+        _newCompanyPaymentControllers[key]!.dispose();
+        _newCompanyPaymentControllers.remove(key);
+      }
+      _newCompanyPaymentDates.remove(key);
+      if (_newCompanyPaymentDetailsControllers.containsKey(key)) {
+        _newCompanyPaymentDetailsControllers[key]!.dispose();
+        _newCompanyPaymentDetailsControllers.remove(key);
+      }
+    });
+  }
+
+  double _calculateCompanyOverallBalance(int purchaseId, int? paymentIndex) {
+    final record = _filteredCompanyCreditData.firstWhere(
+      (r) => r['id'] == purchaseId,
+      orElse: () => {},
+    );
+    if (record.isEmpty) return 0;
+
+    final credit = FormatUtils.parseDecimal(record['credit']);
+    final payments = _companyBalancePayments[purchaseId] ?? [];
+    
+    if (paymentIndex == null) {
+      double totalPaid = 0;
+      for (var payment in payments) {
+        totalPaid += FormatUtils.parseDecimal(payment['balance_paid']);
+      }
+      return credit - totalPaid;
+          } else {
+      if (paymentIndex == 0) {
+        final payment = payments[paymentIndex];
+        final balancePaid = FormatUtils.parseDecimal(payment['balance_paid']);
+        return credit - balancePaid;
+      } else {
+        final prevPayment = payments[paymentIndex - 1];
+        final prevOverallBalance = FormatUtils.parseDecimal(prevPayment['overall_balance']);
+        final currentPayment = payments[paymentIndex];
+        final balancePaid = FormatUtils.parseDecimal(currentPayment['balance_paid']);
+        return prevOverallBalance - balancePaid;
+      }
+    }
+  }
+
+  Future<void> _saveCompanyCreditRecord(int recordId) async {
+    final record = _filteredCompanyCreditData.firstWhere(
+      (r) => r['id'] == recordId,
+      orElse: () => {},
+    );
+    
+    if (record.isEmpty) {
+      return;
+    }
+
+    final balancePaid = _companyBalancePaidControllers.containsKey(recordId)
+        ? FormatUtils.parseDecimal(_companyBalancePaidControllers[recordId]!.text.trim())
+        : 0.0;
+    final balancePaidDate = _companyBalancePaidDates[recordId];
+    final details = _companyDetailsControllers.containsKey(recordId)
+        ? _companyDetailsControllers[recordId]!.text.trim()
+        : record['details']?.toString() ?? '';
+
+    setState(() => _isLoadingCompanyCredit = true);
+
+    try {
+      final payments = _companyBalancePayments[recordId] ?? [];
+      final credit = FormatUtils.parseDecimal(record['credit']);
+      
+      if (payments.isEmpty && balancePaid > 0) {
+        final overallBalance = credit - balancePaid;
+        final payment = {
+          'purchase_id': recordId,
+            'balance_paid': balancePaid,
+          'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
+          'details': details.isEmpty ? null : details,
+          'overall_balance': overallBalance,
+        };
+        await ApiService.saveBalancePayment(payment);
+      } else if (payments.isNotEmpty && balancePaid > 0) {
+        final firstPayment = payments.first;
+        final firstPaymentId = firstPayment['id'] as int?;
+        if (firstPaymentId != null) {
+          final overallBalance = credit - balancePaid;
+          final payment = {
+            'id': firstPaymentId,
+            'purchase_id': recordId,
+            'balance_paid': balancePaid,
+            'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
+            'details': details.isEmpty ? null : details,
+            'overall_balance': overallBalance,
+          };
+          await ApiService.saveBalancePayment(payment);
+        }
+      }
+      
+      _editModeCompanyCredit[recordId] = false;
+
+      await _loadCompanyCreditData();
+
+      if (mounted) {
+        UIHelpers.showSuccessSnackBar(context, 'Details updated successfully');
+      }
+    } catch (e) {
+      debugPrint('Error saving credit record: $e');
+      if (mounted) {
+        UIHelpers.showErrorSnackBar(context, 'Error saving details: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingCompanyCredit = false);
+      }
+    }
+  }
+
+  Future<void> _saveCompanyPaymentRow(int purchaseId, int? paymentId) async {
+    setState(() => _isLoadingCompanyCredit = true);
+
+    try {
+      final record = _filteredCompanyCreditData.firstWhere(
+        (r) => r['id'] == purchaseId,
+        orElse: () => {},
+      );
+      if (record.isEmpty) return;
+
+      final credit = FormatUtils.parseDecimal(record['credit']);
+      final payments = _companyBalancePayments[purchaseId] ?? [];
+      
+      double balancePaid;
+      DateTime? balancePaidDate;
+      String details;
+      double overallBalance;
+
+      if (paymentId == null) {
+        final key = '${purchaseId}_new';
+        balancePaid = FormatUtils.parseDecimal(_newCompanyPaymentControllers[key]?.text ?? '0');
+        balancePaidDate = _newCompanyPaymentDates[key];
+        details = _newCompanyPaymentDetailsControllers.containsKey(key)
+            ? _newCompanyPaymentDetailsControllers[key]!.text.trim()
+            : '';
+        
+        if (payments.isEmpty) {
+          overallBalance = credit - balancePaid;
+        } else {
+          final lastPayment = payments.last;
+          final lastOverallBalance = FormatUtils.parseDecimal(lastPayment['overall_balance']);
+          overallBalance = lastOverallBalance - balancePaid;
+        }
+
+        final payment = {
+          'purchase_id': purchaseId,
+          'balance_paid': balancePaid,
+          'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
+          'details': details.isEmpty ? null : details,
+          'overall_balance': overallBalance,
+        };
+
+        await ApiService.saveBalancePayment(payment);
+        _cancelNewCompanyPaymentRow(purchaseId);
+      } else {
+        final key = paymentId;
+        balancePaid = _companyBalancePaidControllers.containsKey(key)
+            ? FormatUtils.parseDecimal(_companyBalancePaidControllers[key]!.text.trim())
+            : FormatUtils.parseDecimal(payments.firstWhere((p) => p['id'] == paymentId)['balance_paid']);
+        balancePaidDate = _companyBalancePaidDates[key];
+        details = _companyDetailsControllers.containsKey(key)
+            ? _companyDetailsControllers[key]!.text.trim()
+            : (payments.firstWhere((p) => p['id'] == paymentId)['details']?.toString() ?? '');
+
+        final paymentIndex = payments.indexWhere((p) => p['id'] == paymentId);
+        overallBalance = _calculateCompanyOverallBalance(purchaseId, paymentIndex);
+
+        final payment = {
+          'id': paymentId,
+          'purchase_id': purchaseId,
+          'balance_paid': balancePaid,
+          'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
+          'details': details.isEmpty ? null : details,
+          'overall_balance': overallBalance,
+        };
+
+        await ApiService.saveBalancePayment(payment);
+      }
+
+      await _loadCompanyCreditData();
+
+      if (mounted) {
+        UIHelpers.showSuccessSnackBar(context, 'Payment saved successfully');
+      }
+    } catch (e) {
+      debugPrint('Error saving payment: $e');
+      if (mounted) {
+        UIHelpers.showErrorSnackBar(context, 'Error saving payment: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingCompanyCredit = false);
+      }
+    }
+  }
+
+  Future<void> _deleteCompanyCreditRecord(int recordId, String name) async {
+    final confirmed = await UIHelpers.showDeleteConfirmationDialog(
+      context: context,
+      itemName: 'credit record for "$name"',
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() => _isLoadingCompanyCredit = true);
+
+    try {
+      await ApiService.deleteCompanyPurchaseDetails(recordId.toString());
+
+      await _loadCompanyCreditData();
+
+      if (mounted) {
+        UIHelpers.showSuccessSnackBar(context, 'Credit record deleted successfully');
+      }
+    } catch (e) {
+      debugPrint('Error deleting credit record: $e');
+      if (mounted) {
+        UIHelpers.showErrorSnackBar(context, 'Error deleting credit record: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingCompanyCredit = false);
+      }
+    }
+  }
+
+
+  Widget _buildCompanyCreditDetailsTab() {
+    // Note: This is a simplified version. The full table implementation would be very similar
+    // to _buildCreditDetailsTab but using _companyCredit* variables instead.
+    // For now, this provides the basic structure with search and filtering.
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          color: Colors.grey.shade100,
+          child: Column(
+            children: [
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Company Purchases with Outstanding Credit',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 4),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 250,
+                      child: StatefulBuilder(
+                        builder: (context, setState) {
+                          return TextField(
+                            controller: _companyCreditSearchController,
+                            decoration: InputDecoration(
+                              labelText: 'Search by Item Name or Shop Name',
+                              hintText: 'Enter item name or shop name to search',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _companyCreditSearchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      onPressed: () {
+                                        _companyCreditSearchController.clear();
+                                        _filterCompanyCreditData('');
+                                        setState(() {});
+                                      },
+                                    )
+                                  : null,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              _filterCompanyCreditData(value);
+                              setState(() {});
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // From Date Picker
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 160,
+                          height: 56,
+                          child: InkWell(
+                            onTap: _selectFromDateCompanyCredit,
+                            child: InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: 'From Date',
+                                prefixIcon: const Icon(Icons.calendar_today, size: 18),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              child: Text(
+                                _fromDateCompanyCredit != null
+                                    ? _fromDateCompanyCredit!.toIso8601String().split('T')[0]
+                                    : 'From Date',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (_fromDateCompanyCredit != null)
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                            onPressed: () {
+                              setState(() {
+                                _fromDateCompanyCredit = null;
+                              });
+                              _filterCompanyCreditData(_companyCreditSearchController.text);
+                            },
+                            tooltip: 'Clear From Date',
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    // To Date Picker
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 160,
+                          height: 56,
+                          child: InkWell(
+                            onTap: _selectToDateCompanyCredit,
+                            child: InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: 'To Date',
+                                prefixIcon: const Icon(Icons.calendar_today, size: 18),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              child: Text(
+                                _toDateCompanyCredit != null
+                                    ? _toDateCompanyCredit!.toIso8601String().split('T')[0]
+                                    : 'To Date',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (_toDateCompanyCredit != null)
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                            onPressed: () {
+                              setState(() {
+                                _toDateCompanyCredit = null;
+                              });
+                              _filterCompanyCreditData(_companyCreditSearchController.text);
+                            },
+                            tooltip: 'Clear To Date',
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _isLoadingCompanyCredit
+              ? const Center(child: CircularProgressIndicator())
+              : _filteredCompanyCreditData.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No purchases with outstanding credit',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: DataTable(
+                              columnSpacing: 20,
+                              columns: [
+                                if (widget.selectedSector == null && _isAdmin)
+                                  DataColumn(
+                                    label: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        IconButton(
+                                          icon: Icon(
+                                            _companyCreditSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                            size: 16,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              _companyCreditSectorSortAscending = !_companyCreditSectorSortAscending;
+                                              _filteredCompanyCreditData.sort((a, b) {
+                                                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                                                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                                                return _companyCreditSectorSortAscending
+                                                    ? aName.compareTo(bName)
+                                                    : bName.compareTo(aName);
+                                              });
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Shop Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Amount Pending', style: TextStyle(fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                  label: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('Credit Taken Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      IconButton(
+                                        icon: Icon(
+                                          _companyCreditDateSortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                          size: 16,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            _companyCreditDateSortAscending = !_companyCreditDateSortAscending;
+                                            _sortCompanyCreditData();
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const DataColumn(label: Text('Balance Paid', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Overall Balance', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Details', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                              ],
+                              rows: _filteredCompanyCreditData.map((record) {
+                                final recordId = record['id'] as int;
+                                final credit = FormatUtils.parseDecimal(record['credit']);
+                                final payments = _companyBalancePayments[recordId] ?? [];
+                                double totalPaid = 0;
+                                for (var payment in payments) {
+                                  totalPaid += FormatUtils.parseDecimal(payment['balance_paid']);
+                                }
+                                final overallBalance = credit - totalPaid;
+                                
+                                return DataRow(
+                                  cells: [
+                                    if (widget.selectedSector == null && _isAdmin)
+                                      DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
+                                    DataCell(Text(record['item_name']?.toString() ?? '')),
+                                    DataCell(Text(record['shop_name']?.toString() ?? '')),
+                                    DataCell(Text(record['purchase_details']?.toString() ?? '')),
+                                    DataCell(Text('₹${credit.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red))),
+                                    DataCell(Text(FormatUtils.formatDate(record['purchase_date']))),
+                                    DataCell(Text('₹${totalPaid.toStringAsFixed(2)}')),
+                                    DataCell(Text('₹${overallBalance.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: overallBalance > 0 ? Colors.red : Colors.green))),
+                                    DataCell(Text(record['details']?.toString() ?? '')),
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                            tooltip: 'Edit',
+                                            onPressed: () => _toggleEditModeCompanyCredit(recordId),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.add, color: Colors.orange, size: 20),
+                                            tooltip: 'Add Payment',
+                                            onPressed: () => _addNewCompanyPaymentRow(recordId),
+                                          ),
+                                          if (widget.isMainAdmin)
+                                            IconButton(
+                                              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                              tooltip: 'Delete',
+                                              onPressed: () => _deleteCompanyCreditRecord(recordId, record['item_name']?.toString() ?? 'Unknown'),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+        ),
+      ],
+    );
+  }
+
+  // ========== Overall Income Expense and Credit Details Tab ==========
+  
+  Future<void> _loadAllDataForSummary() async {
+    if (widget.selectedSector == null && !_isAdmin) return;
+
+    setState(() => _isLoadingSummary = true);
+    try {
+      // Load all sales data without date filter
+      final allSales = await ApiService.getSalesDetails(
+        sector: widget.selectedSector,
+        // No date parameter to get all data
+      );
+      
+      // Load all purchase data without date filter
+      final allPurchases = await ApiService.getCompanyPurchaseDetails(
+        sector: widget.selectedSector,
+        // No date parameter to get all data
+      );
+
+      setState(() {
+        _allSalesDataForSummary = allSales;
+        _allPurchaseDataForSummary = allPurchases;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading summary data: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingSummary = false);
+      }
+    }
+  }
+
+  Future<void> _selectFromDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _fromDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _fromDate = picked;
+      });
+    }
+  }
+
+  Future<void> _selectToDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _toDate ?? DateTime.now(),
+      firstDate: _fromDate ?? DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _toDate = picked;
+      });
+    }
+  }
+
+  DateTime? _parseDateFromRecord(dynamic dateValue) {
+    if (dateValue == null) return null;
+    try {
+      if (dateValue is DateTime) {
+        return dateValue;
+      } else if (dateValue is String) {
+        String dateStr = dateValue;
+        if (dateStr.contains('T')) {
+          dateStr = dateStr.split('T')[0];
+        }
+        if (dateStr.contains(' ')) {
+          dateStr = dateStr.split(' ')[0];
+        }
+        return DateTime.tryParse(dateStr);
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+    return null;
+  }
+
+  Future<void> _downloadSalesDetailsPDF() async {
+    if (_salesData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No sales data to download'),
           backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 5),
         ),
       );
       return;
     }
 
-    // Show filename input dialog
-    final fileNameController = TextEditingController();
-    final fileName = await showDialog<String>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Enter File Name'),
-          content: TextField(
-            controller: fileNameController,
-            decoration: const InputDecoration(
-              labelText: 'File Name',
-              hintText: 'Enter file name (without .pdf)',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (fileNameController.text.trim().isNotEmpty) {
-                  Navigator.of(context).pop(fileNameController.text.trim());
-                }
-              },
-              child: const Text('Download PDF'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (fileName == null || fileName.isEmpty) {
-      return; // User cancelled
-    }
-
-    setState(() => _isGeneratingPDF = true);
-
+    setState(() => _isLoadingSales = true);
     try {
-      // Use exactly what's displayed in the table - _filteredCreditData
-      // This is the data that's currently visible on the page after all filters are applied
-      print('Download: _filteredCreditData.length = ${_filteredCreditData.length}');
-      print('Download: _creditData.length = ${_creditData.length}');
-      print('Download: Using ${dataToUse.length} records for PDF');
-      print('Download: _selectedMonthsCredit = $_selectedMonthsCredit');
-      print('Download: _selectedCompanyStaffFilterCredit = $_selectedCompanyStaffFilterCredit (type: ${_selectedCompanyStaffFilterCredit.runtimeType})');
-      print('Download: _creditSearchController.text = ${_creditSearchController.text}');
+      final fromDate = _selectedDate ?? DateTime.now();
+      final toDate = _selectedDate ?? DateTime.now();
       
-      // Debug: Check if data has company_staff values
-      if (_creditData.isNotEmpty) {
-        final companyStaffValues = _creditData.map((r) => r['company_staff']).toSet();
-        print('Download: company_staff values in _creditData: $companyStaffValues');
-      }
-      if (dataToUse.isNotEmpty) {
-        final companyStaffValues = dataToUse.map((r) => r['company_staff']).toSet();
-        print('Download: company_staff values in dataToUse: $companyStaffValues');
-      }
-      
-      // Debug: Print first record to see structure
-      if (dataToUse.isNotEmpty) {
-        print('Download: First record keys: ${dataToUse.first.keys.toList()}');
-        print('Download: First record sale_date: ${dataToUse.first['sale_date']}');
-        print('Download: First record id: ${dataToUse.first['id']}');
-      }
-
-      // Collect all data including payment rows and calculate total
-      final List<Map<String, dynamic>> allRowsForPDF = [];
-      double totalOverallBalance = 0.0;
-
-      for (var record in dataToUse) {
-        if (record.isEmpty || record['id'] == null) {
-          print('Download: Skipping invalid record: $record');
-          continue;
-        }
-        
-        final recordId = record['id'] as int;
-        final amountPending = _parseDecimal(record['amount_pending']);
-        final payments = _balancePayments[recordId] ?? [];
-        final isAddingNewPayment = _addingNewPayment[recordId] == true;
-
-        // Calculate total paid from existing payments
-        double totalPaid = 0;
-        for (var payment in payments) {
-          totalPaid += _parseDecimal(payment['balance_paid']);
-        }
-
-        // Add new payment if being added
-        if (isAddingNewPayment) {
-          final newKey = '${recordId}_new';
-          final newPaymentController = _newPaymentControllers[newKey];
-          if (newPaymentController != null && newPaymentController.text.isNotEmpty) {
-            totalPaid += _parseDecimal(newPaymentController.text);
-          }
-        }
-
-        final mainOverallBalance = amountPending - totalPaid;
-        totalOverallBalance += mainOverallBalance;
-
-        // Add main row
-        allRowsForPDF.add({
-          'type': 'main',
-          'sale_date': record['sale_date'],
-          'name': record['name']?.toString() ?? '',
-          'product_name': record['product_name']?.toString() ?? '',
-          'credit_amount': amountPending,
-          'balance_paid': totalPaid,
-          'balance_paid_date': payments.isNotEmpty && payments.last['balance_paid_date'] != null 
-              ? payments.last['balance_paid_date'] 
-              : null,
-          'overall_balance': mainOverallBalance,
-          'details': record['details']?.toString() ?? '',
-        });
-
-        // Add payment rows
-        for (int i = 0; i < payments.length; i++) {
-          final payment = payments[i];
-          final balancePaid = _parseDecimal(payment['balance_paid']);
-          
-          // Calculate overall balance for this payment
-          double paymentOverallBalance;
-          if (i == 0) {
-            paymentOverallBalance = amountPending - balancePaid;
-          } else {
-            final prevPayment = payments[i - 1];
-            final prevOverallBalance = _parseDecimal(prevPayment['overall_balance']);
-            paymentOverallBalance = prevOverallBalance - balancePaid;
-          }
-
-          allRowsForPDF.add({
-            'type': 'payment',
-            'sale_date': null,
-            'name': '',
-            'product_name': '',
-            'credit_amount': null,
-            'balance_paid': balancePaid,
-            'balance_paid_date': payment['balance_paid_date'],
-            'overall_balance': paymentOverallBalance,
-            'details': payment['details']?.toString() ?? '',
-          });
-        }
-
-        // Add new payment row if being added
-        if (isAddingNewPayment) {
-          final newKey = '${recordId}_new';
-          final newPaymentController = _newPaymentControllers[newKey];
-          final newPaymentDate = _newPaymentDates[newKey];
-          final newDetailsController = _newPaymentDetailsControllers[newKey];
-
-          if (newPaymentController != null && newPaymentController.text.isNotEmpty) {
-            final newBalancePaid = _parseDecimal(newPaymentController.text);
-            final prevOverallBalance = payments.isNotEmpty 
-                ? _parseDecimal(payments.last['overall_balance'])
-                : mainOverallBalance;
-            final newPaymentOverallBalance = prevOverallBalance - newBalancePaid;
-
-            allRowsForPDF.add({
-              'type': 'payment',
-              'sale_date': null,
-              'name': '',
-              'product_name': '',
-              'credit_amount': null,
-              'balance_paid': newBalancePaid,
-              'balance_paid_date': newPaymentDate,
-              'overall_balance': newPaymentOverallBalance,
-              'details': newDetailsController?.text ?? '',
-            });
-          }
-        }
-      }
-
-      // Add total row
-      allRowsForPDF.add({
-        'type': 'total',
-        'sale_date': null,
-        'name': 'TOTAL',
-        'product_name': null,
-        'credit_amount': null,
-        'balance_paid': null,
-        'balance_paid_date': null,
-        'overall_balance': totalOverallBalance,
-        'details': null,
-      });
-
-      print('Download: Total rows collected for PDF: ${allRowsForPDF.length}');
-      if (allRowsForPDF.isNotEmpty) {
-        print('Download: First row type: ${allRowsForPDF.first['type']}');
-        print('Download: First row data: ${allRowsForPDF.first}');
-      } else {
-        print('Download: WARNING - No rows collected for PDF!');
-        print('Download: _filteredCreditData had ${_filteredCreditData.length} records but no rows were added to PDF');
-      }
-
-      if (allRowsForPDF.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No data rows to include in PDF. Please check the console for details.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        setState(() => _isGeneratingPDF = false);
-        return;
-      }
-
-      await PdfGenerator.generateCustomerCreditDetailsPDF(
-        creditData: allRowsForPDF,
-        fileName: fileName,
+      final filePath = await PdfGenerator.generateSalesDetailsPDF(
+        salesData: _salesData,
+        fromDate: fromDate,
+        toDate: toDate,
       );
-
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('PDF saved successfully to Downloads folder'),
+          SnackBar(
+            content: Text('PDF downloaded successfully: $filePath'),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error generating PDF: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error downloading PDF: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
       if (mounted) {
-        setState(() => _isGeneratingPDF = false);
+        setState(() => _isLoadingSales = false);
       }
     }
+  }
+
+  Future<void> _downloadCreditDetailsPDF() async {
+    // IMPORTANT: Use _filteredCreditData if it has data, otherwise fall back to _creditData
+    // This ensures PDF works even when no filters are applied
+    List<Map<String, dynamic>> dataToUse = _filteredCreditData.isNotEmpty 
+        ? _filteredCreditData 
+        : _creditData;
+    
+    if (dataToUse.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No credit data to download'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show dialog to get filename
+    final fileNameController = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter File Name'),
+        content: TextField(
+          controller: fileNameController,
+          decoration: const InputDecoration(
+            labelText: 'File Name',
+            hintText: 'Enter file name (without extension)',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (fileNameController.text.trim().isNotEmpty) {
+                Navigator.pop(context, true);
+      } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a file name'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            },
+            child: const Text('Download'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != true) return;
+
+    final fileName = fileNameController.text.trim();
+    fileNameController.dispose();
+
+    setState(() => _isLoadingCredit = true);
+    try {
+      // Generate PDF with currently visible table data
+      // IMPORTANT: Use _filteredCreditData if it has data, otherwise fall back to _creditData
+      // This ensures PDF works even when no filters are applied
+      List<Map<String, dynamic>> dataToUse = _filteredCreditData.isNotEmpty 
+          ? _filteredCreditData 
+          : _creditData;
+      
+      print('Download PDF: _filteredCreditData.length = ${_filteredCreditData.length}');
+      print('Download PDF: _creditData.length = ${_creditData.length}');
+      print('Download PDF: dataToUse.length = ${dataToUse.length}');
+      print('Download PDF: _balancePayments.length = ${_balancePayments.length}');
+      
+      if (dataToUse.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No data to download. Please ensure there is data in the table.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Convert sector codes to names for PDF
+      final Map<String, String> sectorNameMap = {};
+      for (var sector in _sectors) {
+        sectorNameMap[sector.code] = sector.name;
+      }
+      
+      final filePath = await PdfGenerator.generateSalesCreditDetailsPDFFromTable(
+        creditData: dataToUse, // Use filtered data if available, otherwise use all credit data
+        balancePayments: _balancePayments,
+        showSector: widget.selectedSector == null && _isAdmin,
+        sectorNameMap: sectorNameMap,
+        fileName: fileName,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF downloaded successfully: $filePath'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error downloading PDF: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingCredit = false);
+      }
+    }
+  }
+
+  Future<void> _downloadOverallSummaryPDF() async {
+    // Filter data by date range (same as in _buildOverallIncomeExpenseTab)
+    List<Map<String, dynamic>> filteredSales = _allSalesDataForSummary;
+    List<Map<String, dynamic>> filteredPurchases = _allPurchaseDataForSummary;
+    
+    if (_fromDate != null || _toDate != null) {
+      filteredSales = _allSalesDataForSummary.where((sale) {
+        final saleDate = _parseDateFromRecord(sale['sale_date']);
+        if (saleDate == null) return false;
+        final saleDateOnly = DateTime(saleDate.year, saleDate.month, saleDate.day);
+        final fromDateOnly = _fromDate != null ? DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day) : null;
+        final toDateOnly = _toDate != null ? DateTime(_toDate!.year, _toDate!.month, _toDate!.day) : null;
+        
+        if (fromDateOnly != null && saleDateOnly.isBefore(fromDateOnly)) return false;
+        if (toDateOnly != null && saleDateOnly.isAfter(toDateOnly)) return false;
+        return true;
+      }).toList();
+      
+      filteredPurchases = _allPurchaseDataForSummary.where((purchase) {
+        final purchaseDate = _parseDateFromRecord(purchase['purchase_date']);
+        if (purchaseDate == null) return false;
+        final purchaseDateOnly = DateTime(purchaseDate.year, purchaseDate.month, purchaseDate.day);
+        final fromDateOnly = _fromDate != null ? DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day) : null;
+        final toDateOnly = _toDate != null ? DateTime(_toDate!.year, _toDate!.month, _toDate!.day) : null;
+        
+        if (fromDateOnly != null && purchaseDateOnly.isBefore(fromDateOnly)) return false;
+        if (toDateOnly != null && purchaseDateOnly.isAfter(toDateOnly)) return false;
+        return true;
+      }).toList();
+    }
+
+    if (filteredSales.isEmpty && filteredPurchases.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+          content: Text('No data to download'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoadingSummary = true);
+    try {
+      final fromDate = _fromDate ?? DateTime.now();
+      final toDate = _toDate ?? DateTime.now();
+      
+      final filePath = await PdfGenerator.generateSalesDetailsPDF(
+        salesData: filteredSales,
+        fromDate: fromDate,
+        toDate: toDate,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF downloaded successfully: $filePath'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error downloading PDF: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingSummary = false);
+      }
+    }
+  }
+
+  Future<void> _downloadCompanyCreditDetailsPDF() async {
+    if (_filteredCompanyCreditData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No purchase credit data to download'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoadingCompanyCredit = true);
+    try {
+      final dateFormat = DateFormat('yyyy-MM-dd');
+      final fileName = 'Purchase_Credit_Details_${dateFormat.format(DateTime.now())}.pdf';
+      
+      final filePath = await PdfGenerator.generateCompanyPurchaseCreditDetailsPDF(
+        creditData: _filteredCompanyCreditData,
+        fileName: fileName,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF downloaded successfully: $filePath'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error downloading PDF: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingCompanyCredit = false);
+      }
+    }
+  }
+
+  Widget _buildOverallIncomeExpenseTab() {
+    // Filter data by date range
+    List<Map<String, dynamic>> filteredSales = _allSalesDataForSummary;
+    List<Map<String, dynamic>> filteredPurchases = _allPurchaseDataForSummary;
+    
+    if (_fromDate != null || _toDate != null) {
+      filteredSales = _allSalesDataForSummary.where((sale) {
+        final saleDate = _parseDateFromRecord(sale['sale_date']);
+        if (saleDate == null) return false;
+        final saleDateOnly = DateTime(saleDate.year, saleDate.month, saleDate.day);
+        final fromDateOnly = _fromDate != null ? DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day) : null;
+        final toDateOnly = _toDate != null ? DateTime(_toDate!.year, _toDate!.month, _toDate!.day) : null;
+        
+        if (fromDateOnly != null && saleDateOnly.isBefore(fromDateOnly)) return false;
+        if (toDateOnly != null && saleDateOnly.isAfter(toDateOnly)) return false;
+        return true;
+      }).toList();
+      
+      filteredPurchases = _allPurchaseDataForSummary.where((purchase) {
+        final purchaseDate = _parseDateFromRecord(purchase['purchase_date']);
+        if (purchaseDate == null) return false;
+        final purchaseDateOnly = DateTime(purchaseDate.year, purchaseDate.month, purchaseDate.day);
+        final fromDateOnly = _fromDate != null ? DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day) : null;
+        final toDateOnly = _toDate != null ? DateTime(_toDate!.year, _toDate!.month, _toDate!.day) : null;
+        
+        if (fromDateOnly != null && purchaseDateOnly.isBefore(fromDateOnly)) return false;
+        if (toDateOnly != null && purchaseDateOnly.isAfter(toDateOnly)) return false;
+        return true;
+      }).toList();
+    }
+    
+    // Group by sector if all sectors is selected
+    final showSectorColumn = widget.selectedSector == null && _isAdmin;
+    Map<String, Map<String, double>> sectorData = {};
+    
+    if (showSectorColumn) {
+      // Group sales data by sector
+      for (var sale in filteredSales) {
+        final sectorCode = sale['sector_code']?.toString() ?? 'Unknown';
+        if (!sectorData.containsKey(sectorCode)) {
+          sectorData[sectorCode] = {
+            'salesIncome': 0.0,
+            'salesCredit': 0.0,
+            'purchaseExpense': 0.0,
+            'purchaseCredit': 0.0,
+          };
+        }
+        sectorData[sectorCode]!['salesIncome'] = sectorData[sectorCode]!['salesIncome']! + FormatUtils.parseDecimal(sale['amount_received']);
+        sectorData[sectorCode]!['salesCredit'] = sectorData[sectorCode]!['salesCredit']! + FormatUtils.parseDecimal(sale['credit_amount']);
+      }
+      
+      // Group purchase data by sector
+      for (var purchase in filteredPurchases) {
+        final sectorCode = purchase['sector_code']?.toString() ?? 'Unknown';
+        if (!sectorData.containsKey(sectorCode)) {
+          sectorData[sectorCode] = {
+            'salesIncome': 0.0,
+            'salesCredit': 0.0,
+            'purchaseExpense': 0.0,
+            'purchaseCredit': 0.0,
+          };
+        }
+        sectorData[sectorCode]!['purchaseExpense'] = sectorData[sectorCode]!['purchaseExpense']! + FormatUtils.parseDecimal(purchase['purchase_amount']);
+        sectorData[sectorCode]!['purchaseCredit'] = sectorData[sectorCode]!['purchaseCredit']! + FormatUtils.parseDecimal(purchase['credit']);
+      }
+    }
+    
+    // Calculate totals
+    double totalSalesIncome = 0.0;
+    double totalSalesCredit = 0.0;
+    double totalPurchaseExpense = 0.0;
+    double totalPurchaseCredit = 0.0;
+    
+    for (var sale in filteredSales) {
+      totalSalesIncome += FormatUtils.parseDecimal(sale['amount_received']);
+      totalSalesCredit += FormatUtils.parseDecimal(sale['credit_amount']);
+    }
+    
+    for (var purchase in filteredPurchases) {
+      totalPurchaseExpense += FormatUtils.parseDecimal(purchase['purchase_amount']);
+      totalPurchaseCredit += FormatUtils.parseDecimal(purchase['credit']);
+    }
+    
+    return Column(
+      children: [
+        // Header with Date Range
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          color: Colors.grey.shade100,
+          child: Column(
+            children: [
+              const Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Overall Income, Expense and Credit Details',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              // Date Range Selection - Only visible for admin or abinaya
+              if (_isAdmin || widget.username.toLowerCase() == 'abinaya') ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: _selectFromDate,
+                              child: InputDecorator(
+                                decoration: InputDecoration(
+                                  labelText: 'From Date',
+                                  prefixIcon: const Icon(Icons.calendar_today),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text(
+                                  _fromDate != null
+                                      ? _fromDate!.toIso8601String().split('T')[0]
+                                      : 'Select From Date',
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (_fromDate != null)
+                            IconButton(
+                              icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  _fromDate = null;
+                                });
+                              },
+                              tooltip: 'Clear From Date',
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: _selectToDate,
+                              child: InputDecorator(
+                                decoration: InputDecoration(
+                                  labelText: 'To Date',
+                                  prefixIcon: const Icon(Icons.calendar_today),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text(
+                                  _toDate != null
+                                      ? _toDate!.toIso8601String().split('T')[0]
+                                      : 'Select To Date',
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (_toDate != null)
+                            IconButton(
+                              icon: const Icon(Icons.clear, size: 20, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  _toDate = null;
+                                });
+                              },
+                              tooltip: 'Clear To Date',
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        // Table
+        Expanded(
+          child: _isLoadingSummary
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DataTable(
+                          columnSpacing: 20,
+                          columns: [
+                            if (showSectorColumn)
+                              const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Sales Income', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Sales Credit', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Purchase Expense', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Purchase Credit', style: TextStyle(fontWeight: FontWeight.bold))),
+                          ],
+                          rows: [
+                            // Sector-wise rows if all sectors is selected
+                            if (showSectorColumn)
+                              ...sectorData.entries.map((entry) {
+                                final sectorCode = entry.key;
+                                final data = entry.value;
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text(_getSectorName(sectorCode))),
+                                    DataCell(Text('₹${data['salesIncome']!.toStringAsFixed(2)}')),
+                                    DataCell(Text('₹${data['salesCredit']!.toStringAsFixed(2)}')),
+                                    DataCell(Text('₹${data['purchaseExpense']!.toStringAsFixed(2)}')),
+                                    DataCell(Text('₹${data['purchaseCredit']!.toStringAsFixed(2)}')),
+                                  ],
+                                );
+                              }).toList(),
+                            // Total row
+                            DataRow(
+                              color: WidgetStateProperty.all(Colors.blue.shade50),
+                              cells: [
+                                if (showSectorColumn)
+                                  DataCell(
+                                    const Text(
+                                      'TOTAL',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                  ),
+                                DataCell(
+                                  Text(
+                                    '₹${totalSalesIncome.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    '₹${totalSalesCredit.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    '₹${totalPurchaseExpense.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    '₹${totalPurchaseCredit.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
   }
 }
 

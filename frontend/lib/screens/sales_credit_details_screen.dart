@@ -55,6 +55,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   DateTime? _fromDateCredit; // From date for Sales Credit Details filter
   DateTime? _toDateCredit; // To date for Sales Credit Details filter
   final Map<int, bool> _editModeCredit = {}; // Track which rows are in edit mode (key = record ID)
+  final Map<int, bool> _editModePayment = {}; // Track which payment rows are in edit mode (key = payment ID)
   final Map<int, TextEditingController> _balancePaidControllers = {}; // Controllers for Balance Paid field (key = record ID or payment ID)
   final Map<int, DateTime?> _balancePaidDates = {}; // Selected dates for Balance Paid Date (key = record ID or payment ID)
   final Map<int, TextEditingController> _detailsControllers = {}; // Controllers for Details field (key = record ID or payment ID)
@@ -84,6 +85,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   bool _companyCreditDateSortAscending = true; // true = ascending (oldest first), false = descending (newest first)
   bool _companyCreditSectorSortAscending = true; // Sort direction for Sector column in Company Credit Details
   final Map<int, bool> _editModeCompanyCredit = {}; // Track which rows are in edit mode (key = record ID)
+  final Map<int, bool> _editModeCompanyPayment = {}; // Track which payment rows are in edit mode (key = payment ID)
   final Map<int, TextEditingController> _companyBalancePaidControllers = {}; // Controllers for Balance Paid field (key = record ID or payment ID)
   final Map<int, DateTime?> _companyBalancePaidDates = {}; // Selected dates for Balance Paid Date (key = record ID or payment ID)
   final Map<int, TextEditingController> _companyDetailsControllers = {}; // Controllers for Details field (key = record ID or payment ID)
@@ -99,7 +101,19 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   DateTime? _toDate;
   List<Map<String, dynamic>> _allSalesDataForSummary = [];
   List<Map<String, dynamic>> _allPurchaseDataForSummary = [];
+  List<Map<String, dynamic>> _allCreditDataForSummary = [];
+  List<Map<String, dynamic>> _allCompanyCreditDataForSummary = [];
   bool _isLoadingSummary = false;
+
+  // Horizontal ScrollControllers for draggable scrollbars
+  final ScrollController _salesHorizontalScrollController = ScrollController();
+  final ScrollController _creditHorizontalScrollController = ScrollController();
+  final ScrollController _purchaseHorizontalScrollController = ScrollController();
+  final ScrollController _companyCreditHorizontalScrollController = ScrollController();
+  final ScrollController _summaryHorizontalScrollController = ScrollController();
+  final ScrollController _creditPaymentHorizontalScrollController = ScrollController();
+  final ScrollController _companyCreditPaymentHorizontalScrollController = ScrollController();
+  final Map<String, ScrollController> _photoCellControllers = {};
 
   @override
   void initState() {
@@ -160,6 +174,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     for (var controller in _newPaymentDetailsControllers.values) {
       controller.dispose();
     }
+    _editModePayment.clear();
     // Purchase Details cleanup
     for (var controllers in _controllersPurchase.values) {
       for (var controller in controllers.values) {
@@ -180,6 +195,18 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     for (var controller in _newCompanyPaymentDetailsControllers.values) {
       controller.dispose();
     }
+    // Dispose horizontal scroll controllers
+    _salesHorizontalScrollController.dispose();
+    _creditHorizontalScrollController.dispose();
+    _purchaseHorizontalScrollController.dispose();
+    _companyCreditHorizontalScrollController.dispose();
+    _summaryHorizontalScrollController.dispose();
+    _creditPaymentHorizontalScrollController.dispose();
+    _companyCreditPaymentHorizontalScrollController.dispose();
+    for (var controller in _photoCellControllers.values) {
+      controller.dispose();
+    }
+    _photoCellControllers.clear();
     super.dispose();
   }
 
@@ -378,19 +405,14 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         _balancePaidDates.remove(recordId);
         _editModeCredit[recordId] = false;
       } else {
-        // Enter edit mode - find record by ID and create controller with current balance_paid value
+        // Enter edit mode - find record by ID and create controller for details only
+        // Note: Balance paid and balance paid date are NOT editable for main row
         final record = _filteredCreditData.firstWhere(
           (r) => r['id'] == recordId,
           orElse: () => {},
         );
         if (record.isNotEmpty) {
-          final currentBalancePaid = _parseDecimal(record['balance_paid']);
-          _balancePaidControllers[recordId] = TextEditingController(
-            text: currentBalancePaid > 0 ? currentBalancePaid.toStringAsFixed(2) : '',
-          );
-          // Initialize balance_paid_date if exists
-          _balancePaidDates[recordId] = FormatUtils.parseDate(record['balance_paid_date']);
-          // Initialize details controller
+          // Initialize details controller only (balance paid and date are not editable for main row)
           _detailsControllers[recordId] = TextEditingController(
             text: record['details']?.toString() ?? '',
           );
@@ -407,23 +429,23 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     );
     if (record.isEmpty) return 0.0;
     
-    final amountPending = _parseDecimal(record['amount_pending']);
+    final creditAmount = _parseDecimal(record['credit_amount'] ?? record['amount_pending'] ?? 0);
     final payments = _balancePayments[saleId] ?? [];
     
     if (paymentIndex == null) {
-      // Calculate for main row: Amount Pending - sum of all payments
+      // Calculate for main row: Credit Amount - sum of all payments
       double totalPaid = 0;
       for (var payment in payments) {
         totalPaid += _parseDecimal(payment['balance_paid']);
       }
-      return amountPending - totalPaid;
+      return creditAmount - totalPaid;
     } else {
       // Calculate for a specific payment row
       if (paymentIndex == 0) {
-        // First payment: Amount Pending - this payment
+        // First payment: Credit Amount - this payment
         final payment = payments[paymentIndex];
         final balancePaid = _parseDecimal(payment['balance_paid']);
-        return amountPending - balancePaid;
+        return creditAmount - balancePaid;
       } else {
         // Subsequent payments: previous overall_balance - this payment
         final prevPayment = payments[paymentIndex - 1];
@@ -446,50 +468,18 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       return;
     }
 
-    // Get Balance Paid, Balance Paid Date, and Details from controllers
-    final balancePaid = _balancePaidControllers.containsKey(recordId)
-        ? _parseDecimal(_balancePaidControllers[recordId]!.text.trim())
-        : 0.0;
-    final balancePaidDate = _balancePaidDates[recordId];
-    final details = _detailsControllers.containsKey(recordId)
-        ? _detailsControllers[recordId]!.text.trim()
-        : record['details']?.toString() ?? '';
+    // Get Details from controller only (balance paid and date are NOT editable for main row)
+    // Note: Currently, there's no API endpoint to update just the details field of a credit record
+    // The details field is typically updated when saving payment records
+    // For now, we'll just exit edit mode and reload data
+    // If an API endpoint becomes available, update it here
 
     setState(() => _isLoadingCredit = true);
 
     try {
-      // If this is the first payment, create a new payment record
-      final payments = _balancePayments[recordId] ?? [];
-      final amountPending = _parseDecimal(record['amount_pending']);
-      
-      if (payments.isEmpty && balancePaid > 0) {
-        // Create first payment
-        final overallBalance = amountPending - balancePaid;
-        final payment = {
-          'sale_id': recordId,
-          'balance_paid': balancePaid,
-          'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
-          'details': details.isEmpty ? null : details,
-          'overall_balance': overallBalance,
-        };
-        await ApiService.saveSalesBalancePayment(payment);
-      } else if (payments.isNotEmpty && balancePaid > 0) {
-        // Update the first payment with new values
-        final firstPayment = payments.first;
-        final firstPaymentId = firstPayment['id'] as int?;
-        if (firstPaymentId != null) {
-          final overallBalance = amountPending - balancePaid;
-          final payment = {
-            'id': firstPaymentId,
-            'sale_id': recordId,
-            'balance_paid': balancePaid,
-            'balance_paid_date': balancePaidDate != null ? FormatUtils.formatDate(balancePaidDate) : null,
-            'details': details.isEmpty ? null : details,
-            'overall_balance': overallBalance,
-          };
-          await ApiService.saveSalesBalancePayment(payment);
-        }
-      }
+      // Update only the details field for the main record
+      // Balance paid and balance paid date can only be edited via payment rows (using + button)
+      // TODO: If there's an API endpoint to update credit record details, use it here
       
       // Exit edit mode after save
       _editModeCredit[recordId] = false;
@@ -522,7 +512,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       );
       if (record.isEmpty) return;
 
-      final amountPending = _parseDecimal(record['amount_pending']);
+      final creditAmount = _parseDecimal(record['credit_amount'] ?? record['amount_pending'] ?? 0);
       final payments = _balancePayments[saleId] ?? [];
       
       double balancePaid;
@@ -541,8 +531,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         
         // Calculate overall balance: previous overall balance - this payment
         if (payments.isEmpty) {
-          // First payment: Amount Pending - this payment
-          overallBalance = amountPending - balancePaid;
+          // First payment: Credit Amount - this payment
+          overallBalance = creditAmount - balancePaid;
         } else {
           // Subsequent payment: last payment's overall_balance - this payment
           final lastPayment = payments.last;
@@ -585,6 +575,19 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         };
 
         await ApiService.saveSalesBalancePayment(payment);
+        // Clear edit mode and controllers after saving
+        if (_editModePayment.containsKey(paymentId)) {
+          _editModePayment[paymentId] = false;
+        }
+        if (_balancePaidControllers.containsKey(paymentId)) {
+          _balancePaidControllers[paymentId]!.dispose();
+          _balancePaidControllers.remove(paymentId);
+        }
+        if (_detailsControllers.containsKey(paymentId)) {
+          _detailsControllers[paymentId]!.dispose();
+          _detailsControllers.remove(paymentId);
+        }
+        _balancePaidDates.remove(paymentId);
       }
 
       // Reload credit data to reflect changes
@@ -624,6 +627,34 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         _newPaymentDetailsControllers.remove(key);
       }
       _newPaymentDates.remove(key);
+    });
+  }
+
+  void _toggleEditModePayment(int paymentId, Map<String, dynamic> payment) {
+    setState(() {
+      if (_editModePayment[paymentId] == true) {
+        // Cancel edit mode - restore original values
+        if (_balancePaidControllers.containsKey(paymentId)) {
+          _balancePaidControllers[paymentId]!.dispose();
+          _balancePaidControllers.remove(paymentId);
+        }
+        if (_detailsControllers.containsKey(paymentId)) {
+          _detailsControllers[paymentId]!.dispose();
+          _detailsControllers.remove(paymentId);
+        }
+        _balancePaidDates.remove(paymentId);
+        _editModePayment[paymentId] = false;
+      } else {
+        // Enter edit mode - initialize with current values
+        _balancePaidControllers[paymentId] = TextEditingController(
+          text: _parseDecimal(payment['balance_paid']).toStringAsFixed(2),
+        );
+        _balancePaidDates[paymentId] = FormatUtils.parseDate(payment['balance_paid_date']);
+        _detailsControllers[paymentId] = TextEditingController(
+          text: payment['details']?.toString() ?? '',
+        );
+        _editModePayment[paymentId] = true;
+      }
     });
   }
 
@@ -1239,8 +1270,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           tabs: const [
             Tab(text: 'Sales Details'),
             Tab(text: 'Sales Credit Details'),
-            Tab(text: 'Purchase Details'),
-            Tab(text: 'Purchase Credit Details'),
+            Tab(text: 'Expense Details'),
+            Tab(text: 'Expense Credit Details'),
             Tab(text: 'Overall Summary'),
           ],
         ),
@@ -1404,8 +1435,13 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : SingleChildScrollView(
+                  : Scrollbar(
+                      thumbVisibility: true,
+                      interactive: true,
+                      controller: _salesHorizontalScrollController,
+                      child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
+                        controller: _salesHorizontalScrollController,
                       child: SingleChildScrollView(
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -1639,6 +1675,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 );
                               }).toList(),
                             ),
+                            ),
                           ),
               ),
             ),
@@ -1674,8 +1711,13 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                 ],
               ),
               const SizedBox(height: 12),
-              SingleChildScrollView(
+              Scrollbar(
+                thumbVisibility: true,
+                interactive: true,
+                controller: _creditPaymentHorizontalScrollController,
+                child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
+                  controller: _creditPaymentHorizontalScrollController,
                 child: Row(
                   children: [
                     // Search Bar
@@ -1821,6 +1863,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                   ),
                   ],
                 ),
+                ),
               ),
             ],
           ),
@@ -1836,7 +1879,9 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : SingleChildScrollView(
+                  : Scrollbar(
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: SingleChildScrollView(
                         child: Padding(
@@ -1916,7 +1961,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 
                                 final rowsFromData = _filteredCreditData.expand((record) {
                                 final recordId = record['id'] as int;
-                                final amountPending = _parseDecimal(record['amount_pending']);
+                                final creditAmount = _parseDecimal(record['credit_amount'] ?? record['amount_pending'] ?? 0);
                                 final saleDateRaw = record['sale_date'];
                                 final saleDateFormatted = _formatDate(saleDateRaw);
                                 final payments = _balancePayments[recordId] ?? [];
@@ -1925,17 +1970,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 // Main row
                                 final List<DataRow> rows = [];
                                 
-                                // Calculate overall balance for main row (Amount Pending - sum of all payments)
+                                // Calculate overall balance for main row (Credit Amount - sum of all payments)
                                 double totalPaid = 0;
                                 for (var payment in payments) {
                                   totalPaid += _parseDecimal(payment['balance_paid']);
                                 }
-                                  double mainOverallBalance = amountPending - totalPaid;
-                                  
-                                  // If in edit mode, calculate based on controller value
-                                  if (_editModeCredit[recordId] == true && _balancePaidControllers.containsKey(recordId)) {
-                                    mainOverallBalance = amountPending - _parseDecimal(_balancePaidControllers[recordId]!.text);
-                                  }
+                                  double mainOverallBalance = creditAmount - totalPaid;
                                   
                                   // Add to total overall balance (sum of all overall balances across all records)
                                   totalOverallBalance += mainOverallBalance;
@@ -1970,7 +2010,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     DataCell(Text(record['quantity']?.toString() ?? '')),
                                     DataCell(
                                       Text(
-                                        '₹${amountPending.toStringAsFixed(2)}',
+                                        '₹${creditAmount.toStringAsFixed(2)}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.red,
@@ -1978,86 +2018,17 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                       ),
                                     ),
                                     DataCell(Text(saleDateFormatted)),
-                                    // Balance Paid - editable when in edit mode
-                                    DataCell(
-                                      _editModeCredit[recordId] == true && _balancePaidControllers.containsKey(recordId)
-                                          ? SizedBox(
-                                              width: 120,
-                                              child: TextFormField(
-                                                controller: _balancePaidControllers[recordId],
-                                                decoration: const InputDecoration(
-                                                  labelText: 'Balance Paid',
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                                keyboardType: TextInputType.number,
-                                                inputFormatters: [
-                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                ],
-                                                onChanged: (value) {
-                                                  setState(() {}); // Update Overall Balance in real-time
-                                                },
-                                              ),
-                                            )
-                                          : Text('₹${totalPaid.toStringAsFixed(2)}'),
-                                    ),
-                                    // Balance Paid Date - editable when in edit mode
-                                    DataCell(
-                                      _editModeCredit[recordId] == true && _balancePaidDates.containsKey(recordId)
-                                          ? InkWell(
-                                              onTap: () async {
-                                                final selectedDate = await showDatePicker(
-                                                  context: context,
-                                                  initialDate: _balancePaidDates[recordId] ?? DateTime.now(),
-                                                  firstDate: DateTime(2000),
-                                                  lastDate: DateTime(2100),
-                                                );
-                                                if (selectedDate != null) {
-                                                  setState(() {
-                                                    _balancePaidDates[recordId] = selectedDate;
-                                                  });
-                                                }
-                                              },
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                decoration: BoxDecoration(
-                                                  border: Border.all(color: Colors.grey),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[700]),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      _balancePaidDates[recordId] != null
-                                                          ? FormatUtils.formatDateDisplay(_balancePaidDates[recordId])
-                                                          : 'Select Date',
-                                                      style: TextStyle(
-                                                        color: _balancePaidDates[recordId] != null ? Colors.black : Colors.grey,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            )
-                                          : Text(
-                                              payments.isNotEmpty && payments.last['balance_paid_date'] != null
-                                                  ? FormatUtils.formatDateDisplay(payments.last['balance_paid_date'])
-                                                  : 'N/A',
-                                            ),
-                                    ),
-                                    // Overall Balance - calculated (Amount Pending - Balance Paid)
+                                    // Balance Paid - NOT editable for main row (read-only)
+                                    DataCell(Text('₹${totalPaid.toStringAsFixed(2)}')),
+                                    // Balance Paid Date - NOT visible for main row (empty cell)
+                                    const DataCell(Text('')),
+                                    // Overall Balance - calculated (Credit Amount - Balance Paid)
                                     DataCell(
                                       Text(
-                                        '₹${(_editModeCredit[recordId] == true && _balancePaidControllers.containsKey(recordId))
-                                            ? (amountPending - _parseDecimal(_balancePaidControllers[recordId]!.text)).toStringAsFixed(2)
-                                            : mainOverallBalance.toStringAsFixed(2)}',
+                                        '₹${mainOverallBalance.toStringAsFixed(2)}',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          color: (_editModeCredit[recordId] == true && _balancePaidControllers.containsKey(recordId))
-                                              ? ((amountPending - _parseDecimal(_balancePaidControllers[recordId]!.text)) > 0 ? Colors.red : Colors.green)
-                                              : (mainOverallBalance > 0 ? Colors.red : Colors.green),
+                                          color: mainOverallBalance > 0 ? Colors.red : Colors.green,
                                         ),
                                       ),
                                     ),
@@ -2150,7 +2121,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                   // Calculate overall balance for this payment
                                   double paymentOverallBalance;
                                   if (i == 0) {
-                                    paymentOverallBalance = amountPending - balancePaid;
+                                    paymentOverallBalance = creditAmount - balancePaid;
                                   } else {
                                     final prevPayment = payments[i - 1];
                                     final prevOverallBalance = _parseDecimal(prevPayment['overall_balance']);
@@ -2174,7 +2145,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                       const DataCell(Text('')),
                                       // Quantity - empty
                                       const DataCell(Text('')),
-                                      // Amount Pending - empty
+                                      // Credit Amount - empty
                                       const DataCell(Text('')),
                                       // Credit Taken Date - empty
                                       const DataCell(Text('')),
@@ -2288,19 +2259,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                                   IconButton(
                                                     icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
                                                     tooltip: 'Cancel',
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        if (_balancePaidControllers.containsKey(paymentKey)) {
-                                                          _balancePaidControllers[paymentKey]!.dispose();
-                                                          _balancePaidControllers.remove(paymentKey);
-                                                        }
-                                                        _balancePaidDates.remove(paymentKey);
-                                                        if (_detailsControllers.containsKey(paymentKey)) {
-                                                          _detailsControllers[paymentKey]!.dispose();
-                                                          _detailsControllers.remove(paymentKey);
-                                                        }
-                                                      });
-                                                    },
+                                                    onPressed: () => _toggleEditModePayment(paymentId, payment),
                                                   ),
                                                 ],
                                               )
@@ -2310,17 +2269,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                                   IconButton(
                                                     icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
                                                     tooltip: 'Edit Payment',
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _balancePaidControllers[paymentKey] = TextEditingController(
-                                                          text: _parseDecimal(payment['balance_paid']).toStringAsFixed(2),
-                                                        );
-                                                        _balancePaidDates[paymentKey] = FormatUtils.parseDate(payment['balance_paid_date']);
-                                                        _detailsControllers[paymentKey] = TextEditingController(
-                                                          text: payment['details']?.toString() ?? '',
-                                                        );
-                                                      });
-                                                    },
+                                                    onPressed: () => _toggleEditModePayment(paymentId, payment),
                                                   ),
                                                   if (widget.isMainAdmin)
                                                     IconButton(
@@ -2504,7 +2453,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                       const DataCell(Text('')),
                                       // Quantity - empty
                                       const DataCell(Text('')),
-                                      // Amount Pending - empty
+                                      // Credit Amount - empty
                                       const DataCell(Text('')),
                                       // Credit Taken Date - empty
                                       const DataCell(Text('')),
@@ -2534,6 +2483,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 return allRows;
                               }(),
                             ),
+                            ),
                           ),
                         ),
                       ),
@@ -2542,7 +2492,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       ],
     );
   }
-
 
   // ========== Purchase Details Methods ==========
   
@@ -2653,13 +2602,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     final shopNameController = TextEditingController();
     final purchaseDetailsController = TextEditingController();
     final purchaseAmountController = TextEditingController();
-    final amountPaidController = TextEditingController();
     final creditController = TextEditingController();
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add Purchase Details'),
+        title: const Text('Add Expense Details'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2702,18 +2650,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
               ),
               const SizedBox(height: 16),
               TextFormField(
-                controller: amountPaidController,
-                decoration: const InputDecoration(
-                  labelText: 'Amount Paid',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
                 controller: creditController,
                 decoration: const InputDecoration(
                   labelText: 'Credit',
@@ -2734,7 +2670,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
               shopNameController.dispose();
               purchaseDetailsController.dispose();
               purchaseAmountController.dispose();
-              amountPaidController.dispose();
               creditController.dispose();
               Navigator.pop(context, false);
             },
@@ -2756,7 +2691,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         shopName: shopNameController.text.trim(),
         purchaseDetails: purchaseDetailsController.text.trim(),
         purchaseAmount: FormatUtils.parseDecimal(purchaseAmountController.text),
-        amountPaid: FormatUtils.parseDecimal(amountPaidController.text),
         credit: FormatUtils.parseDecimal(creditController.text),
       );
     }
@@ -2765,7 +2699,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     shopNameController.dispose();
     purchaseDetailsController.dispose();
     purchaseAmountController.dispose();
-    amountPaidController.dispose();
     creditController.dispose();
   }
 
@@ -2774,7 +2707,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     required String shopName,
     required String purchaseDetails,
     required double purchaseAmount,
-    required double amountPaid,
     required double credit,
   }) async {
     if (widget.selectedSector == null && !_isAdmin) return;
@@ -2789,7 +2721,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         'shop_name': shopName.isEmpty ? null : shopName,
         'purchase_details': purchaseDetails.isEmpty ? null : purchaseDetails,
         'purchase_amount': purchaseAmount,
-        'amount_paid': amountPaid,
         'credit': credit,
         'purchase_date': dateStr,
       };
@@ -2833,7 +2764,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           'shop_name': TextEditingController(text: record['shop_name']?.toString() ?? ''),
           'purchase_details': TextEditingController(text: record['purchase_details']?.toString() ?? ''),
           'purchase_amount': TextEditingController(text: FormatUtils.parseDecimal(record['purchase_amount']).toStringAsFixed(2)),
-          'amount_paid': TextEditingController(text: FormatUtils.parseDecimal(record['amount_paid']).toStringAsFixed(2)),
           'credit': TextEditingController(text: FormatUtils.parseDecimal(record['credit']).toStringAsFixed(2)),
         };
         _editModePurchase[index] = true;
@@ -2855,7 +2785,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         'shop_name': _controllersPurchase[index]!['shop_name']!.text.trim().isEmpty ? null : _controllersPurchase[index]!['shop_name']!.text.trim(),
         'purchase_details': _controllersPurchase[index]!['purchase_details']!.text.trim().isEmpty ? null : _controllersPurchase[index]!['purchase_details']!.text.trim(),
         'purchase_amount': FormatUtils.parseDecimal(_controllersPurchase[index]!['purchase_amount']!.text),
-        'amount_paid': FormatUtils.parseDecimal(_controllersPurchase[index]!['amount_paid']!.text),
         'credit': FormatUtils.parseDecimal(_controllersPurchase[index]!['credit']!.text),
         'purchase_date': _selectedDatePurchase!.toIso8601String().split('T')[0],
       };
@@ -2933,6 +2862,9 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     return SizedBox(
       width: 150,
       height: 60,
+      child: Scrollbar(
+        thumbVisibility: true,
+        interactive: true,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -3025,6 +2957,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
               );
             }),
           ],
+        ),
         ),
       ),
     );
@@ -3161,7 +3094,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                 child: ElevatedButton.icon(
                   onPressed: _isLoadingPurchase ? null : _showAddPurchaseDialog,
                   icon: const Icon(Icons.add),
-                  label: const Text('Add Purchase Details', style: TextStyle(fontSize: 16)),
+                  label: const Text('Add Expense Details', style: TextStyle(fontSize: 16)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple.shade700,
                     foregroundColor: Colors.white,
@@ -3182,8 +3115,13 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : SingleChildScrollView(
+                  : Scrollbar(
+                      thumbVisibility: true,
+                      interactive: true,
+                      controller: _purchaseHorizontalScrollController,
+                      child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
+                        controller: _purchaseHorizontalScrollController,
                       child: SingleChildScrollView(
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -3226,7 +3164,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 const DataColumn(label: Text('Shop Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Purchase Amount', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Amount Paid', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Credit', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Bill Image', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -3312,24 +3249,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                           ? SizedBox(
                                               width: 120,
                                               child: TextFormField(
-                                                controller: _controllersPurchase[index]!['amount_paid'],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                                keyboardType: TextInputType.number,
-                                                inputFormatters: [
-                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                ],
-                                              ),
-                                            )
-                                          : Text('₹${FormatUtils.parseDecimal(record['amount_paid']).toStringAsFixed(2)}'),
-                                    ),
-                                    DataCell(
-                                      isEditMode && _controllersPurchase.containsKey(index)
-                                          ? SizedBox(
-                                              width: 120,
-                                              child: TextFormField(
                                                 controller: _controllersPurchase[index]!['credit'],
                                                 decoration: const InputDecoration(
                                                   border: OutlineInputBorder(),
@@ -3396,6 +3315,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                   ],
                                 );
                               }).toList(),
+                            ),
                             ),
                           ),
                         ),
@@ -3622,6 +3542,34 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     });
   }
 
+  void _toggleEditModeCompanyPayment(int paymentId, Map<String, dynamic> payment) {
+    setState(() {
+      if (_editModeCompanyPayment[paymentId] == true) {
+        // Cancel edit mode - restore original values
+        if (_companyBalancePaidControllers.containsKey(paymentId)) {
+          _companyBalancePaidControllers[paymentId]!.dispose();
+          _companyBalancePaidControllers.remove(paymentId);
+        }
+        if (_companyDetailsControllers.containsKey(paymentId)) {
+          _companyDetailsControllers[paymentId]!.dispose();
+          _companyDetailsControllers.remove(paymentId);
+        }
+        _companyBalancePaidDates.remove(paymentId);
+        _editModeCompanyPayment[paymentId] = false;
+      } else {
+        // Enter edit mode - initialize with current values
+        _companyBalancePaidControllers[paymentId] = TextEditingController(
+          text: FormatUtils.parseDecimal(payment['balance_paid']).toStringAsFixed(2),
+        );
+        _companyBalancePaidDates[paymentId] = FormatUtils.parseDate(payment['balance_paid_date']);
+        _companyDetailsControllers[paymentId] = TextEditingController(
+          text: payment['details']?.toString() ?? '',
+        );
+        _editModeCompanyPayment[paymentId] = true;
+      }
+    });
+  }
+
   double _calculateCompanyOverallBalance(int purchaseId, int? paymentIndex) {
     final record = _filteredCompanyCreditData.firstWhere(
       (r) => r['id'] == purchaseId,
@@ -3790,6 +3738,19 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         };
 
         await ApiService.saveBalancePayment(payment);
+        // Clear edit mode and controllers after saving
+        if (_editModeCompanyPayment.containsKey(paymentId)) {
+          _editModeCompanyPayment[paymentId] = false;
+        }
+        if (_companyBalancePaidControllers.containsKey(paymentId)) {
+          _companyBalancePaidControllers[paymentId]!.dispose();
+          _companyBalancePaidControllers.remove(paymentId);
+        }
+        if (_companyDetailsControllers.containsKey(paymentId)) {
+          _companyDetailsControllers[paymentId]!.dispose();
+          _companyDetailsControllers.remove(paymentId);
+        }
+        _companyBalancePaidDates.remove(paymentId);
       }
 
       await _loadCompanyCreditData();
@@ -3871,8 +3832,13 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                 ],
               ),
               const SizedBox(height: 12),
-              SingleChildScrollView(
+              Scrollbar(
+                thumbVisibility: true,
+                interactive: true,
+                controller: _companyCreditPaymentHorizontalScrollController,
+                child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
+                  controller: _companyCreditPaymentHorizontalScrollController,
                 child: Row(
                   children: [
                     SizedBox(
@@ -3991,6 +3957,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                     ),
                   ],
                 ),
+                ),
               ),
             ],
           ),
@@ -4005,8 +3972,13 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : SingleChildScrollView(
+                  : Scrollbar(
+                      thumbVisibility: true,
+                      interactive: true,
+                      controller: _companyCreditHorizontalScrollController,
+                      child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
+                        controller: _companyCreditHorizontalScrollController,
                       child: SingleChildScrollView(
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -4070,21 +4042,33 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                   ),
                                 ),
                                 const DataColumn(label: Text('Balance Paid', style: TextStyle(fontWeight: FontWeight.bold))),
+                                const DataColumn(label: Text('Balance Paid Date', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Overall Balance', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Details', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
-                              rows: _filteredCompanyCreditData.map((record) {
+                              rows: () {
+                                final allRows = <DataRow>[];
+                                
+                                final rowsFromData = _filteredCompanyCreditData.expand((record) {
                                 final recordId = record['id'] as int;
                                 final credit = FormatUtils.parseDecimal(record['credit']);
                                 final payments = _companyBalancePayments[recordId] ?? [];
+                                  final isAddingNewPayment = _addingNewCompanyPayment[recordId] == true;
+                                  final purchaseDate = FormatUtils.formatDate(record['purchase_date']);
+                                  
+                                  final List<DataRow> rows = [];
+                                  
+                                  // Calculate overall balance for main row
                                 double totalPaid = 0;
                                 for (var payment in payments) {
                                   totalPaid += FormatUtils.parseDecimal(payment['balance_paid']);
                                 }
-                                final overallBalance = credit - totalPaid;
+                                  final mainOverallBalance = credit - totalPaid;
                                 
-                                return DataRow(
+                                  // Main row
+                                  rows.add(DataRow(
+                                    color: WidgetStateProperty.all(Colors.blue.shade200),
                                   cells: [
                                     if (widget.selectedSector == null && _isAdmin)
                                       DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
@@ -4092,9 +4076,10 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     DataCell(Text(record['shop_name']?.toString() ?? '')),
                                     DataCell(Text(record['purchase_details']?.toString() ?? '')),
                                     DataCell(Text('₹${credit.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red))),
-                                    DataCell(Text(FormatUtils.formatDate(record['purchase_date']))),
+                                      DataCell(Text(purchaseDate)),
                                     DataCell(Text('₹${totalPaid.toStringAsFixed(2)}')),
-                                    DataCell(Text('₹${overallBalance.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: overallBalance > 0 ? Colors.red : Colors.green))),
+                                    const DataCell(Text('')), // Balance Paid Date (empty for main row)
+                                      DataCell(Text('₹${mainOverallBalance.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: mainOverallBalance > 0 ? Colors.red : Colors.green))),
                                     DataCell(Text(record['details']?.toString() ?? '')),
                                     DataCell(
                                       Row(
@@ -4120,12 +4105,271 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                       ),
                                     ),
                                   ],
-                                );
-                              }).toList(),
+                                  ));
+                                  
+                                  // Add existing payment rows
+                                  for (int i = 0; i < payments.length; i++) {
+                                    final payment = payments[i];
+                                    final paymentId = payment['id'] as int;
+                                    final paymentKey = paymentId;
+                                    
+                                    double paymentOverallBalance;
+                                    if (i == 0) {
+                                      paymentOverallBalance = credit - FormatUtils.parseDecimal(payment['balance_paid']);
+                                    } else {
+                                      final prevPayment = payments[i - 1];
+                                      final prevOverallBalance = FormatUtils.parseDecimal(prevPayment['overall_balance']);
+                                      paymentOverallBalance = prevOverallBalance - FormatUtils.parseDecimal(payment['balance_paid']);
+                                    }
+                                    
+                                    final isEditingPayment = _editModeCompanyPayment[paymentId] == true;
+                                    
+                                    rows.add(DataRow(
+                                      cells: [
+                                        if (widget.selectedSector == null && _isAdmin)
+                                          const DataCell(Text('')),
+                                        const DataCell(Text('')), // Item Name
+                                        const DataCell(Text('')), // Shop Name
+                                        const DataCell(Text('')), // Purchase Details
+                                        const DataCell(Text('')), // Amount Pending
+                                        const DataCell(Text('')), // Credit Taken Date (empty for payment rows)
+                                        // Balance Paid - editable when in edit mode
+                                        DataCell(
+                                          isEditingPayment
+                                              ? SizedBox(
+                                                  width: 120,
+                                                  child: TextFormField(
+                                                    controller: _companyBalancePaidControllers[paymentKey],
+                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                    decoration: const InputDecoration(
+                                                      labelText: 'Balance Paid',
+                                                      border: OutlineInputBorder(),
+                                                      isDense: true,
+                                                    ),
+                                                  ),
+                                                )
+                                              : Text('₹${FormatUtils.parseDecimal(payment['balance_paid']).toStringAsFixed(2)}'),
+                                        ),
+                                        // Balance Paid Date - editable when in edit mode
+                                        DataCell(
+                                          isEditingPayment
+                                              ? InkWell(
+                                                  onTap: () async {
+                                                    final selectedDate = await showDatePicker(
+                                                      context: context,
+                                                      initialDate: _companyBalancePaidDates[paymentKey] ?? DateTime.now(),
+                                                      firstDate: DateTime(2000),
+                                                      lastDate: DateTime.now(),
+                                                    );
+                                                    if (selectedDate != null) {
+                                                      setState(() {
+                                                        _companyBalancePaidDates[paymentKey] = selectedDate;
+                                                      });
+                                                    }
+                                                  },
+                                                  child: InputDecorator(
+                                                    decoration: const InputDecoration(
+                                                      labelText: 'Balance Paid Date',
+                                                      border: OutlineInputBorder(),
+                                                      isDense: true,
+                                                      suffixIcon: Icon(Icons.calendar_today, size: 18),
+                                                    ),
+                                                    child: Text(
+                                                      _companyBalancePaidDates[paymentKey] != null
+                                                          ? FormatUtils.formatDateDisplay(FormatUtils.formatDate(_companyBalancePaidDates[paymentKey]!))
+                                                          : 'Select Date',
+                                                    ),
+                                                  ),
+                                                )
+                                              : Text(payment['balance_paid_date'] != null ? FormatUtils.formatDateDisplay(payment['balance_paid_date']) : 'N/A'),
+                                        ),
+                                        DataCell(Text('₹${paymentOverallBalance.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: paymentOverallBalance > 0 ? Colors.red : Colors.green))), // Overall Balance
+                                        // Details - editable when in edit mode
+                                        DataCell(
+                                          isEditingPayment
+                                              ? SizedBox(
+                                                  width: 150,
+                                                  child: TextFormField(
+                                                    controller: _companyDetailsControllers[paymentKey],
+                                                    decoration: const InputDecoration(
+                                                      labelText: 'Details',
+                                                      border: OutlineInputBorder(),
+                                                      isDense: true,
+                                                    ),
+                                                    maxLines: 2,
+                                                  ),
+                                                )
+                                              : Text(payment['details']?.toString() ?? ''),
+                                        ),
+                                        DataCell(
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (isEditingPayment) ...[
+                                                IconButton(
+                                                  icon: const Icon(Icons.save, color: Colors.green, size: 20),
+                                                  tooltip: 'Save Payment',
+                                                  onPressed: () => _saveCompanyPaymentRow(recordId, paymentId),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
+                                                  tooltip: 'Cancel',
+                                                  onPressed: () => _toggleEditModeCompanyPayment(paymentId, payment),
+                                                ),
+                                              ] else ...[
+                                                IconButton(
+                                                  icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                                  tooltip: 'Edit Payment',
+                                                  onPressed: () => _toggleEditModeCompanyPayment(paymentId, payment),
+                                                ),
+                                                if (widget.isMainAdmin)
+                                                  IconButton(
+                                                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                                    tooltip: 'Delete Payment',
+                                                    onPressed: () async {
+                                                      final confirmed = await UIHelpers.showDeleteConfirmationDialog(
+                                                        context: context,
+                                                        itemName: 'payment',
+                                                      );
+                                                      if (confirmed == true) {
+                                                        // Delete payment logic here
+                                                      }
+                                                    },
+                                                  ),
+                                              ],
+                                            ],
+                                          ),
+                                        ), // Action
+                                      ],
+                                    ));
+                                  }
+                                  
+                                  // Add new payment row if adding
+                                  if (isAddingNewPayment) {
+                                    final newKey = '${recordId}_new';
+                                    final newPaymentController = _newCompanyPaymentControllers[newKey] ?? TextEditingController();
+                                    final newPaymentDate = _newCompanyPaymentDates[newKey];
+                                    final newDetailsController = _newCompanyPaymentDetailsControllers[newKey] ?? TextEditingController();
+                                    
+                                    rows.add(DataRow(
+                                      cells: [
+                                        if (widget.selectedSector == null && _isAdmin)
+                                          const DataCell(Text('')), // Sector
+                                        const DataCell(Text('')), // Item Name
+                                        const DataCell(Text('')), // Shop Name
+                                        const DataCell(Text('')), // Purchase Details
+                                        const DataCell(Text('')), // Amount Pending
+                                        const DataCell(Text('')), // Credit Taken Date (empty for new payment)
+                                        DataCell(
+                                          SizedBox(
+                                            width: 120,
+                                            child: TextFormField(
+                                              controller: newPaymentController,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Balance Paid',
+                                                border: OutlineInputBorder(),
+                                                isDense: true,
+                                              ),
+                                              keyboardType: TextInputType.number,
+                                              inputFormatters: [
+                                                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                              ],
+                                            ),
+                                          ),
+                                        ), // Balance Paid
+                                        DataCell(
+                                          InkWell(
+                                            onTap: () async {
+                                              final selectedDate = await showDatePicker(
+                                                context: context,
+                                                initialDate: newPaymentDate ?? DateTime.now(),
+                                                firstDate: DateTime(2000),
+                                                lastDate: DateTime(2100),
+                                              );
+                                              if (selectedDate != null) {
+                                                setState(() {
+                                                  _newCompanyPaymentDates[newKey] = selectedDate;
+                                                });
+                                              }
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                              decoration: BoxDecoration(
+                                                border: Border.all(color: Colors.grey),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.calendar_today, size: 16, color: Colors.grey[700]),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    newPaymentDate != null
+                                                        ? FormatUtils.formatDateDisplay(newPaymentDate)
+                                                        : 'Select Date',
+                                                    style: TextStyle(
+                                                      color: newPaymentDate != null ? Colors.black : Colors.grey,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ), // Balance Paid Date
+                                        const DataCell(Text('')), // Overall Balance
+                                        DataCell(
+                                          SizedBox(
+                                            width: 200,
+                                            child: TextFormField(
+                                              controller: newDetailsController,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Details',
+                                                border: OutlineInputBorder(),
+                                                isDense: true,
+                                              ),
+                                              maxLines: 2,
+                                            ),
+                                          ),
+                                        ), // Details
+                                        DataCell(
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.save, color: Colors.green, size: 20),
+                                                tooltip: 'Save Payment',
+                                                onPressed: () => _saveCompanyPaymentRow(recordId, null),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
+                                                tooltip: 'Cancel',
+                                                onPressed: () => _cancelNewCompanyPaymentRow(recordId),
+                                              ),
+                                            ],
+                                          ),
+                                        ), // Action
+                                      ],
+                                    ));
+                                    
+                                    if (!_newCompanyPaymentControllers.containsKey(newKey)) {
+                                      _newCompanyPaymentControllers[newKey] = newPaymentController;
+                                    }
+                                    if (!_newCompanyPaymentDetailsControllers.containsKey(newKey)) {
+                                      _newCompanyPaymentDetailsControllers[newKey] = newDetailsController;
+                                    }
+                                  }
+                                  
+                                  return rows;
+                                }).toList();
+                                
+                                allRows.addAll(rowsFromData);
+                                return allRows;
+                              }(),
                             ),
                           ),
                         ),
                       ),
+                    ),
                     ),
         ),
       ],
@@ -4151,9 +4395,24 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         // No date parameter to get all data
       );
 
+      // Load all credit data for balance paid calculations
+      // Use getCreditDetailsFromSales to ensure balance_payments are included
+      final allCredits = await ApiService.getCreditDetailsFromSales(
+        sector: widget.selectedSector,
+        companyStaff: null, // Get all company staff for summary
+        month: null, // Get all months for summary
+      );
+      
+      // Load all company credit data for balance paid calculations
+      final allCompanyCredits = await ApiService.getCreditDetailsFromCompanyPurchases(
+        sector: widget.selectedSector,
+      );
+
       setState(() {
         _allSalesDataForSummary = allSales;
         _allPurchaseDataForSummary = allPurchases;
+        _allCreditDataForSummary = allCredits;
+        _allCompanyCreditDataForSummary = allCompanyCredits;
       });
     } catch (e) {
       if (mounted) {
@@ -4197,24 +4456,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   }
 
   DateTime? _parseDateFromRecord(dynamic dateValue) {
-    if (dateValue == null) return null;
-    try {
-      if (dateValue is DateTime) {
-        return dateValue;
-      } else if (dateValue is String) {
-        String dateStr = dateValue;
-        if (dateStr.contains('T')) {
-          dateStr = dateStr.split('T')[0];
-        }
-        if (dateStr.contains(' ')) {
-          dateStr = dateStr.split(' ')[0];
-        }
-        return DateTime.tryParse(dateStr);
-      }
-    } catch (e) {
-      // Ignore parse errors
-    }
-    return null;
+    // Use FormatUtils.parseDate which handles multiple date formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
+    return FormatUtils.parseDate(dateValue);
   }
 
   Future<void> _downloadSalesDetailsPDF() async {
@@ -4502,6 +4745,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     // Filter data by date range
     List<Map<String, dynamic>> filteredSales = _allSalesDataForSummary;
     List<Map<String, dynamic>> filteredPurchases = _allPurchaseDataForSummary;
+    List<Map<String, dynamic>> filteredCredits = _allCreditDataForSummary;
+    List<Map<String, dynamic>> filteredCompanyCredits = _allCompanyCreditDataForSummary;
     
     if (_fromDate != null || _toDate != null) {
       filteredSales = _allSalesDataForSummary.where((sale) {
@@ -4541,12 +4786,96 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           sectorData[sectorCode] = {
             'salesIncome': 0.0,
             'salesCredit': 0.0,
+            'creditReceived': 0.0,
             'purchaseExpense': 0.0,
             'purchaseCredit': 0.0,
+            'purchaseCreditPaid': 0.0,
           };
         }
         sectorData[sectorCode]!['salesIncome'] = sectorData[sectorCode]!['salesIncome']! + FormatUtils.parseDecimal(sale['amount_received']);
         sectorData[sectorCode]!['salesCredit'] = sectorData[sectorCode]!['salesCredit']! + FormatUtils.parseDecimal(sale['credit_amount']);
+      }
+      
+      // Group credit data by sector and calculate balance paid
+      for (var credit in filteredCredits) {
+        final sectorCode = credit['sector_code']?.toString() ?? 'Unknown';
+        if (!sectorData.containsKey(sectorCode)) {
+          sectorData[sectorCode] = {
+            'salesIncome': 0.0,
+            'salesCredit': 0.0,
+            'creditReceived': 0.0,
+            'purchaseExpense': 0.0,
+            'purchaseCredit': 0.0,
+            'purchaseCreditPaid': 0.0,
+          };
+        }
+        // Sum up balance paid amounts from balance_payments
+        // This matches balance_paid_date from sales credit details page with the selected date range
+        final balancePayments = credit['balance_payments'] as List<dynamic>? ?? [];
+        double balancePaidTotal = 0.0;
+        for (var payment in balancePayments) {
+          final paymentDate = _parseDateFromRecord(payment['balance_paid_date']);
+          if (paymentDate != null) {
+            // Extract date only (year, month, day) ignoring time
+            final paymentDateOnly = DateTime(paymentDate.year, paymentDate.month, paymentDate.day);
+            final fromDateOnly = _fromDate != null ? DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day) : null;
+            final toDateOnly = _toDate != null ? DateTime(_toDate!.year, _toDate!.month, _toDate!.day) : null;
+            
+            // Only include payments where balance_paid_date matches the selected date range (inclusive)
+            bool includePayment = true;
+            if (fromDateOnly != null && paymentDateOnly.isBefore(fromDateOnly)) {
+              includePayment = false;
+            }
+            if (toDateOnly != null && paymentDateOnly.isAfter(toDateOnly)) {
+              includePayment = false;
+            }
+            
+            // If payment date matches the selected date range, include the balance_paid amount
+            if (includePayment) {
+              balancePaidTotal += FormatUtils.parseDecimal(payment['balance_paid']);
+            }
+          } else if (_fromDate == null && _toDate == null) {
+            // If no date filter, include all payments (even those without dates)
+            balancePaidTotal += FormatUtils.parseDecimal(payment['balance_paid']);
+          }
+        }
+        sectorData[sectorCode]!['creditReceived'] = sectorData[sectorCode]!['creditReceived']! + balancePaidTotal;
+      }
+      
+      // Group company credit data by sector and calculate balance paid
+      for (var credit in filteredCompanyCredits) {
+        final sectorCode = credit['sector_code']?.toString() ?? 'Unknown';
+        if (!sectorData.containsKey(sectorCode)) {
+          sectorData[sectorCode] = {
+            'salesIncome': 0.0,
+            'salesCredit': 0.0,
+            'creditReceived': 0.0,
+            'purchaseExpense': 0.0,
+            'purchaseCredit': 0.0,
+            'purchaseCreditPaid': 0.0,
+          };
+        }
+        // Sum up balance paid amounts from balance_payments
+        final balancePayments = credit['balance_payments'] as List<dynamic>? ?? [];
+        double balancePaidTotal = 0.0;
+        for (var payment in balancePayments) {
+          final paymentDate = _parseDateFromRecord(payment['balance_paid_date']);
+          if (paymentDate != null) {
+            final paymentDateOnly = DateTime(paymentDate.year, paymentDate.month, paymentDate.day);
+            final fromDateOnly = _fromDate != null ? DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day) : null;
+            final toDateOnly = _toDate != null ? DateTime(_toDate!.year, _toDate!.month, _toDate!.day) : null;
+            
+            // Only include payments within the date range
+            if (fromDateOnly != null && paymentDateOnly.isBefore(fromDateOnly)) continue;
+            if (toDateOnly != null && paymentDateOnly.isAfter(toDateOnly)) continue;
+            
+            balancePaidTotal += FormatUtils.parseDecimal(payment['balance_paid']);
+          } else if (_fromDate == null && _toDate == null) {
+            // If no date filter, include all payments
+            balancePaidTotal += FormatUtils.parseDecimal(payment['balance_paid']);
+          }
+        }
+        sectorData[sectorCode]!['purchaseCreditPaid'] = sectorData[sectorCode]!['purchaseCreditPaid']! + balancePaidTotal;
       }
       
       // Group purchase data by sector
@@ -4556,8 +4885,10 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           sectorData[sectorCode] = {
             'salesIncome': 0.0,
             'salesCredit': 0.0,
+            'creditReceived': 0.0,
             'purchaseExpense': 0.0,
             'purchaseCredit': 0.0,
+            'purchaseCreditPaid': 0.0,
           };
         }
         sectorData[sectorCode]!['purchaseExpense'] = sectorData[sectorCode]!['purchaseExpense']! + FormatUtils.parseDecimal(purchase['purchase_amount']);
@@ -4568,8 +4899,10 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     // Calculate totals
     double totalSalesIncome = 0.0;
     double totalSalesCredit = 0.0;
+    double totalCreditReceived = 0.0;
     double totalPurchaseExpense = 0.0;
     double totalPurchaseCredit = 0.0;
+    double totalPurchaseCreditPaid = 0.0;
     
     for (var sale in filteredSales) {
       totalSalesIncome += FormatUtils.parseDecimal(sale['amount_received']);
@@ -4579,6 +4912,67 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     for (var purchase in filteredPurchases) {
       totalPurchaseExpense += FormatUtils.parseDecimal(purchase['purchase_amount']);
       totalPurchaseCredit += FormatUtils.parseDecimal(purchase['credit']);
+    }
+    
+    // Calculate total credit received from sales credit balance payments
+    // This matches balance_paid_date from sales credit details page with the selected date range
+    for (var credit in filteredCredits) {
+      final balancePayments = credit['balance_payments'] as List<dynamic>? ?? [];
+      for (var payment in balancePayments) {
+        final paymentDate = _parseDateFromRecord(payment['balance_paid_date']);
+        if (paymentDate != null) {
+          // Extract date only (year, month, day) ignoring time
+          final paymentDateOnly = DateTime(paymentDate.year, paymentDate.month, paymentDate.day);
+          final fromDateOnly = _fromDate != null ? DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day) : null;
+          final toDateOnly = _toDate != null ? DateTime(_toDate!.year, _toDate!.month, _toDate!.day) : null;
+          
+          // Only include payments where balance_paid_date matches the selected date range (inclusive)
+          bool includePayment = true;
+          if (fromDateOnly != null && paymentDateOnly.isBefore(fromDateOnly)) {
+            includePayment = false;
+          }
+          if (toDateOnly != null && paymentDateOnly.isAfter(toDateOnly)) {
+            includePayment = false;
+          }
+          
+          // If payment date matches the selected date range, include the balance_paid amount
+          if (includePayment) {
+            totalCreditReceived += FormatUtils.parseDecimal(payment['balance_paid']);
+          }
+        } else if (_fromDate == null && _toDate == null) {
+          // If no date filter, include all payments (even those without dates)
+          totalCreditReceived += FormatUtils.parseDecimal(payment['balance_paid']);
+        }
+      }
+    }
+    
+    // Calculate total purchase credit paid from company credit balance payments
+    for (var credit in filteredCompanyCredits) {
+      final balancePayments = credit['balance_payments'] as List<dynamic>? ?? [];
+      for (var payment in balancePayments) {
+        final paymentDate = _parseDateFromRecord(payment['balance_paid_date']);
+        if (paymentDate != null) {
+          final paymentDateOnly = DateTime(paymentDate.year, paymentDate.month, paymentDate.day);
+          final fromDateOnly = _fromDate != null ? DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day) : null;
+          final toDateOnly = _toDate != null ? DateTime(_toDate!.year, _toDate!.month, _toDate!.day) : null;
+          
+          // Only include payments within the date range (inclusive)
+          bool includePayment = true;
+          if (fromDateOnly != null && paymentDateOnly.isBefore(fromDateOnly)) {
+            includePayment = false;
+          }
+          if (toDateOnly != null && paymentDateOnly.isAfter(toDateOnly)) {
+            includePayment = false;
+          }
+          
+          if (includePayment) {
+            totalPurchaseCreditPaid += FormatUtils.parseDecimal(payment['balance_paid']);
+          }
+        } else if (_fromDate == null && _toDate == null) {
+          // If no date filter, include all payments (even those without dates)
+          totalPurchaseCreditPaid += FormatUtils.parseDecimal(payment['balance_paid']);
+        }
+      }
     }
     
     return Column(
@@ -4687,8 +5081,13 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         Expanded(
           child: _isLoadingSummary
               ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
+              : Scrollbar(
+                  thumbVisibility: true,
+                  interactive: true,
+                  controller: _summaryHorizontalScrollController,
+                  child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
+                    controller: _summaryHorizontalScrollController,
                   child: SingleChildScrollView(
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -4703,9 +5102,11 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                             if (showSectorColumn)
                               const DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
                             const DataColumn(label: Text('Sales Income', style: TextStyle(fontWeight: FontWeight.bold))),
-                            const DataColumn(label: Text('Sales Credit', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Credit Given', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Credit Received', style: TextStyle(fontWeight: FontWeight.bold))),
                             const DataColumn(label: Text('Purchase Expense', style: TextStyle(fontWeight: FontWeight.bold))),
                             const DataColumn(label: Text('Purchase Credit', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Purchase Credit Paid', style: TextStyle(fontWeight: FontWeight.bold))),
                           ],
                           rows: [
                             // Sector-wise rows if all sectors is selected
@@ -4718,18 +5119,20 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     DataCell(Text(_getSectorName(sectorCode))),
                                     DataCell(Text('₹${data['salesIncome']!.toStringAsFixed(2)}')),
                                     DataCell(Text('₹${data['salesCredit']!.toStringAsFixed(2)}')),
+                                    DataCell(Text('₹${data['creditReceived']!.toStringAsFixed(2)}')),
                                     DataCell(Text('₹${data['purchaseExpense']!.toStringAsFixed(2)}')),
                                     DataCell(Text('₹${data['purchaseCredit']!.toStringAsFixed(2)}')),
+                                    DataCell(Text('₹${data['purchaseCreditPaid']!.toStringAsFixed(2)}')),
                                   ],
                                 );
-                              }).toList(),
+                              }),
                             // Total row
                             DataRow(
                               color: WidgetStateProperty.all(Colors.blue.shade50),
                               cells: [
                                 if (showSectorColumn)
-                                  DataCell(
-                                    const Text(
+                                  const DataCell(
+                                    Text(
                                       'TOTAL',
                                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                     ),
@@ -4748,6 +5151,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 ),
                                 DataCell(
                                   Text(
+                                    '₹${totalCreditReceived.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
                                     '₹${totalPurchaseExpense.toStringAsFixed(2)}',
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                   ),
@@ -4758,9 +5167,16 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                   ),
                                 ),
+                                DataCell(
+                                  Text(
+                                    '₹${totalPurchaseCreditPaid.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
                               ],
                             ),
                           ],
+                        ),
                         ),
                       ),
                     ),

@@ -63,6 +63,13 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
   final Map<String, TextEditingController> _newPaymentControllers = {}; // Controllers for new payment rows (key = "purchaseId_new")
   final Map<String, DateTime?> _newPaymentDates = {}; // Dates for new payment rows (key = "purchaseId_new")
   final Map<String, TextEditingController> _newPaymentDetailsControllers = {}; // Details controllers for new payment rows (key = "purchaseId_new")
+  
+  // Horizontal ScrollControllers for draggable scrollbars
+  final ScrollController _purchaseHorizontalScrollController = ScrollController();
+  final ScrollController _creditHorizontalScrollController = ScrollController();
+  final ScrollController _purchasePaymentHorizontalScrollController = ScrollController();
+  final ScrollController _creditPaymentHorizontalScrollController = ScrollController();
+  final Map<String, ScrollController> _photoCellControllers = {};
 
   @override
   void initState() {
@@ -103,6 +110,15 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
     for (var controller in _newPaymentDetailsControllers.values) {
       controller.dispose();
     }
+    // Dispose horizontal scroll controllers
+    _purchaseHorizontalScrollController.dispose();
+    _creditHorizontalScrollController.dispose();
+    _purchasePaymentHorizontalScrollController.dispose();
+    _creditPaymentHorizontalScrollController.dispose();
+    for (var controller in _photoCellControllers.values) {
+      controller.dispose();
+    }
+    _photoCellControllers.clear();
     super.dispose();
   }
 
@@ -1431,11 +1447,14 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
     return SizedBox(
       width: 150,
       height: 60, // Match typical row height
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      child: Scrollbar(
+        thumbVisibility: true,
+        interactive: true,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             ...photos.map((photo) {
               final imageUrl = photo['image_url'] as String? ?? '';
               final photoId = photo['id'] as int?;
@@ -1526,6 +1545,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -1782,23 +1802,28 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
               : _purchaseData.isEmpty
                   ? const Center(
                       child: Text(
-                        'No purchases data available',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                    )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                      'No purchases data available',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  )
+                  : Scrollbar(
+                      thumbVisibility: true,
+                      interactive: true,
+                      controller: _purchaseHorizontalScrollController,
                       child: SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: DataTable(
-                              columnSpacing: 20,
-                              columns: [
+                        scrollDirection: Axis.horizontal,
+                        controller: _purchaseHorizontalScrollController,
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: DataTable(
+                                columnSpacing: 20,
+                                columns: [
                                 if (widget.selectedSector == null && _isAdmin)
                                   DataColumn(
                                     label: Row(
@@ -2013,6 +2038,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                         ),
                       ),
                     ),
+                  ),
         ),
         // Add Purchase Button
         Padding(
@@ -2063,13 +2089,18 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                 ],
               ),
               const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    // Search Bar
-                    SizedBox(
-                      width: 250,
+              Scrollbar(
+                thumbVisibility: true,
+                interactive: true,
+                controller: _creditPaymentHorizontalScrollController,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  controller: _creditPaymentHorizontalScrollController,
+                  child: Row(
+                    children: [
+                      // Search Bar
+                      SizedBox(
+                        width: 250,
                       child: StatefulBuilder(
                         builder: (context, setState) {
                           return TextField(
@@ -2179,6 +2210,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                   ],
                 ),
               ),
+            ),
             ],
           ),
         ),
@@ -2189,20 +2221,25 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
               : _filteredCreditData.isEmpty
                   ? const Center(
                       child: Text(
-                        'No purchases with outstanding credit',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                    )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                      'No purchases with outstanding credit',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  )
+                  : Scrollbar(
+                      thumbVisibility: true,
+                      interactive: true,
+                      controller: _creditHorizontalScrollController,
                       child: SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                        scrollDirection: Axis.horizontal,
+                        controller: _creditHorizontalScrollController,
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             child: DataTable(
                               columnSpacing: 20,
                               columns: [
@@ -2885,6 +2922,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                         ),
                       ),
                     ),
+                  ),
         ),
       ],
     );

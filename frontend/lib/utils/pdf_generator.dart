@@ -2301,7 +2301,7 @@ class PdfGenerator {
       ),
     );
     
-    final defaultFileName = 'Sales_Credit_Details.pdf';
+    const defaultFileName = 'Sales_Credit_Details.pdf';
     final finalFileName = fileName != null 
         ? _sanitizeFileName('$fileName.pdf')
         : _sanitizeFileName(defaultFileName);

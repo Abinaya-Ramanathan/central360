@@ -3,7 +3,7 @@
 -- ============================================
 -- This file contains all database migrations consolidated into a single file
 -- Includes: Complete schema, default data, and all incremental updates
--- Last updated: Includes all features through migration 050
+-- Last updated: Includes all features through migration 055
 -- ============================================
 
 -- ============================================
@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS mahal_bookings (
   advance_received DECIMAL(10, 2) DEFAULT 0,
   quoted_amount DECIMAL(10, 2) DEFAULT 0,
   amount_received DECIMAL(10, 2) DEFAULT 0,
+  final_settlement_amount DECIMAL(10, 2), -- Added in Migration 054
   order_status VARCHAR(20) DEFAULT 'open' CHECK (order_status IN ('open', 'closed')),
   details TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -293,11 +294,11 @@ CREATE TABLE IF NOT EXISTS overall_stock (
 CREATE TABLE IF NOT EXISTS sales_details (
   id SERIAL PRIMARY KEY,
   sector_code VARCHAR(50) NOT NULL REFERENCES sectors(code) ON DELETE RESTRICT,
-  name VARCHAR(255) NOT NULL,
+  name VARCHAR(255), -- Made optional (Migration 052)
   contact_number VARCHAR(50),
   address TEXT,
-  product_name VARCHAR(255) NOT NULL,
-  quantity VARCHAR(255) NOT NULL,
+  product_name VARCHAR(255), -- Made optional (Migration 055)
+  quantity VARCHAR(255), -- Made optional (Migration 055)
   amount_received DECIMAL(10, 2) DEFAULT 0,
   credit_amount DECIMAL(10, 2) DEFAULT 0,
   amount_pending DECIMAL(10, 2) DEFAULT 0,
@@ -589,4 +590,105 @@ INSERT INTO products (product_name, sector_code) VALUES
   ('Feeds -> Punnaku', 'SSACF'),
   ('Feeds -> Fodder Thattai', 'SSACF')
 ON CONFLICT (product_name, sector_code) DO NOTHING;
+
+-- ============================================
+-- PART 4: ADDITIONAL TABLES AND UPDATES (Migrations 051-055)
+-- ============================================
+
+-- Migration 053: Daily Income and Expense Table
+CREATE TABLE IF NOT EXISTS daily_income_expense (
+  id SERIAL PRIMARY KEY,
+  sector_code VARCHAR(50) NOT NULL REFERENCES sectors(code) ON DELETE RESTRICT,
+  item_name VARCHAR(255),
+  quantity VARCHAR(255),
+  income_amount DECIMAL(10, 2) DEFAULT 0,
+  expense_amount DECIMAL(10, 2) DEFAULT 0,
+  entry_date DATE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for daily_income_expense
+CREATE INDEX IF NOT EXISTS idx_daily_income_expense_sector ON daily_income_expense(sector_code);
+CREATE INDEX IF NOT EXISTS idx_daily_income_expense_date ON daily_income_expense(entry_date);
+CREATE INDEX IF NOT EXISTS idx_daily_income_expense_sector_date ON daily_income_expense(sector_code, entry_date);
+
+-- ============================================
+-- PART 5: ALTER TABLE STATEMENTS FOR EXISTING DATABASES
+-- ============================================
+-- These statements are safe to run on existing databases
+-- They use IF NOT EXISTS or handle errors gracefully
+
+-- Migration 052: Make sales_details.name field optional
+DO $$ 
+BEGIN
+  ALTER TABLE sales_details ALTER COLUMN name DROP NOT NULL;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
+
+-- Update any existing empty strings to NULL for consistency
+UPDATE sales_details 
+SET name = NULL 
+WHERE name = '' OR name IS NULL;
+
+-- Migration 054: Add final_settlement_amount column to mahal_bookings
+ALTER TABLE mahal_bookings 
+ADD COLUMN IF NOT EXISTS final_settlement_amount DECIMAL(10, 2);
+
+-- Migration 055: Make sales_details.product_name and quantity fields optional
+DO $$ 
+BEGIN
+  ALTER TABLE sales_details ALTER COLUMN product_name DROP NOT NULL;
+  ALTER TABLE sales_details ALTER COLUMN quantity DROP NOT NULL;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
+
+-- ============================================
+-- PART 6: ADDITIONAL PERFORMANCE INDEXES (Migration 051)
+-- ============================================
+
+-- Add index on employees.name for ORDER BY queries (used in employees list)
+CREATE INDEX IF NOT EXISTS idx_employees_name ON employees(name);
+
+-- Add composite index for employees sector + name (common query pattern)
+CREATE INDEX IF NOT EXISTS idx_employees_sector_name ON employees(sector, name);
+
+-- Add index on attendance.employee_id for faster joins
+CREATE INDEX IF NOT EXISTS idx_attendance_employee_id ON attendance(employee_id);
+
+-- Add index on products.sector_code for faster filtering
+CREATE INDEX IF NOT EXISTS idx_products_sector_code ON products(sector_code);
+
+-- Add index on stock_items.sector_code
+CREATE INDEX IF NOT EXISTS idx_stock_items_sector_code ON stock_items(sector_code);
+
+-- Daily expenses composite indexes for faster filtering
+CREATE INDEX IF NOT EXISTS idx_daily_expenses_sector_date ON daily_expenses(sector_code, expense_date);
+CREATE INDEX IF NOT EXISTS idx_daily_expenses_date_sector ON daily_expenses(expense_date, sector_code);
+
+-- Daily production composite indexes for faster filtering
+CREATE INDEX IF NOT EXISTS idx_daily_production_sector_date ON daily_production(sector_code, production_date);
+CREATE INDEX IF NOT EXISTS idx_daily_production_date_product ON daily_production(production_date, product_name);
+
+-- Credit details composite indexes for faster filtering
+CREATE INDEX IF NOT EXISTS idx_credit_details_sector_date ON credit_details(sector_code, credit_date);
+CREATE INDEX IF NOT EXISTS idx_credit_details_date_sector ON credit_details(credit_date, sector_code);
+
+-- Salary expenses composite indexes for faster filtering
+CREATE INDEX IF NOT EXISTS idx_salary_expenses_employee_week ON salary_expenses(employee_id, week_start_date, week_end_date);
+CREATE INDEX IF NOT EXISTS idx_salary_expenses_sector_week ON salary_expenses(sector, week_start_date);
+
+-- Analyze tables to update statistics for query planner
+ANALYZE employees;
+ANALYZE attendance;
+ANALYZE products;
+ANALYZE stock_items;
+ANALYZE daily_expenses;
+ANALYZE daily_production;
+ANALYZE credit_details;
+ANALYZE salary_expenses;
+ANALYZE daily_income_expense;
+ANALYZE mahal_bookings;
 

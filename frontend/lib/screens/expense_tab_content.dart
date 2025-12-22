@@ -28,6 +28,9 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
   List<Sector> _sectors = [];
   bool _isLoading = false;
   bool _sortAscending = true; // Sort direction for Sector column
+  
+  // Horizontal ScrollController for draggable scrollbar
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void initState() {
@@ -48,6 +51,12 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
         widget.selectedDate != null) {
       _loadData();
     }
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSectors() async {
@@ -848,14 +857,20 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+              : Scrollbar(
+                  thumbVisibility: true,
+                  interactive: true,
+                  controller: _horizontalScrollController,
                   child: SingleChildScrollView(
-                    child: widget.selectedSector == null && !widget.isAdmin
+                    scrollDirection: Axis.horizontal,
+                    controller: _horizontalScrollController,
+                    child: SingleChildScrollView(
+                      child: widget.selectedSector == null && !widget.isAdmin
                         ? _buildAllSectorsSummaryTable()
                         : _buildSingleSectorTable(),
                   ),
                 ),
+              ),
         ),
         if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null))
           Padding(

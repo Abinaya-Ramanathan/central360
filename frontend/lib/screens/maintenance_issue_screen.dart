@@ -36,12 +36,21 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
   final Map<int, String> _editSectorCode = {}; // Track edited sector code
   bool _isLoading = false;
   bool _sortAscending = true; // Sort direction for Sector column
+  
+  // Horizontal ScrollController for draggable scrollbar
+  final ScrollController _photoHorizontalScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadSectors();
     _loadIssues();
+  }
+
+  @override
+  void dispose() {
+    _photoHorizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSectors() async {
@@ -291,10 +300,14 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
       });
     }
 
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      itemCount: photoItems.length,
-      itemBuilder: (context, index) {
+    return Scrollbar(
+      thumbVisibility: true,
+      controller: _photoHorizontalScrollController,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        controller: _photoHorizontalScrollController,
+        itemCount: photoItems.length,
+        itemBuilder: (context, index) {
         final photoItem = photoItems[index];
         final imageUrl = photoItem['imageUrl'] as String;
         final photoId = photoItem['id'] as int?;
@@ -392,6 +405,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
           ),
         );
       },
+      ),
     );
   }
 
@@ -567,13 +581,15 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                         )
                       : SingleChildScrollView(
                           scrollDirection: Axis.vertical,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              columnSpacing: 20,
-                              sortColumnIndex: widget.selectedSector == null ? 0 : null,
-                              sortAscending: _sortAscending,
-                              columns: [
+                          child: Scrollbar(
+                            thumbVisibility: true,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                columnSpacing: 20,
+                                sortColumnIndex: widget.selectedSector == null ? 0 : null,
+                                sortAscending: _sortAscending,
+                                columns: [
                                 if (widget.selectedSector == null)
                                   DataColumn(
                                     label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -780,6 +796,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                             ),
                           ),
                         ),
+                      ),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -815,8 +832,8 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                     ),
                   ),
                 ),
-              ],
-            ),
+            ],
+          ),
     );
   }
 }

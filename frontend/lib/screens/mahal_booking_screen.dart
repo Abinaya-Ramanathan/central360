@@ -56,6 +56,9 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
   // Event Details edit state for Final Settlement Amount
   final Map<String, bool> _editModeEvent = {}; // key = bookingId
   final Map<String, TextEditingController> _finalSettlementControllers = {}; // key = bookingId
+  
+  // Custom mahal details
+  final List<String> _customMahalDetails = [];
 
   @override
   void initState() {
@@ -495,13 +498,15 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
         Expanded(
           child: filteredEvents.isEmpty
               ? Center(child: Text('No event details found', style: TextStyle(color: Colors.grey.shade600)))
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+              : Scrollbar(
+                  thumbVisibility: true,
                   child: SingleChildScrollView(
-                    child: DataTable(
-                      headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                      dataTextStyle: const TextStyle(color: Colors.black87),
-                      columns: [
+                    scrollDirection: Axis.horizontal,
+                    child: SingleChildScrollView(
+                      child: DataTable(
+                        headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                        dataTextStyle: const TextStyle(color: Colors.black87),
+                        columns: [
                         const DataColumn(label: Text('Booking ID')),
                         const DataColumn(label: Text('Mahal Detail')),
                         DataColumn(
@@ -663,19 +668,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     ),
                   ),
                 ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: widget.selectedSector == null ? null : _addEvent,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Event Details', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple.shade700, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            ),
-          ),
+              ),
         ),
       ],
     );
@@ -1241,10 +1234,11 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                                         border: OutlineInputBorder(),
                                         isDense: true,
                                       ),
-                                      items: const [
-                                        DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
-                                        DropdownMenuItem(value: 'Thirukampuliyur Minihall', child: Text('Thirukampuliyur Minihall')),
-                                        DropdownMenuItem(value: 'Thirukampuliyur Big Hall', child: Text('Thirukampuliyur Big Hall')),
+                                      items: [
+                                        const DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
+                                        const DropdownMenuItem(value: 'Thirukampuliyur Minihall', child: Text('Thirukampuliyur Minihall')),
+                                        const DropdownMenuItem(value: 'Thirukampuliyur Big Hall', child: Text('Thirukampuliyur Big Hall')),
+                                        ..._customMahalDetails.map((detail) => DropdownMenuItem(value: detail, child: Text(detail))),
                                       ],
                                       onChanged: (value) {
                                         if (value != null) {
@@ -1523,6 +1517,16 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
     final countController = TextEditingController(text: '1');
     String selectedMahalDetail = 'Thanthondrimalai Mini hall';
     final List<Map<String, dynamic>> itemsToAdd = [];
+    
+    // Default mahal details
+    final defaultMahalDetails = [
+      'Thanthondrimalai Mini hall',
+      'Thirukampuliyur Minihall',
+      'Thirukampuliyur Big Hall',
+    ];
+    
+    // Combine default and custom mahal details
+    final allMahalDetails = [...defaultMahalDetails, ..._customMahalDetails];
 
     final result = await showDialog<bool>(
       context: context,
@@ -1539,10 +1543,11 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     labelText: 'Mahal Details *',
                     border: OutlineInputBorder(),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
-                    DropdownMenuItem(value: 'Thirukampuliyur Minihall', child: Text('Thirukampuliyur Minihall')),
-                    DropdownMenuItem(value: 'Thirukampuliyur Big Hall', child: Text('Thirukampuliyur Big Hall')),
+                  items: [
+                    ...allMahalDetails.map((detail) => DropdownMenuItem(
+                      value: detail,
+                      child: Text(detail),
+                    )),
                   ],
                   onChanged: (value) {
                     if (value != null) {
@@ -1634,11 +1639,20 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                   return;
                 }
                 
+                // Ensure selectedMahalDetail is not empty, use default if needed
+                if (selectedMahalDetail.isEmpty) {
+                  selectedMahalDetail = defaultMahalDetails[0];
+                }
+                
                 // Add current item if filled
                 if (itemNameController.text.trim().isNotEmpty) {
                   final count = int.tryParse(countController.text) ?? 1;
+                  // Ensure selectedMahalDetail is not empty
+                  final mahalDetailToUse = selectedMahalDetail.isNotEmpty 
+                      ? selectedMahalDetail 
+                      : defaultMahalDetails[0];
                   itemsToAdd.add({
-                    'mahal_detail': selectedMahalDetail,
+                    'mahal_detail': mahalDetailToUse,
                     'item_name': itemNameController.text.trim(),
                     'count': count,
                   });

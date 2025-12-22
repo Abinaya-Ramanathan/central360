@@ -31,6 +31,9 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
   List<Map<String, dynamic>> _productionData = [];
   List<Sector> _sectors = [];
   bool _isLoading = false;
+  
+  // Horizontal ScrollController for draggable scrollbar
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void initState() {
@@ -47,6 +50,12 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
         }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSectors() async {
@@ -663,10 +672,15 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
               )
             else
               Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+                child: Scrollbar(
+                  thumbVisibility: true,
+                  interactive: true,
+                  controller: _horizontalScrollController,
                   child: SingleChildScrollView(
-                    child: DataTable(
+                    scrollDirection: Axis.horizontal,
+                    controller: _horizontalScrollController,
+                    child: SingleChildScrollView(
+                      child: DataTable(
                       columnSpacing: 20,
                       columns: const [
                         DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -706,6 +720,7 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
                   ),
                 ),
               ),
+            ),
             // Edit Production Details Button
             Container(
               padding: const EdgeInsets.all(16),

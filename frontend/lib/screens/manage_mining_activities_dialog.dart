@@ -234,10 +234,12 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
                         )
                       : SingleChildScrollView(
                           scrollDirection: Axis.vertical,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              columnSpacing: 20,
+                          child: Scrollbar(
+                            thumbVisibility: true,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                columnSpacing: 20,
                               sortColumnIndex: 1,
                               sortAscending: _sortAscending,
                               columns: [
@@ -302,6 +304,7 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
                             ),
                           ),
                         ),
+                      ),
             ),
           ],
         ),

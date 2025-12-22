@@ -493,12 +493,14 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                  : Scrollbar(
+                      thumbVisibility: true,
                       child: SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
+                        scrollDirection: Axis.horizontal,
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Employees Table
@@ -514,10 +516,12 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                                       DataColumn(label: Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                       DataColumn(label: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
                                       DataColumn(label: Text('Total OT in hours', style: TextStyle(fontWeight: FontWeight.bold))),
+                                      DataColumn(label: Text('Calculated Salary', style: TextStyle(fontWeight: FontWeight.bold))),
                                     ],
                                     rows: _employees.map((employee) {
                                       final presentDays = _presentDaysCount[employee.id] ?? 0;
                                       final totalOtHours = _totalOtHours[employee.id] ?? 0.0;
+                                      final calculatedSalary = presentDays * employee.dailySalary;
                                       return DataRow(
                                         cells: [
                                           DataCell(Text(employee.name)),
@@ -536,6 +540,15 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 color: totalOtHours > 0 ? Colors.orange.shade700 : Colors.grey,
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Text(
+                                              '₹${calculatedSalary.toStringAsFixed(2)}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: calculatedSalary > 0 ? Colors.blue.shade700 : Colors.grey,
                                               ),
                                             ),
                                           ),
@@ -637,6 +650,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                         ),
                       ),
                     ),
+              ),
         ),
       ],
     );

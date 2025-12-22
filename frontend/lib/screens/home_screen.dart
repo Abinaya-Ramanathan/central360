@@ -438,7 +438,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   },
                                   icon: const Icon(Icons.credit_card, size: 18),
                                   label: const Text(
-                                    'Sales Purchase and Credit Details',
+                                    'Sales Expense and Credit Details',
                                     style: TextStyle(fontSize: 14),
                                   ),
                                   style: ElevatedButton.styleFrom(

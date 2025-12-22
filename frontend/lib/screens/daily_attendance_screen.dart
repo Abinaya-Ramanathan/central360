@@ -32,6 +32,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
   DateTime? _selectedDate;
   bool _isEditMode = false;
   bool _isLoading = false;
+  final ScrollController _horizontalScrollController = ScrollController();
 
   // Attendance data for each employee
   final Map<String, Map<String, dynamic>> _attendanceData = {};
@@ -42,6 +43,12 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
     _selectedDate = widget.preSelectedDate ?? DateTime.now();
     _loadSectors();
     _loadEmployees();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSectors() async {
@@ -490,80 +497,82 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
         ),
         child: Column(
           children: [
-            // Filters
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      // Date Selection - only show if not pre-selected
-                      if (widget.preSelectedMonth == null && widget.preSelectedDate == null)
-                        InkWell(
-                          onTap: _selectDate,
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'Date',
-                              prefixIcon: const Icon(Icons.calendar_today, color: Colors.blue),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+            // Date Selection - only show if not pre-selected
+            if (widget.preSelectedMonth == null && widget.preSelectedDate == null)
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: Colors.white,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: _selectDate,
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Date',
+                            prefixIcon: const Icon(Icons.calendar_today, color: Colors.orange),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(
-                              _selectedDate != null
-                                  ? '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'
-                                  : 'Select Date',
-                            ),
+                          ),
+                          child: Text(
+                            _selectedDate != null
+                                ? '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'
+                                : 'Select Date',
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            // Table
+            // Table and Search Field in Expanded Column
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _employees.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.people_outline,
-                                size: 64,
-                                color: Colors.blue.shade300,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                widget.selectedSector == null
-                                    ? 'Please select a sector from Home page'
-                                    : 'No employees in selected sector',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade600,
+              child: Column(
+                children: [
+                  // Table scroll area
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _employees.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.people_outline,
+                                      size: 64,
+                                      color: Colors.blue.shade300,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      widget.selectedSector == null
+                                          ? 'Please select a sector from Home page'
+                                          : 'No employees in selected sector',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SingleChildScrollView(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Card(
-                                elevation: 4,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: DataTable(
+                              )
+                            : Scrollbar(
+                                controller: _horizontalScrollController,
+                                thumbVisibility: true,
+                                interactive: true,
+                                child: SingleChildScrollView(
+                                  controller: _horizontalScrollController,
+                                  scrollDirection: Axis.horizontal,
+                                  child: SingleChildScrollView(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Card(
+                                        elevation: 4,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: DataTable(
                                   headingRowColor: WidgetStateProperty.all(
                                     Colors.blue.shade100,
                                   ),
@@ -699,23 +708,31 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                             ),
                           ),
                         ),
+                      ),
+                    ),
+                ],
+              ),
             ),
             // Edit/Save Button
             if (_employees.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
+                  width: 180,
+                  height: 48,
                   child: FilledButton.icon(
                     onPressed: _isEditMode ? _saveAttendance : () => setState(() => _isEditMode = true),
-                    icon: Icon(_isEditMode ? Icons.save : Icons.edit),
-                    label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
+                    icon: Icon(_isEditMode ? Icons.save : Icons.edit, size: 18),
+                    label: Text(
+                      _isEditMode ? 'Save Attendance' : 'Edit Attendance',
+                      style: const TextStyle(fontSize: 13),
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.blue.shade700,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
                   ),
                 ),

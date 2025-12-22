@@ -29,7 +29,7 @@ process.on('unhandledRejection', (reason, promise) => {
 async function runMigrations() {
   try {
     const migrationsDir = path.join(__dirname, 'migrations');
-    // Use single consolidated migration file that includes all migrations (001-050)
+    // Use single consolidated migration file that includes all migrations (001-055)
     const migrationFiles = ['000_consolidated_migrations.sql'];
     
     for (const migrationFile of migrationFiles) {

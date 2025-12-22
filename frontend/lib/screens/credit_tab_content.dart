@@ -445,10 +445,12 @@ class _CreditTabContentState extends State<CreditTabContent> {
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                  : Scrollbar(
+                      thumbVisibility: true,
                       child: SingleChildScrollView(
-                        child: DataTable(
+                        scrollDirection: Axis.horizontal,
+                        child: SingleChildScrollView(
+                          child: DataTable(
                           columnSpacing: 20,
                           columns: [
                             if (widget.selectedSector == null && widget.isAdmin)
@@ -592,6 +594,7 @@ class _CreditTabContentState extends State<CreditTabContent> {
                         ),
                       ),
                     ),
+              ),
         ),
         Padding(
           padding: const EdgeInsets.all(16.0),

@@ -37,6 +37,10 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
   bool _isGeneratingPDF = false;
   String? _selectedCompanyStaffFilter; // null, 'true', or 'false'
   Set<String> _selectedMonths = {}; // Set of 'YYYY-MM' strings for multiple month selection
+  
+  // Horizontal ScrollControllers for draggable scrollbars
+  final ScrollController _horizontalScrollController = ScrollController();
+  final ScrollController _tableHorizontalScrollController = ScrollController();
 
   @override
   void initState() {
@@ -56,6 +60,8 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
       }
     }
     _searchController.dispose();
+    _horizontalScrollController.dispose();
+    _tableHorizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -1128,10 +1134,15 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
           // Search Bar, Download Button and Notes
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
+            child: Scrollbar(
+              thumbVisibility: true,
+              interactive: true,
+              controller: _horizontalScrollController,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                controller: _horizontalScrollController,
+                child: Row(
+                  children: [
                 // Search Bar
                 SizedBox(
                   width: 250,
@@ -1271,6 +1282,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
               ),
             ),
           ),
+        ),
           // Table
           Expanded(
             child: _isLoading
@@ -1284,16 +1296,21 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                       )
                     : SingleChildScrollView(
                         scrollDirection: Axis.vertical,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: DataTable(
+                        child: Scrollbar(
+                          thumbVisibility: true,
+                          interactive: true,
+                          controller: _tableHorizontalScrollController,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            controller: _tableHorizontalScrollController,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Card(
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: DataTable(
                                 columnSpacing: 20,
                                 sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
                                 sortAscending: _sectorSortAscending,
@@ -1622,6 +1639,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                           ),
                         ),
                       ),
+                    ),
           ),
           // Add Credit Details Button
           Padding(

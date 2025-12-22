@@ -257,12 +257,6 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                       _selectedMahalDetail = value;
                     });
                   },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a mahal detail';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 16),
                 // Event Date
@@ -281,16 +275,6 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                     ),
                   ),
                   onChanged: _onEventDateTextChanged,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Event date is required';
-                    }
-                    final parsedDate = FormatUtils.parseDate(value);
-                    if (parsedDate == null) {
-                      return 'Invalid format. Use DD/MM/YYYY';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 16),
                 // Event Timing
@@ -342,12 +326,6 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                       borderSide: const BorderSide(color: Colors.purple, width: 2),
                     ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Client name is required';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 16),
                 // Client Phone 1
@@ -495,6 +473,9 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                   validator: (value) {
                     if (value != null && value.trim().isNotEmpty) {
                       final amount = double.tryParse(value.trim());
+                      if (amount != null && amount < 0) {
+                        return 'Amount cannot be negative';
+                      }
                       if (amount == null) {
                         return 'Please enter a valid amount';
                       }

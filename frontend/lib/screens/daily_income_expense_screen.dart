@@ -39,6 +39,10 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
   final List<String> _selectedMonths = [];
   DateTime? _tempSelectedDate;
   String? _tempSelectedMonth;
+  
+  // Horizontal ScrollControllers for draggable scrollbars (separate for each tab)
+  final ScrollController _dailyTabHorizontalScrollController = ScrollController();
+  final ScrollController _overallTabHorizontalScrollController = ScrollController();
 
   @override
   void initState() {
@@ -53,6 +57,8 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
   void dispose() {
     _tabController.dispose();
     _disposeControllers();
+    _dailyTabHorizontalScrollController.dispose();
+    _overallTabHorizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -329,13 +335,18 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
       }
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Scrollbar(
+      thumbVisibility: true,
+      interactive: true,
+      controller: _dailyTabHorizontalScrollController,
       child: SingleChildScrollView(
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(Colors.blue.shade100),
-          columns: const [
-            DataColumn(label: Text('Item Name')),
+        scrollDirection: Axis.horizontal,
+        controller: _dailyTabHorizontalScrollController,
+        child: SingleChildScrollView(
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(Colors.blue.shade100),
+            columns: const [
+              DataColumn(label: Text('Item Name')),
             DataColumn(label: Text('Quantity')),
             DataColumn(label: Text('Income'), numeric: true),
             DataColumn(label: Text('Expense'), numeric: true),
@@ -475,6 +486,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -712,13 +724,18 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
       grandTotalExpense += _parseAmount(item['total_expense']);
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Scrollbar(
+      thumbVisibility: true,
+      interactive: true,
+      controller: _overallTabHorizontalScrollController,
       child: SingleChildScrollView(
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(Colors.blue.shade100),
-          columns: const [
-            DataColumn(label: Text('Sector Name')),
+        scrollDirection: Axis.horizontal,
+        controller: _overallTabHorizontalScrollController,
+        child: SingleChildScrollView(
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(Colors.blue.shade100),
+            columns: const [
+              DataColumn(label: Text('Sector Name')),
             DataColumn(label: Text('Total Income'), numeric: true),
             DataColumn(label: Text('Total Expense'), numeric: true),
           ],
@@ -763,6 +780,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
           ],
         ),
       ),
+    ),
     );
   }
 

@@ -405,12 +405,14 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                         style: const TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                  : Scrollbar(
+                      thumbVisibility: true,
                       child: SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Card(
+                        scrollDirection: Axis.horizontal,
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Card(
                             elevation: 4,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -613,6 +615,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
                         ),
                       ),
                     ),
+              ),
         ),
       ],
     );

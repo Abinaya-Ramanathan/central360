@@ -10,21 +10,21 @@ router.get('/version', (_req, res) => {
     // TODO: Update these values when releasing a new version
     // You can also read from a config file or environment variables
     const versionInfo = {
-      version: '1.0.23',  // Update this when releasing new version
-      buildNumber: '24',  // Update this when releasing new version
+      version: '1.0.24',  // Update this when releasing new version
+      buildNumber: '25',  // Update this when releasing new version
       platforms: {
         windows: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.23/company360-setup.exe',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.24/company360-setup.exe',
           isRequired: false,
         },
         android: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.23/company360-v1.0.23.apk',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.24/company360-v1.0.24.apk',
           isRequired: false,
         }
       },
-      releaseNotes: 'Added final settlement amount field to event details with inline editing. Added date range filters with clear options for Sales Credit, Purchase Credit, and Event Details. Added total row in Event Details showing settlement amount sum and booking count. Customized SSMMC sector to show only Maintenance, Sales Purchase Credit, and Mahal Booking buttons. Backend version 0.1.9',
+      releaseNotes: 'Added search option in staff attendance entry page. Updated Daily Mining Activity with Edit Activity button. Renamed Purchase details to Expense details. Added Credit Received and Purchase Credit Paid columns to overall summary. Added Calculated Salary column in Present days count. Added custom mahal details option. Made all fields non-mandatory. Backend version 0.1.10',
       isRequired: false,  // Set to true for critical security updates
-      releaseDate: '2025-01-15T00:00:00Z',
+      releaseDate: '2025-01-16T00:00:00Z',
     };
     
     res.json(versionInfo);

@@ -255,7 +255,6 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> {
           Expanded(
             child: ProductionTabContent(
               selectedSector: widget.selectedSector,
-              selectedMonth: _selectedMonth,
               selectedDate: _selectedDate,
               isAdmin: _isAdmin,
             ),

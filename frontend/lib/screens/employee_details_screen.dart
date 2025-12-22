@@ -32,6 +32,9 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   bool _isAdmin = false;
   bool _sortAscending = true; // Sort direction for Sector column
   final TextEditingController _searchController = TextEditingController();
+  
+  // Horizontal ScrollController for draggable scrollbar
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void initState() {
@@ -45,6 +48,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _horizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -500,13 +504,18 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
                         ),
                       ),
                     )
-                  : SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      scrollDirection: Axis.horizontal,
+                  : Scrollbar(
+                      thumbVisibility: true,
+                      interactive: true,
+                      controller: _horizontalScrollController,
                       child: SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Card(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        scrollDirection: Axis.horizontal,
+                        controller: _horizontalScrollController,
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Card(
                             elevation: 4,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -696,6 +705,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
                     ),
               ),
             ),
+          ),
           ],
         ),
       ),

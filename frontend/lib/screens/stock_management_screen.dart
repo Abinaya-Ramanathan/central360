@@ -59,7 +59,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   final Map<String, TextEditingController> _overallNewStockLitreControllers = {};
   final Map<String, TextEditingController> _overallNewStockPiecesControllers = {};
   final Map<String, TextEditingController> _overallNewStockBoxesControllers = {};
-
+  
+  // Horizontal ScrollControllers for draggable scrollbars
+  final ScrollController _stockHorizontalScrollController = ScrollController();
+  final ScrollController _overallStockHorizontalScrollController = ScrollController();
 
   @override
   void initState() {
@@ -917,12 +920,17 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                         ? const Center(child: Text('No daily stock records found'))
                         : SingleChildScrollView(
                             scrollDirection: Axis.vertical,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: DataTable(
-                              columnSpacing: 12,
-                              sortColumnIndex: widget.selectedSector == null ? 0 : null,
-                              sortAscending: _sortAscendingDaily,
+                            child: Scrollbar(
+                              thumbVisibility: true,
+                              interactive: true,
+                              controller: _stockHorizontalScrollController,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                controller: _stockHorizontalScrollController,
+                                child: DataTable(
+                                columnSpacing: 12,
+                                sortColumnIndex: widget.selectedSector == null ? 0 : null,
+                                sortAscending: _sortAscendingDaily,
                               columns: [
                                 if (widget.selectedSector == null)
                                   DataColumn(
@@ -1039,6 +1047,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                             ),
                           ),
                         ),
+                      ),
               ),
             ],
           ),
@@ -1133,9 +1142,14 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                         ? const Center(child: Text('No overall stock records found'))
                         : SingleChildScrollView(
                             scrollDirection: Axis.vertical,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: DataTable(
+                            child: Scrollbar(
+                              thumbVisibility: true,
+                              interactive: true,
+                              controller: _overallStockHorizontalScrollController,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                controller: _overallStockHorizontalScrollController,
+                                child: DataTable(
                               columnSpacing: 12,
                               sortColumnIndex: widget.selectedSector == null ? 0 : null,
                               sortAscending: _sortAscendingOverall,
@@ -1457,8 +1471,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                   ],
                                 );
                               }).toList(),
+                                ),
+                              ),
                             ),
-                          ),
                         ),
               ),
             ],

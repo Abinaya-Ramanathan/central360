@@ -31,6 +31,9 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
   // Key: employee_id, Value: List of salary records
   final Map<String, List<Map<String, dynamic>>> _salaryData = {};
   
+  // Horizontal ScrollController for draggable scrollbar
+  final ScrollController _horizontalScrollController = ScrollController();
+  
   int _parseIntValue(dynamic value) {
     if (value == null) return 0;
     if (value is int) return value;
@@ -85,6 +88,12 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     super.initState();
     _selectedMonth = DateTime.now();
     _loadEmployees();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadEmployees() async {
@@ -675,10 +684,15 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
               )
             else
               Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+                child: Scrollbar(
+                  thumbVisibility: true,
+                  interactive: true,
+                  controller: _horizontalScrollController,
                   child: SingleChildScrollView(
-                    child: DataTable(
+                    scrollDirection: Axis.horizontal,
+                    controller: _horizontalScrollController,
+                    child: SingleChildScrollView(
+                      child: DataTable(
                       columnSpacing: 15,
                       columns: const [
                         DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -691,6 +705,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                   ),
                 ),
               ),
+            ),
           ],
         ),
       ),

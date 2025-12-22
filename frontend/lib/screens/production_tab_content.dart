@@ -33,6 +33,9 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   final Map<String, String?> _productionUnits = {}; // Store unit for each product
 
   List<Sector> _sectors = [];
+  
+  // Horizontal ScrollController for draggable scrollbar
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void initState() {
@@ -55,6 +58,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
     if (widget.searchController == null) {
       _searchController.dispose();
     }
+    _horizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -626,10 +630,15 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                             ],
                           ),
                         )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
+                      : Scrollbar(
+                          thumbVisibility: true,
+                          interactive: true,
+                          controller: _horizontalScrollController,
                           child: SingleChildScrollView(
-                            child: DataTable(
+                            scrollDirection: Axis.horizontal,
+                            controller: _horizontalScrollController,
+                            child: SingleChildScrollView(
+                              child: DataTable(
                               columnSpacing: 20,
                               sortColumnIndex: showSectorColumn ? 0 : null,
                               sortAscending: _sortAscending,
@@ -685,6 +694,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                         ),
                       ),
                     ),
+                  ),
         ),
       ],
     );

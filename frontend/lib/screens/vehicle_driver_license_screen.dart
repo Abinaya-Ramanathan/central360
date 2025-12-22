@@ -295,12 +295,14 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
         Expanded(
           child: _vehicleLicenses.isEmpty
               ? Center(child: Text('No vehicle license details found', style: TextStyle(color: Colors.grey.shade600)))
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+              : Scrollbar(
+                  thumbVisibility: true,
                   child: SingleChildScrollView(
-                    child: DataTable(
-                      headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                      dataTextStyle: const TextStyle(color: Colors.black87),
+                    scrollDirection: Axis.horizontal,
+                    child: SingleChildScrollView(
+                      child: DataTable(
+                        headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                        dataTextStyle: const TextStyle(color: Colors.black87),
                       sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
                       sortAscending: _sectorSortAscendingVehicle,
                       columns: [
@@ -497,6 +499,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                     ),
                   ),
                 ),
+              ),
         ),
         Padding(
           padding: const EdgeInsets.all(16.0),
@@ -531,12 +534,14 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
         Expanded(
           child: _driverLicenses.isEmpty
               ? Center(child: Text('No driver license details found', style: TextStyle(color: Colors.grey.shade600)))
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+              : Scrollbar(
+                  thumbVisibility: true,
                   child: SingleChildScrollView(
-                    child: DataTable(
-                      headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                      dataTextStyle: const TextStyle(color: Colors.black87),
+                    scrollDirection: Axis.horizontal,
+                    child: SingleChildScrollView(
+                      child: DataTable(
+                        headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                        dataTextStyle: const TextStyle(color: Colors.black87),
                       sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
                       sortAscending: _sectorSortAscendingDriver,
                       columns: [
@@ -616,6 +621,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                     ),
                   ),
                 ),
+              ),
         ),
         Padding(
           padding: const EdgeInsets.all(16.0),
@@ -668,12 +674,14 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
         Expanded(
           child: _engineOilServices.isEmpty
               ? Center(child: Text('No vehicle service details found', style: TextStyle(color: Colors.grey.shade600)))
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+              : Scrollbar(
+                  thumbVisibility: true,
                   child: SingleChildScrollView(
-                    child: DataTable(
-                      headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                      dataTextStyle: const TextStyle(color: Colors.black87),
+                    scrollDirection: Axis.horizontal,
+                    child: SingleChildScrollView(
+                      child: DataTable(
+                        headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                        dataTextStyle: const TextStyle(color: Colors.black87),
                       sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
                       sortAscending: _sectorSortAscendingService,
                       columns: [
@@ -793,6 +801,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                     ),
                   ),
                 ),
+              ),
         ),
         Padding(
           padding: const EdgeInsets.all(16.0),

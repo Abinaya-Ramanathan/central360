@@ -829,15 +829,18 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
               )
             else
               Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+                child: Scrollbar(
+                  thumbVisibility: true,
                   child: SingleChildScrollView(
-                    child: widget.selectedSector == null
+                    scrollDirection: Axis.horizontal,
+                    child: SingleChildScrollView(
+                      child: widget.selectedSector == null
                         ? _buildAllSectorsSummaryTable()
                         : _buildSingleSectorTable(),
                   ),
                 ),
               ),
+            ),
             // Add Expense Item Button (only show for single sector view)
             if (widget.selectedSector != null)
               Container(

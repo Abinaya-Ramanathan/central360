@@ -2,99 +2,88 @@
 
 ## Overview
 
-This directory contains the consolidated database migrations for the Central360 application.
+This directory contains the consolidated database migrations for the Central360 application. All migrations have been consolidated into a single file for easier management.
 
-## Current Active Migrations
+## Current Active Migration
 
-### 1. `001_complete_schema.sql`
-**Purpose**: Complete database schema with all tables in their final state.
+### `000_consolidated_migrations.sql`
+
+**Purpose**: Complete database schema with all tables, indexes, default data, and all incremental updates in a single file.
 
 **Includes**:
-- All 21 tables (sectors, employees, attendance, salary_expenses, daily_production, products, daily_expenses, maintenance_issues, mahal_bookings, catering_details, expense_details, credit_details, vehicle_licenses, driver_licenses, engine_oil_services, stock_items, daily_stock, overall_stock, sales_details, sales_balance_payments, company_purchase_details, company_purchase_balance_payments, maintenance_issue_photos, company_purchase_photos)
-- All columns and relationships including latest additions (boxes columns, unit columns, etc.)
+- Complete database schema with all tables (sectors, employees, attendance, salary_expenses, daily_production, products, daily_expenses, maintenance_issues, mahal_bookings, catering_details, expense_details, credit_details, vehicle_licenses, driver_licenses, engine_oil_services, stock_items, daily_stock, overall_stock, sales_details, sales_balance_payments, company_purchase_details, company_purchase_balance_payments, maintenance_issue_photos, company_purchase_photos, daily_income_expense, mahal_vessels, rent_vehicles, rent_vehicle_attendance, ingredient_menus, ingredient_items, mining_activities, daily_mining_activities)
+- All columns and relationships including latest additions
 - All indexes for performance optimization
 - All constraints and foreign keys
-- Consolidates migrations 001-047
+- Default data (sectors, products)
+- All incremental updates (migrations 001-055)
+- Safe ALTER TABLE statements for existing databases
 
-**Usage**: Run this file to create a fresh database with all tables.
+**Usage**: Run this single file to set up a complete database or update an existing database.
 
-### 2. `002_default_data.sql`
-**Purpose**: Inserts default data required for the application to function.
-
-**Includes**:
-- Default sectors (SSBM, SSMM, etc.)
-- Any other required initial data
-
-**Usage**: Run after `001_complete_schema.sql` to populate default data.
-
-### 3. `003_consolidated_incremental_updates.sql`
-**Purpose**: Consolidated incremental updates for existing databases.
-
-**Includes**:
-- All changes from migrations 003-047
-- Safe to run on existing databases (uses IF NOT EXISTS checks)
-- Updates unit constraints, adds new tables and columns
-
-**Usage**: Run this file if you have an existing database that needs to be updated to the latest schema.
+```bash
+node src/migrations/run_migration.js 000_consolidated_migrations.sql
+```
 
 ## Migration Script
 
-To run a migration file, use:
+To run the migration file, use:
 
 ```bash
-node src/migrations/run_migration.js <migration_file>
+node src/migrations/run_migration.js 000_consolidated_migrations.sql
 ```
 
-Example:
+## Database Setup
+
+### For New Installations
+
+Simply run the consolidated migration file:
+
 ```bash
-node src/migrations/run_migration.js 001_complete_schema.sql
+node src/migrations/run_migration.js 000_consolidated_migrations.sql
+```
+
+This will:
+- Create all tables with proper schema
+- Add all indexes for performance
+- Insert default data (sectors, products)
+- Apply all incremental updates
+
+### For Existing Databases
+
+The consolidated migration file is safe to run on existing databases:
+- Uses `CREATE TABLE IF NOT EXISTS` for tables
+- Uses `ADD COLUMN IF NOT EXISTS` for new columns
+- Uses `CREATE INDEX IF NOT EXISTS` for indexes
+- Uses `ON CONFLICT DO NOTHING` for default data inserts
+- Handles errors gracefully with DO blocks for ALTER TABLE statements
+
+Simply run:
+
+```bash
+node src/migrations/run_migration.js 000_consolidated_migrations.sql
 ```
 
 ## Archived Migrations
 
-All historical migration files (001-031, and 003-047) have been archived in the `archive/` directory for reference. These are no longer needed for new installations but are kept for historical tracking.
+All historical migration files (001-050) have been archived in the `archive/` directory for reference. These are no longer needed for new installations but are kept for historical tracking.
 
-See `archive/README.md` for more details.
-
-## Database Setup for New Installations
-
-1. Run the complete schema:
-   ```bash
-   node src/migrations/run_migration.js 001_complete_schema.sql
-   ```
-
-2. Run the default data:
-   ```bash
-   node src/migrations/run_migration.js 002_default_data.sql
-   ```
-
-That's it! Your database is now set up with all tables, indexes, and default data.
-
-## For Existing Databases
-
-If you have an existing database:
-- Run `003_consolidated_incremental_updates.sql` to apply all incremental updates
-- This file is safe to run multiple times (uses IF NOT EXISTS checks)
-- It will update your database to match the latest schema
-
-## Schema Changes
-
-All schema changes are now consolidated into:
-- `001_complete_schema.sql` - Complete schema for new installations
-- `003_consolidated_incremental_updates.sql` - Incremental updates for existing databases
-
-Both files include:
-- Table definitions
-- Column definitions with all recent additions (including boxes columns, unit columns, etc.)
-- Indexes for query performance
-- Foreign key relationships
-- Check constraints (including Boxes in unit constraints)
+The individual migration files (051-055) have been consolidated into `000_consolidated_migrations.sql` and removed.
 
 ## Maintenance
 
 When adding new features:
-1. Update `001_complete_schema.sql` with new tables/columns
-2. Update `003_consolidated_incremental_updates.sql` with incremental changes
-3. Update this README if needed
-4. Document the changes in commit messages
+1. Update `000_consolidated_migrations.sql` with new tables/columns in the appropriate section
+2. Add ALTER TABLE statements in the "ALTER TABLE STATEMENTS FOR EXISTING DATABASES" section
+3. Update indexes if needed
+4. Update this README if needed
+5. Document the changes in commit messages
 
+## Migration History
+
+- **Migrations 001-050**: Consolidated into the main schema and default data sections
+- **Migration 051**: Performance indexes - Added to Part 6
+- **Migration 052**: Made sales_details.name optional - Added to Part 5
+- **Migration 053**: Created daily_income_expense table - Added to Part 4
+- **Migration 054**: Added final_settlement_amount to mahal_bookings - Added to Part 5
+- **Migration 055**: Made sales_details.product_name and quantity optional - Added to Part 5

@@ -653,16 +653,18 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                               style: TextStyle(fontSize: 16, color: Colors.grey),
                             ),
                           )
-                        : SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
+                        : Scrollbar(
+                            thumbVisibility: true,
                             child: SingleChildScrollView(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Card(
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                              scrollDirection: Axis.horizontal,
+                              child: SingleChildScrollView(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Card(
+                                    elevation: 4,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   child: DataTable(
                                     headingRowColor: WidgetStateProperty.all(
                                       Colors.teal.shade100,
@@ -734,6 +736,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                               ),
                             ),
                           ),
+                    ),
               ),
             ],
           ),
@@ -761,13 +764,15 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                       ],
                     ),
                     const SizedBox(height: 12),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          // Search Bar
-                          SizedBox(
-                            width: 250,
+                    Scrollbar(
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            // Search Bar
+                            SizedBox(
+                              width: 250,
                             child: StatefulBuilder(
                               builder: (context, setState) {
                                 return TextField(
@@ -801,6 +806,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                         ],
                       ),
                     ),
+                  ),
                   ],
                 ),
               ),
@@ -818,16 +824,18 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                               ),
                             ),
                           )
-                        : SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
+                        : Scrollbar(
+                            thumbVisibility: true,
                             child: SingleChildScrollView(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Card(
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                              scrollDirection: Axis.horizontal,
+                              child: SingleChildScrollView(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Card(
+                                    elevation: 4,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   child: DataTable(
                                     headingRowColor: WidgetStateProperty.all(
                                       Colors.green.shade100,
@@ -957,6 +965,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                               ),
                             ),
                           ),
+                    ),
               ),
             ],
           ),

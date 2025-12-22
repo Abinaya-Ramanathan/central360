@@ -22,8 +22,8 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
   List<Sector> _sectors = [];
   DateTime? _selectedDate;
   bool _isLoading = false;
+  bool _isGlobalEditMode = false;
   final Map<int, TextEditingController> _quantityControllers = {};
-  final Map<int, bool> _editMode = {};
 
   @override
   void initState() {
@@ -94,7 +94,7 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
 
     // Clear edit mode and controllers when loading new date data
     setState(() {
-      _editMode.clear();
+      _isGlobalEditMode = false;
       for (var controller in _quantityControllers.values) {
         controller.dispose();
       }
@@ -141,38 +141,81 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
     }
   }
 
-  Future<void> _saveEntry(int activityId) async {
-    if (_selectedDate == null) return;
+  void _toggleGlobalEditMode() {
+    setState(() {
+      if (_isGlobalEditMode) {
+        // Exiting edit mode - dispose all controllers
+        for (var controller in _quantityControllers.values) {
+          controller.dispose();
+        }
+        _quantityControllers.clear();
+        _isGlobalEditMode = false;
+      } else {
+        // Entering edit mode - create controllers for all activities
+        _isGlobalEditMode = true;
+        for (var activity in _miningActivities) {
+          final activityId = activity['id'] as int;
+          final existingEntry = _dailyEntries.firstWhere(
+            (entry) => entry['activity_id'] == activityId,
+            orElse: () => {},
+          );
+          _quantityControllers[activityId] = TextEditingController(
+            text: existingEntry['quantity']?.toString() ?? '0',
+          );
+        }
+      }
+    });
+  }
 
-    final quantityController = _quantityControllers[activityId];
-    if (quantityController == null) return;
+  Future<void> _saveAllEntries() async {
+    if (_selectedDate == null) return;
 
     setState(() => _isLoading = true);
     try {
       final dateStr = _selectedDate!.toIso8601String().split('T')[0];
-      final quantity = double.tryParse(quantityController.text) ?? 0.0;
+      int successCount = 0;
+      int errorCount = 0;
 
-      await ApiService.createOrUpdateDailyMiningActivity(
-        activityId: activityId,
-        date: dateStr,
-        quantity: quantity,
-      );
+      for (var activity in _miningActivities) {
+        final activityId = activity['id'] as int;
+        final quantityController = _quantityControllers[activityId];
+        if (quantityController == null) continue;
 
-      // Exit edit mode after successful save
-      setState(() {
-        _editMode[activityId] = false;
-      });
+        try {
+          final quantity = double.tryParse(quantityController.text) ?? 0.0;
+          await ApiService.createOrUpdateDailyMiningActivity(
+            activityId: activityId,
+            date: dateStr,
+            quantity: quantity,
+          );
+          successCount++;
+        } catch (e) {
+          errorCount++;
+        }
+      }
+
+      // Exit edit mode after saving
+      _toggleGlobalEditMode();
 
       await _loadDailyEntries();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mining activity entry saved successfully')),
-        );
+        if (errorCount == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Successfully saved $successCount mining activity entries')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Saved $successCount entries, $errorCount errors occurred'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving entry: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error saving entries: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -182,35 +225,11 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
     }
   }
 
-  void _toggleEditMode(int activityId) {
-    setState(() {
-      if (_editMode[activityId] == true) {
-        // Exiting edit mode - dispose controller
-        if (_quantityControllers.containsKey(activityId)) {
-          _quantityControllers[activityId]!.dispose();
-          _quantityControllers.remove(activityId);
-        }
-        _editMode[activityId] = false;
-      } else {
-        // Entering edit mode
-        _editMode[activityId] = true;
-        final existingEntry = _dailyEntries.firstWhere(
-          (entry) => entry['activity_id'] == activityId,
-          orElse: () => {},
-        );
-
-        _quantityControllers[activityId] = TextEditingController(
-          text: existingEntry['quantity']?.toString() ?? '0',
-        );
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Date Selection
+        // Date Selection and Edit Activity Button
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.grey.shade100,
@@ -238,6 +257,18 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                   ),
                 ),
               ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: _isGlobalEditMode ? _saveAllEntries : _toggleGlobalEditMode,
+                icon: Icon(_isGlobalEditMode ? Icons.save : Icons.edit),
+                label: Text(_isGlobalEditMode ? 'Save' : 'Edit Activity'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _isGlobalEditMode ? Colors.green.shade700 : Colors.blue.shade700,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -254,10 +285,12 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                     )
                   : SingleChildScrollView(
                       scrollDirection: Axis.vertical,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
+                      child: Scrollbar(
+                        thumbVisibility: true,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
                           child: Card(
                             elevation: 4,
                             shape: RoundedRectangleBorder(
@@ -269,11 +302,9 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                                 DataColumn(label: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
                                 DataColumn(label: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
                               rows: _miningActivities.map((activity) {
                                 final activityId = activity['id'] as int;
-                                final isEditMode = _editMode[activityId] == true;
                                 final existingEntry = _dailyEntries.firstWhere(
                                   (entry) => entry['activity_id'] == activityId,
                                   orElse: () => {},
@@ -284,7 +315,7 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                                     DataCell(Text(activity['activity_name']?.toString() ?? 'N/A')),
                                     DataCell(Text(_getSectorName(activity['sector_code']?.toString()))),
                                     DataCell(
-                                      isEditMode && _quantityControllers.containsKey(activityId)
+                                      _isGlobalEditMode && _quantityControllers.containsKey(activityId)
                                           ? SizedBox(
                                               width: 120,
                                               child: TextFormField(
@@ -298,29 +329,6 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                                             )
                                           : Text(existingEntry['quantity']?.toString() ?? '0'),
                                     ),
-                                    DataCell(
-                                      isEditMode
-                                          ? Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.save, color: Colors.green, size: 20),
-                                                  tooltip: 'Save',
-                                                  onPressed: () => _saveEntry(activityId),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
-                                                  tooltip: 'Cancel',
-                                                  onPressed: () => _toggleEditMode(activityId),
-                                                ),
-                                              ],
-                                            )
-                                          : IconButton(
-                                              icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                              tooltip: 'Edit',
-                                              onPressed: () => _toggleEditMode(activityId),
-                                            ),
-                                    ),
                                   ],
                                 );
                               }).toList(),
@@ -329,6 +337,7 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                         ),
                       ),
                     ),
+                  ),
         ),
       ],
     );

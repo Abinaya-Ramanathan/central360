@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/employee.dart';
+import '../models/sector.dart';
+import '../services/api_service.dart';
 import '../services/sector_service.dart';
 
 class EditEmployeeDialog extends StatefulWidget {
@@ -30,12 +32,20 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
   late String? _selectedSector;
   DateTime? _joiningDate;
   int? _joiningYear;
-  final SectorService _sectorService = SectorService();
+  List<Sector> _sectors = [];
+
+  Future<void> _loadSectors() async {
+    try {
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
     final emp = widget.employee;
+    _loadSectors();
     _nameController = TextEditingController(text: emp.name);
     _contactController = TextEditingController(text: emp.contact);
     _contact2Controller = TextEditingController(text: emp.contact2);
@@ -302,7 +312,7 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
                             borderSide: const BorderSide(color: Colors.blue, width: 2),
                           ),
                         ),
-                        items: _sectorService.sectors.map((sector) {
+                        items: _sectors.map((sector) {
                           return DropdownMenuItem<String>(
                             value: sector.code,
                             child: Text('${sector.code} - ${sector.name}'),

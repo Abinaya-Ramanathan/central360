@@ -1,3 +1,5 @@
+import '../utils/format_utils.dart';
+
 class CreditDetails {
   final int? id;
   final String sectorCode;
@@ -31,7 +33,7 @@ class CreditDetails {
       'purchase_details': purchaseDetails,
       'credit_amount': creditAmount,
       'amount_settled': amountSettled,
-      'credit_date': creditDate.toIso8601String().split('T')[0],
+      'credit_date': FormatUtils.formatDateForApi(creditDate),
     };
   }
 

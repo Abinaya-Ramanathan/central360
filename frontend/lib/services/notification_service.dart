@@ -383,49 +383,54 @@ class NotificationService {
 
   /// Check mahal bookings for event date (2 days before)
   Future<void> checkMahalBookingEventDates(List<MahalBooking> bookings) async {
-    if (!await requestNotificationPermission()) {
+    if (bookings.isEmpty) return;
+    if (!_initialized) return;
+    try {
+      if (!await requestNotificationPermission()) {
+        return;
+      }
+    } catch (_) {
       return;
     }
 
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
 
-    for (var booking in bookings) {
-      final bookingId = booking.bookingId ?? 'Unknown';
-      final mahalDetail = booking.mahalDetail;
-      final clientName = booking.clientName;
+      for (var booking in bookings) {
+        final bookingId = booking.bookingId ?? 'Unknown';
+        final mahalDetail = booking.mahalDetail;
+        final clientName = booking.clientName;
 
-      // Check Event Date
-      final eventDate = booking.eventDate;
-      final expiryDate = DateTime(eventDate.year, eventDate.month, eventDate.day);
-      final daysUntilEvent = expiryDate.difference(today).inDays;
+        final eventDate = booking.eventDate;
+        final expiryDate = DateTime(eventDate.year, eventDate.month, eventDate.day);
+        final daysUntilEvent = expiryDate.difference(today).inDays;
 
-      if (daysUntilEvent >= 0 && daysUntilEvent <= 2) {
-        final notificationKey = _generateNotificationKey('event', bookingId, expiryDate);
-        
-        // Only send notification if we haven't sent it already
-        if (!_sentNotifications.contains(notificationKey)) {
-          final daysText = daysUntilEvent == 0 
-              ? 'today' 
-              : daysUntilEvent == 1 
-                  ? 'tomorrow' 
-                  : 'in 2 days';
-          
-          await showNotification(
-            id: _generateNotificationId('event', booking.hashCode),
-            title: 'Event Date Reminder',
-            body: 'Event for $clientName at $mahalDetail (Booking: $bookingId) is $daysText.',
-            payload: 'event_$bookingId',
-          );
-          
-          // Mark this notification as sent
-          _sentNotifications.add(notificationKey);
+        if (daysUntilEvent >= 0 && daysUntilEvent <= 2) {
+          final notificationKey = _generateNotificationKey('event', bookingId, expiryDate);
+
+          if (!_sentNotifications.contains(notificationKey)) {
+            final daysText = daysUntilEvent == 0
+                ? 'today'
+                : daysUntilEvent == 1
+                    ? 'tomorrow'
+                    : 'in 2 days';
+
+            await showNotification(
+              id: _generateNotificationId('event', booking.hashCode),
+              title: 'Event Date Reminder',
+              body: 'Event for $clientName at $mahalDetail (Booking: $bookingId) is $daysText.',
+              payload: 'event_$bookingId',
+            );
+            _sentNotifications.add(notificationKey);
+          }
+        } else if (daysUntilEvent < 0) {
+          final notificationKey = _generateNotificationKey('event', bookingId, expiryDate);
+          _sentNotifications.remove(notificationKey);
         }
-      } else if (daysUntilEvent < 0) {
-        // Event date has already passed - remove from sent notifications if it was there
-        final notificationKey = _generateNotificationKey('event', bookingId, expiryDate);
-        _sentNotifications.remove(notificationKey);
       }
+    } catch (e) {
+      debugPrint('Error in checkMahalBookingEventDates: $e');
     }
   }
 

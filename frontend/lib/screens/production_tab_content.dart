@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
+import '../utils/format_utils.dart';
 
 class ProductionTabContent extends StatefulWidget {
   final String? selectedSector;
@@ -92,15 +94,9 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -135,8 +131,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
     if (widget.selectedSector == null && !widget.isAdmin) return;
     try {
       if (widget.selectedSector == null && widget.isAdmin) {
-        // Load all products from all sectors
-        final allSectors = await ApiService.getSectors();
+        final allSectors = await SectorService().loadSectorsForScreen();
         _products = [];
         for (var sector in allSectors) {
           final sectorProducts = await ApiService.getProducts(sector: sector.code);
@@ -185,7 +180,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
       final year = widget.selectedDate!.year;
       final month = widget.selectedDate!.month;
       final monthStr = '$year-${month.toString().padLeft(2, '0')}';
-      final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(widget.selectedDate!);
 
       final records = await ApiService.getDailyProduction(
         month: monthStr,
@@ -459,7 +454,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
             onPressed: () async {
               setState(() => _isLoading = true);
               try {
-                final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
+                final dateStr = FormatUtils.formatDateForApi(widget.selectedDate!);
 
                 // Save all records from _productionData (controllers are created for all records)
                 int successCount = 0;

@@ -3,6 +3,7 @@ import '../models/vehicle_license.dart';
 import '../models/driver_license.dart';
 import '../models/engine_oil_service.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../models/sector.dart';
@@ -58,6 +59,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() => setState(() {}));
     // Use AuthService to get admin status (based on password, not username)
     _isAdmin = AuthService.isAdmin;
     _initializeNotifications();
@@ -84,15 +86,9 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -238,12 +234,60 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
         ),
         body: _isLoading && _vehicleLicenses.isEmpty && _driverLicenses.isEmpty && _engineOilServices.isEmpty
             ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
-                controller: _tabController,
+            : Column(
                 children: [
-                  _buildVehicleLicenseTab(),
-                  _buildDriverLicenseTab(),
-                  _buildEngineOilServiceTab(),
+                  // Action button: top-right in body, just below AppBar
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (_tabController.index == 0)
+                          FilledButton.icon(
+                            onPressed: _addVehicleLicense,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add Vehicle', style: TextStyle(fontSize: 13)),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.deepOrange.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        if (_tabController.index == 1)
+                          FilledButton.icon(
+                            onPressed: _addDriverLicense,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add Driver', style: TextStyle(fontSize: 13)),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.deepOrange.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        if (_tabController.index == 2)
+                          FilledButton.icon(
+                            onPressed: _addEngineOilService,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add Service', style: TextStyle(fontSize: 13)),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.deepOrange.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildVehicleLicenseTab(),
+                        _buildDriverLicenseTab(),
+                        _buildEngineOilServiceTab(),
+                      ],
+                    ),
+                  ),
                 ],
               ),
       ),
@@ -501,23 +545,6 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                 ),
               ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _addVehicleLicense,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Vehicle License Details', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepOrange.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -622,23 +649,6 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                   ),
                 ),
               ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _addDriverLicense,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Driver License Details', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepOrange.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
         ),
       ],
     );
@@ -802,23 +812,6 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                   ),
                 ),
               ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _addEngineOilService,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Vehicle service details', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepOrange.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
         ),
       ],
     );

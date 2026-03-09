@@ -1,20 +1,13 @@
 import 'package:flutter/material.dart';
-import 'employee_details_screen.dart';
-import 'maintenance_issue_screen.dart';
-import 'mahal_booking_screen.dart';
-import 'sales_credit_details_screen.dart';
-import 'vehicle_driver_license_screen.dart';
-import 'attendance_advance_screen.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
-import 'stock_management_screen.dart';
 import 'login_screen.dart';
 import 'update_dialog.dart';
 import '../services/update_service.dart';
 import 'new_entry_screen.dart';
-import 'ingredients_details_screen.dart';
+import 'sector_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -34,12 +27,77 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+/// Internal value for the "All Sectors" button (so null can mean "no selection").
+const _allSectorsValue = '__ALL__';
+
 class _HomeScreenState extends State<HomeScreen> {
   final SectorService _sectorService = SectorService();
   List<Sector> _sectors = [];
-  String? _selectedSector;
   bool _isAdmin = false;
   bool _isMainAdmin = false;
+
+  /// Top-level sectors to show on home: no parent, or parent code added if it has children but is missing.
+  List<Sector> get _displaySectors {
+    final topLevel = _sectors
+        .where((s) => s.parentCode == null || (s.parentCode?.isEmpty ?? true))
+        .toList();
+    final parentCodes = _sectors
+        .where((s) => s.parentCode != null && s.parentCode!.isNotEmpty)
+        .map((s) => s.parentCode!)
+        .toSet();
+    for (final code in parentCodes) {
+      if (!topLevel.any((s) => s.code == code)) {
+        topLevel.add(Sector(code: code, name: code));
+      }
+    }
+    return topLevel;
+  }
+
+  Color _sectorButtonColor(String value) {
+    if (value == _allSectorsValue) return Colors.indigo.shade700;
+    switch (value) {
+      case 'SSC':
+        return Colors.purple.shade700;
+      case 'SSBM':
+        return Colors.deepOrange.shade700;
+      default:
+        // Deterministic color selection for any other sector codes.
+        const palette = [
+          Colors.teal,
+          Colors.green,
+          Colors.cyan,
+          Colors.brown,
+          Colors.amber,
+          Colors.blueGrey,
+        ];
+        final idx = value.codeUnits.fold<int>(0, (a, b) => a + b) % palette.length;
+        return palette[idx].shade700;
+    }
+  }
+
+  ButtonStyle _homeHeaderButtonStyle(Color color) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: color,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      minimumSize: const Size(0, 52),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+    );
+  }
+
+  /// Sector values to show as buttons: New Entry first, then these (admin: All + displaySectors; non-admin: single).
+  List<String> get _sectorButtonValues {
+    if (_isAdmin) {
+      return [_allSectorsValue, ..._displaySectors.map((s) => s.code)];
+    }
+    if (widget.initialSector != null) {
+      return [widget.initialSector!];
+    }
+    return [];
+  }
 
   @override
   void initState() {
@@ -48,9 +106,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // Use AuthService if available, otherwise fall back to widget parameters
     _isAdmin = AuthService.isAdmin || widget.isAdmin;
     _isMainAdmin = AuthService.isMainAdmin || widget.isMainAdmin;
-    if (widget.initialSector != null) {
-      _selectedSector = widget.initialSector;
-    }
     _loadSectors();
     // Check for updates after a short delay (to let UI load first)
     Future.delayed(const Duration(seconds: 2), () {
@@ -198,407 +253,76 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Column(
           children: [
-            // Sector Selection and New Entry Button - Same line
+            // Home page: New Entry top right (line 1), sector buttons (line 2)
             Container(
               padding: const EdgeInsets.all(16.0),
               color: Colors.white,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.business, color: Colors.blue),
-                      SizedBox(width: 12),
-                      Text(
-                        'Select Sector:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Sector Dropdown and New Entry Button - Same line
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _selectedSector,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                  // First line: New Entry button top right
+                  if (_isAdmin)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => NewEntryScreen(
+                                username: widget.username,
+                                selectedSector: null,
+                                isMainAdmin: _isMainAdmin,
+                              ),
                             ),
-                            prefixIcon: const Icon(Icons.filter_list),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                          isExpanded: true,
-                          hint: const Text('Select Sector'),
-                          items: [
-                            // For admin users, show "All Sectors" and all sectors
-                            if (_isAdmin) ...[
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('All Sectors'),
-                              ),
-                              ..._sectors.map((sector) {
-                                return DropdownMenuItem<String>(
-                                  value: sector.code,
-                                  child: Text('${sector.code} - ${sector.name}'),
-                                );
-                              }),
-                            ]
-                            // For non-admin users with initialSector, only show their sector
-                            else if (!_isAdmin && widget.initialSector != null && _sectors.isNotEmpty)
-                              DropdownMenuItem<String>(
-                                value: widget.initialSector,
-                                child: Text(_sectors.firstWhere(
-                                  (s) => s.code == widget.initialSector,
-                                  orElse: () => Sector(code: widget.initialSector!, name: widget.initialSector!),
-                                ).name),
-                              ),
-                          ],
-                          onChanged: _isAdmin ? (value) {
-                            setState(() {
-                              _selectedSector = value;
-                            });
-                          } : null,
-                        ),
+                          ).then((_) {
+                            if (mounted) _loadSectors();
+                          });
+                        },
+                        icon: const Icon(Icons.add, size: 20),
+                        label: const Text('New Entry'),
+                        style: _homeHeaderButtonStyle(Colors.blue.shade700),
                       ),
-                      if (_isAdmin) ...[
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => NewEntryScreen(
-                                  username: widget.username,
-                                  selectedSector: _selectedSector,
-                                  isMainAdmin: _isMainAdmin,
-                                ),
+                    ),
+                  if (_isAdmin) const SizedBox(height: 12),
+                  // Second line: sector buttons
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _sectorButtonValues.map((value) {
+                      final label = value == _allSectorsValue
+                          ? 'All Sectors'
+                          : () {
+                              final inDisplay = _displaySectors.where((s) => s.code == value);
+                              if (inDisplay.isNotEmpty) return '$value - ${inDisplay.first.name}';
+                              final inAll = _sectors.where((s) => s.code == value);
+                              return inAll.isNotEmpty ? '$value - ${inAll.first.name}' : value;
+                            }();
+                      return ElevatedButton(
+                        onPressed: () {
+                          final sector = value == _allSectorsValue ? null : value;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SectorDashboardScreen(
+                                username: widget.username,
+                                selectedSector: sector,
+                                isAdmin: _isAdmin,
+                                isMainAdmin: _isMainAdmin,
                               ),
-                            );
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('New Entry'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ),
-                        ),
-                      ],
-                    ],
+                          );
+                        },
+                        style: _homeHeaderButtonStyle(_sectorButtonColor(value)),
+                        child: Text(label),
+                      );
+                    }).toList(),
                   ),
                 ],
               ),
             ),
-            // Welcome Card and Buttons
-            Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      Card(
-                        elevation: 8,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Show Employee Details only for Admin
-                              if (_isAdmin)
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 42,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                        builder: (context) => EmployeeDetailsScreen(
-                                          username: widget.username,
-                                          selectedSector: _selectedSector,
-                                          isMainAdmin: _isMainAdmin || _isAdmin, // Ensure abinaya has full access
-                                        ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.people, size: 18),
-                                    label: const Text(
-                                      'Employee Details',
-                                      style: TextStyle(fontSize: 14),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              // Show Employee Details only for Admin
-                              if (_isAdmin) const SizedBox(height: 10),
-                              // Attendance and Advance Details - available for all users except SSMMC
-                              if (_selectedSector != 'SSMMC') ...[
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 42,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => AttendanceAdvanceScreen(
-                                            username: widget.username,
-                                            selectedSector: _selectedSector,
-                                            isAdmin: _isAdmin,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.event_available, size: 18),
-                                    label: const Text(
-                                      'Attendance and Advance Details',
-                                      style: TextStyle(fontSize: 14),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-                              // Maintenance Issue Report - available for all users
-                              if (_selectedSector != 'SSMMC') const SizedBox(height: 10),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 42,
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => MaintenanceIssueScreen(
-                                          username: widget.username,
-                                          selectedSector: _selectedSector,
-                                          isMainAdmin: _isMainAdmin,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.build, size: 18),
-                                  label: const Text(
-                                    'Maintenance Issue Report',
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.teal.shade700,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Sales and Credit Details - available for all users
-                              const SizedBox(height: 10),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 42,
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => SalesCreditDetailsScreen(
-                                          username: widget.username,
-                                          selectedSector: _selectedSector,
-                                          isMainAdmin: _isMainAdmin,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.credit_card, size: 18),
-                                  label: const Text(
-                                    'Sales Expense and Credit Details',
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.indigo.shade700,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Stock Management - available for all users except SSMMC
-                              if (_selectedSector != 'SSMMC') ...[
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 42,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => StockManagementScreen(
-                                            username: widget.username,
-                                            selectedSector: _selectedSector,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.warehouse, size: 18),
-                                    label: const Text(
-                                      'Daily Production and Stock Management',
-                                      style: TextStyle(fontSize: 14),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.amber.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              // Mahal Booking Details - for SSMMC sector or All Sectors (admin only)
-                              if ((_selectedSector == 'SSMMC' || (_selectedSector == null && _isAdmin))) ...[
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 42,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => MahalBookingScreen(
-                                            username: widget.username,
-                                            selectedSector: _selectedSector,
-                                            isMainAdmin: _isMainAdmin,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.event_seat, size: 18),
-                                    label: const Text(
-                                      'Mahal Booking and Catering Orders Details',
-                                      style: TextStyle(fontSize: 14),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.purple.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              // Vehicle Driver License and Oil Service Details - for All Sectors (admin) or SSBM sector
-                              if ((_selectedSector == null && _isAdmin) || _selectedSector == 'SSBM') ...[
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 42,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                        builder: (context) => VehicleDriverLicenseScreen(
-                                          username: widget.username,
-                                          selectedSector: _selectedSector,
-                                          isMainAdmin: _isMainAdmin,
-                                        ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.drive_eta, size: 18),
-                                    label: const Text(
-                                      'Vehicle and Driver Details',
-                                      style: TextStyle(fontSize: 14),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.deepOrange.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              // Ingredients Details - visible for admin when sector is SSC or All Sectors
-                              if (_isAdmin && (_selectedSector == 'SSC' || _selectedSector == null)) ...[
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 42,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => IngredientsDetailsScreen(
-                                            username: widget.username,
-                                            isMainAdmin: _isMainAdmin,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.restaurant_menu, size: 18),
-                                    label: const Text(
-                                      'Ingredients Details',
-                                      style: TextStyle(fontSize: 14),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.brown.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            const Expanded(child: SizedBox.shrink()),
           ],
         ),
       ),

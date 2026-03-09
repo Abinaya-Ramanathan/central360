@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/product.dart';
 import '../models/sector.dart';
 import 'edit_product_dialog.dart';
@@ -36,7 +37,7 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
     setState(() => _isLoading = true);
     try {
       final products = await ApiService.getProducts();
-      final sectors = await ApiService.getSectors();
+      final sectors = await SectorService().loadSectorsForScreen();
       if (mounted) {
         // Filter products by selected sector
         List<Map<String, dynamic>> filteredProducts = products;

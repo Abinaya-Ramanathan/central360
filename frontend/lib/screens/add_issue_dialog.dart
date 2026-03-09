@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../utils/format_utils.dart';
 
 class AddIssueDialog extends StatefulWidget {
   final String selectedSector;
@@ -144,7 +145,7 @@ class _AddIssueDialogState extends State<AddIssueDialog> {
                     ),
                     child: Text(
                       _dateCreated != null
-                          ? _dateCreated!.toIso8601String().split('T')[0]
+                          ? FormatUtils.formatDateForApi(_dateCreated!)
                           : 'Select date',
                       style: TextStyle(
                         color: _dateCreated != null ? Colors.black : Colors.grey,

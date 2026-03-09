@@ -1,3 +1,5 @@
+import '../utils/format_utils.dart';
+
 class Employee {
   final String id;
   final String name;
@@ -41,7 +43,7 @@ class Employee {
       'daily_salary': dailySalary,
       'weekly_salary': weeklySalary,
       'monthly_salary': monthlySalary,
-      'joining_date': joiningDate?.toIso8601String().split('T')[0],
+      'joining_date': joiningDate != null ? FormatUtils.formatDateForApi(joiningDate!) : null,
       'joining_year': joiningYear,
     };
   }

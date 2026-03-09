@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 
 class AddSectorDialog extends StatefulWidget {
   final Sector? existingSector;
@@ -15,6 +16,9 @@ class _AddSectorDialogState extends State<AddSectorDialog> {
   final _formKey = GlobalKey<FormState>();
   final _codeController = TextEditingController();
   final _nameController = TextEditingController();
+  List<Sector> _sectors = [];
+  /// Optional parent sector code (sub-sector). null = top-level, show on home page.
+  String? _selectedParentCode;
 
   @override
   void initState() {
@@ -22,7 +26,16 @@ class _AddSectorDialogState extends State<AddSectorDialog> {
     if (widget.existingSector != null) {
       _codeController.text = widget.existingSector!.code;
       _nameController.text = widget.existingSector!.name;
+      _selectedParentCode = widget.existingSector!.parentCode;
     }
+    _loadSectors();
+  }
+
+  Future<void> _loadSectors() async {
+    try {
+      final list = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = list);
+    } catch (_) {}
   }
 
   @override
@@ -51,7 +64,7 @@ class _AddSectorDialogState extends State<AddSectorDialog> {
           // For now, we'll just close the dialog
           Navigator.of(context).pop();
         } else {
-          final sector = Sector(code: code, name: name);
+          final sector = Sector(code: code, name: name, parentCode: _selectedParentCode);
           final created = await ApiService.createSector(sector);
           Navigator.of(context).pop(created);
         }
@@ -222,6 +235,39 @@ class _AddSectorDialogState extends State<AddSectorDialog> {
                       ),
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    // Sub sector (optional) - parent sector; if empty, new sector appears on home page
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedParentCode,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Sub sector (optional)',
+                        hintText: 'None',
+                        prefixIcon: const Icon(Icons.account_tree, color: Colors.blue),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.blue, width: 2),
+                        ),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('None – show on home page', overflow: TextOverflow.ellipsis),
+                        ),
+                        ..._sectors
+                            .where((s) => s.parentCode == null || (s.parentCode?.isEmpty ?? true))
+                            .map((s) => DropdownMenuItem<String>(
+                                  value: s.code,
+                                  child: Text('${s.code} - ${s.name}', overflow: TextOverflow.ellipsis),
+                                )),
+                      ],
+                      onChanged: widget.existingSector == null
+                          ? (value) => setState(() => _selectedParentCode = value)
+                          : null,
                     ),
                     const SizedBox(height: 24),
                     // Submit Button

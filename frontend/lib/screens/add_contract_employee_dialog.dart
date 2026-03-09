@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/contract_employee.dart';
+import '../utils/format_utils.dart';
 
 class AddContractEmployeeDialog extends StatefulWidget {
   final ContractEmployee? contractEmployee;
@@ -146,7 +147,7 @@ class _AddContractEmployeeDialogState extends State<AddContractEmployeeDialog> {
                 'reason': _reasonController.text.trim(),
                 'salary_per_count': double.parse(_salaryPerCountController.text),
                 'total_salary': double.parse(_totalSalaryController.text),
-                'date': widget.selectedDate.toIso8601String().split('T')[0],
+                'date': FormatUtils.formatDateForApi(widget.selectedDate),
               };
               Navigator.pop(context, contractEmployee);
             }

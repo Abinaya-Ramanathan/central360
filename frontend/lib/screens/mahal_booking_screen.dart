@@ -4,6 +4,7 @@ import '../models/catering_details.dart';
 import '../models/expense_details.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../utils/format_utils.dart';
@@ -92,15 +93,9 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -147,6 +142,8 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
         });
         // Check for expiring event dates and send notifications
         _checkEventDatesAndNotify();
+        // Fix event_date for any bookings where it differs from date in booking_id
+        await _syncEventDatesFromBookingIds();
       }
     } catch (e) {
       if (mounted) {
@@ -168,6 +165,66 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
     } catch (e) {
       // Silently handle errors - notifications are non-critical
       debugPrint('Error checking event dates: $e');
+    }
+  }
+
+  /// Extract date string (YYYY-MM-DD) from booking_id if it ends with _YYYY-MM-DD.
+  static String? _dateFromBookingId(String? bookingId) {
+    if (bookingId == null || bookingId.isEmpty) return null;
+    final parts = bookingId.split('_');
+    if (parts.length < 2) return null;
+    final last = parts.last;
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(last)) return last;
+    return null;
+  }
+
+  /// Fix event_date for bookings where it differs from the date in booking_id (legacy timezone bug).
+  /// [showNoChangeMessage] when true, show a snackbar if nothing was fixed (e.g. when user taps the button).
+  Future<void> _syncEventDatesFromBookingIds({bool showNoChangeMessage = false}) async {
+    if (!mounted) return;
+    int fixed = 0;
+    String? lastError;
+    for (final event in _eventDetails) {
+      final bookingId = event.bookingId;
+      final dateStr = _dateFromBookingId(bookingId);
+      if (dateStr == null) continue;
+      final currentEventDateStr = FormatUtils.formatDateForApi(event.eventDate);
+      if (dateStr == currentEventDateStr) continue;
+      final newDate = FormatUtils.parseDate(dateStr);
+      if (newDate == null) continue;
+      try {
+        await ApiService.updateMahalBooking(event.copyWith(eventDate: newDate));
+        fixed++;
+      } catch (e) {
+        lastError = e.toString().replaceFirst('Exception: ', '');
+        debugPrint('Failed to sync event date for $bookingId: $e');
+      }
+    }
+    if (fixed > 0 && mounted) {
+      await _loadAllData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Updated event date for $fixed booking(s) to match Booking ID'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else if (lastError != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not fix event date: $lastError'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } else if (showNoChangeMessage && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Event dates are already in sync with Booking IDs'),
+          backgroundColor: Colors.blue,
+        ),
+      );
     }
   }
 
@@ -228,6 +285,13 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
               ),
             ),
             IconButton(
+              icon: const Icon(Icons.event_note),
+              tooltip: 'Fix event dates to match Booking ID',
+              onPressed: () async {
+                await _syncEventDatesFromBookingIds(showNoChangeMessage: true);
+              },
+            ),
+            IconButton(
               icon: const Icon(Icons.home),
               onPressed: () {
                 Navigator.of(context).pushReplacement(
@@ -270,17 +334,64 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
         ),
         body: _isLoading && _eventDetails.isEmpty
             ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
-                controller: _tabController,
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildEventDetailsTab(),
-                  _buildCateringDetailsTab(),
-                  _buildExpenseDetailsTab(),
-                  _buildMahalVesselsTab(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: widget.selectedSector == null ? null : _addEvent,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Event Details', style: TextStyle(fontSize: 16)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _addCatering,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Catering Details', style: TextStyle(fontSize: 16)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _addExpense,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Expense Details', style: TextStyle(fontSize: 16)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildEventDetailsTab(),
+                        _buildCateringDetailsTab(),
+                        _buildExpenseDetailsTab(),
+                        _buildMahalVesselsTab(),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-      ),
-    );
+            ),
+          );
   }
 
   Widget _buildEventDetailsTab() {
@@ -409,7 +520,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                         ),
                         child: Text(
                           _fromDateEvent != null
-                              ? _fromDateEvent!.toIso8601String().split('T')[0]
+                              ? FormatUtils.formatDateForApi(_fromDateEvent!)
                               : 'From Date',
                           style: const TextStyle(fontSize: 14),
                         ),
@@ -461,7 +572,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                         ),
                         child: Text(
                           _toDateEvent != null
-                              ? _toDateEvent!.toIso8601String().split('T')[0]
+                              ? FormatUtils.formatDateForApi(_toDateEvent!)
                               : 'To Date',
                           style: const TextStyle(fontSize: 14),
                         ),
@@ -479,18 +590,6 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                       tooltip: 'Clear To Date',
                     ),
                 ],
-              ),
-              const SizedBox(width: 12),
-              // Add Event Details Button
-              ElevatedButton.icon(
-                onPressed: widget.selectedSector == null ? null : _addEvent,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Event Details', style: TextStyle(fontSize: 16)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple.shade700,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
               ),
             ],
           ),
@@ -731,19 +830,6 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                   ),
                 ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _addCatering,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Catering Details', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade700, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -824,19 +910,6 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     ),
                   ),
                 ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _addExpense,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Expense Details', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            ),
-          ),
         ),
       ],
     );

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
+import '../utils/format_utils.dart';
 
 class DailyMiningActivityTabContent extends StatefulWidget {
   final String? selectedSector;
@@ -44,15 +46,9 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -103,7 +99,7 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
 
     setState(() => _isLoading = true);
     try {
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       final entries = await ApiService.getDailyMiningActivities(
         date: dateStr,
         sector: widget.selectedSector,
@@ -172,7 +168,7 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
 
     setState(() => _isLoading = true);
     try {
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       int successCount = 0;
       int errorCount = 0;
 
@@ -248,7 +244,7 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                     ),
                     child: Text(
                       _selectedDate != null
-                          ? _selectedDate!.toIso8601String().split('T')[0]
+                          ? FormatUtils.formatDateForApi(_selectedDate!)
                           : 'Select Date',
                       style: TextStyle(
                         color: _selectedDate != null ? Colors.black : Colors.grey,

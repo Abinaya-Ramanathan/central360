@@ -3,11 +3,27 @@ import db from '../db.js';
 
 const router = Router();
 
-// Get all sectors
+// Sri Suryaas Cafe sub-sectors: always included in list and mapped as subsectors of SSC
+const SSC_SUBSECTORS = [
+  { code: 'SSCT', name: 'SRI SURYAAS CAFE THANTHONDRIMALAI', parent_sector_code: 'SSC' },
+  { code: 'CS', name: 'CANTEEN STORE', parent_sector_code: 'SSC' },
+  { code: 'SSCM', name: 'SRI SURYAAS CAFE MAIN BRANCH', parent_sector_code: 'SSC' },
+];
+
+// Get all sectors (merge in SSC sub-sectors if not already in DB)
 router.get('/', async (req, res) => {
   try {
     const { rows } = await db.query('SELECT * FROM sectors ORDER BY code');
-    res.json(rows);
+    const existingCodes = new Set(rows.map((r) => r.code));
+    const merged = [...rows];
+    for (const sub of SSC_SUBSECTORS) {
+      if (!existingCodes.has(sub.code)) {
+        merged.push(sub);
+        existingCodes.add(sub.code);
+      }
+    }
+    merged.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+    res.json(merged);
   } catch (err) {
     console.error('Sector fetch error:', err.message);
     console.error('Full error:', err);
@@ -22,7 +38,7 @@ router.get('/', async (req, res) => {
 // Create sector
 router.post('/', async (req, res) => {
   try {
-    const { code, name } = req.body;
+    const { code, name, parent_sector_code } = req.body;
 
     // Validation
     if (!code || !code.trim()) {
@@ -34,6 +50,15 @@ router.post('/', async (req, res) => {
 
     const codeUpper = code.trim().toUpperCase();
     const nameTrimmed = name.trim();
+    const parentCode = parent_sector_code && String(parent_sector_code).trim() ? String(parent_sector_code).trim().toUpperCase() : null;
+
+    // If parent given, parent must exist
+    if (parentCode) {
+      const parent = await db.query('SELECT code FROM sectors WHERE code = $1', [parentCode]);
+      if (parent.rows.length === 0) {
+        return res.status(400).json({ message: 'Parent sector does not exist' });
+      }
+    }
 
     // Check if sector already exists
     try {
@@ -47,8 +72,8 @@ router.post('/', async (req, res) => {
     }
 
     const { rows } = await db.query(
-      'INSERT INTO sectors (code, name) VALUES ($1, $2) RETURNING *',
-      [codeUpper, nameTrimmed]
+      'INSERT INTO sectors (code, name, parent_sector_code) VALUES ($1, $2, $3) RETURNING *',
+      [codeUpper, nameTrimmed, parentCode]
     );
     res.status(201).json(rows[0]);
   } catch (err) {

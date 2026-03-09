@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
+import '../utils/format_utils.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -47,15 +49,9 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently or show snackbar if needed
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   // Get sector name from code
@@ -147,7 +143,7 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
       final year = _selectedDate!.year;
       final month = _selectedMonth ?? _selectedDate!.month;
       final monthStr = '$year-${month.toString().padLeft(2, '0')}';
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       
       if (widget.selectedSector == null) {
         // All Sectors selected - fetch all expenses and group by sector
@@ -584,7 +580,7 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
         'item_details': itemDetails,
         'amount': amount,
         'reason_for_purchase': reason.isEmpty ? null : reason,
-        'expense_date': _selectedDate!.toIso8601String().split('T')[0],
+        'expense_date': FormatUtils.formatDateForApi(_selectedDate!),
         'sector_code': widget.selectedSector,
       };
 
@@ -770,6 +766,26 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
         ),
         child: Column(
           children: [
+            // Action button: top-right in body, just below AppBar
+            if (widget.selectedSector != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _isLoading ? null : _showAddExpenseDialog,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add Expense', style: TextStyle(fontSize: 13)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.purple.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Month and Date Selection - only show if not pre-selected
             if (widget.preSelectedMonth == null && widget.preSelectedDate == null)
               Container(
@@ -841,34 +857,6 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
                 ),
               ),
             ),
-            // Add Expense Item Button (only show for single sector view)
-            if (widget.selectedSector != null)
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: Colors.white,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _showAddExpenseDialog,
-                        icon: const Icon(Icons.add),
-                        label: const Text(
-                          'Add Expense Items',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple.shade700,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),

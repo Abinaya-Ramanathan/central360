@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../models/sector.dart';
+import '../utils/format_utils.dart';
 import '../utils/pdf_generator.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -176,15 +178,9 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -340,13 +336,13 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
         final dateStr = dateValue.split('T')[0].split(' ')[0];
         return dateStr;
       } else if (dateValue is DateTime) {
-        return dateValue.toIso8601String().split('T')[0];
+        return FormatUtils.formatDateForApi(dateValue);
       } else {
         // Try parsing as string first
         final dateStr = dateValue.toString();
         final parsed = DateTime.tryParse(dateStr);
         if (parsed != null) {
-          return parsed.toIso8601String().split('T')[0];
+          return FormatUtils.formatDateForApi(parsed);
         }
         // If it's already in date format, split by T or space
         return dateStr.split('T')[0].split(' ')[0];
@@ -663,7 +659,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                   );
                   if (picked != null) {
                     selectedCreditDate = picked;
-                    creditDateController.text = picked.toIso8601String().split('T')[0];
+                    creditDateController.text = FormatUtils.formatDateForApi(picked);
                     setDialogState(() {}); // Update dialog state to reflect the change
                   }
                 },
@@ -703,7 +699,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                   );
                   if (picked != null) {
                     selectedFullSettlementDate = picked;
-                    fullSettlementDateController.text = picked.toIso8601String().split('T')[0];
+                    fullSettlementDateController.text = FormatUtils.formatDateForApi(picked);
                     setDialogState(() {}); // Update dialog state to reflect the change
                   }
                 },
@@ -1482,7 +1478,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                                                       lastDate: DateTime(2100),
                                                     );
                                                     if (picked != null) {
-                                                      _controllers[index]!['credit_date']!.text = picked.toIso8601String().split('T')[0];
+                                                      _controllers[index]!['credit_date']!.text = FormatUtils.formatDateForApi(picked);
                                                     }
                                                   },
                                                   child: InputDecorator(
@@ -1537,7 +1533,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                                                     );
                                                     if (picked != null) {
                                                       setState(() {
-                                                        _controllers[index]!['full_settlement_date']!.text = picked.toIso8601String().split('T')[0];
+                                                        _controllers[index]!['full_settlement_date']!.text = FormatUtils.formatDateForApi(picked);
                                                       });
                                                     }
                                                   },

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../models/maintenance_issue.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../config/env_config.dart';
+import '../utils/format_utils.dart';
 import 'add_issue_dialog.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -12,12 +14,15 @@ import 'upload_photos_dialog.dart';
 class MaintenanceIssueScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  /// When set (e.g. main sector page), show issues from these sector codes (main + sub-sectors).
+  final List<String>? includedSectorCodes;
   final bool isMainAdmin;
 
   const MaintenanceIssueScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.includedSectorCodes,
     this.isMainAdmin = false,
   });
 
@@ -55,15 +60,9 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -79,11 +78,14 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
     setState(() => _isLoading = true);
     try {
       final issues = await ApiService.getMaintenanceIssues(
-        sector: widget.selectedSector,
+        sector: widget.includedSectorCodes != null ? null : widget.selectedSector,
       );
+      final filtered = widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty
+          ? issues.where((i) => widget.includedSectorCodes!.contains(i.sectorCode)).toList()
+          : issues;
       if (mounted) {
         setState(() {
-          _issues = issues;
+          _issues = filtered;
           _editMode.clear();
           _editStatus.clear();
           _editDateResolved.clear();
@@ -307,6 +309,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
         scrollDirection: Axis.horizontal,
         controller: _photoHorizontalScrollController,
         itemCount: photoItems.length,
+        cacheExtent: 120,
         itemBuilder: (context, index) {
         final photoItem = photoItems[index];
         final imageUrl = photoItem['imageUrl'] as String;
@@ -566,11 +569,41 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                // Action button: top-right in body, just below AppBar
+                if (widget.selectedSector != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: () async {
+                            final result = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AddIssueDialog(
+                                selectedSector: widget.selectedSector!,
+                              ),
+                            );
+                            if (result == true) {
+                              await _loadIssues();
+                            }
+                          },
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add Issue', style: TextStyle(fontSize: 13)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.teal.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Expanded(
                   child: _issues.isEmpty
                       ? Center(
                           child: Text(
-                            widget.selectedSector == null
+                            (widget.selectedSector == null || widget.includedSectorCodes != null)
                                 ? 'No maintenance issues found'
                                 : 'No maintenance issues in selected sector',
                             style: TextStyle(
@@ -587,10 +620,10 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                               scrollDirection: Axis.horizontal,
                               child: DataTable(
                                 columnSpacing: 20,
-                                sortColumnIndex: widget.selectedSector == null ? 0 : null,
+                                sortColumnIndex: (widget.selectedSector == null || widget.includedSectorCodes != null) ? 0 : null,
                                 sortAscending: _sortAscending,
                                 columns: [
-                                if (widget.selectedSector == null)
+                                if ((widget.selectedSector == null || widget.includedSectorCodes != null))
                                   DataColumn(
                                     label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
                                     onSort: (columnIndex, ascending) {
@@ -618,7 +651,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                                 final isEditMode = _editMode[issueId] == true;
                                 return DataRow(
                                   cells: [
-                                    if (widget.selectedSector == null)
+                                    if ((widget.selectedSector == null || widget.includedSectorCodes != null))
                                       DataCell(
                                         isEditMode
                                             ? DropdownButton<String>(
@@ -686,14 +719,14 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                                                           .toIso8601String()
                                                           .split('T')[0]
                                                       : issue.dateCreated != null
-                                                          ? issue.dateCreated!.toIso8601String().split('T')[0]
+                                                          ? FormatUtils.formatDateForApi(issue.dateCreated!)
                                                           : 'Select date',
                                                 ),
                                               ),
                                             )
                                           : Text(
                                               issue.dateCreated != null
-                                                  ? issue.dateCreated!.toIso8601String().split('T')[0]
+                                                  ? FormatUtils.formatDateForApi(issue.dateCreated!)
                                                   : 'N/A',
                                             ),
                                     ),
@@ -742,7 +775,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                                             )
                                           : Text(
                                               issue.dateResolved != null
-                                                  ? issue.dateResolved!.toIso8601String().split('T')[0]
+                                                  ? FormatUtils.formatDateForApi(issue.dateResolved!)
                                                   : 'N/A',
                                             ),
                                     ),
@@ -797,40 +830,6 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                           ),
                         ),
                       ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: widget.selectedSector == null
-                          ? null
-                          : () async {
-                              final result = await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AddIssueDialog(
-                                  selectedSector: widget.selectedSector!,
-                                ),
-                              );
-                              if (result == true) {
-                                await _loadIssues();
-                              }
-                            },
-                      icon: const Icon(Icons.add),
-                      label: const Text(
-                        'Add Issue',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal.shade700,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
             ],
           ),

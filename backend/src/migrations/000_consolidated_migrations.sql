@@ -10,10 +10,11 @@
 -- PART 1: COMPLETE SCHEMA (Migration 001)
 -- ============================================
 
--- 1. SECTORS TABLE
+-- 1. SECTORS TABLE (includes parent_sector_code for sub-sectors, e.g. SSC -> SSCT/CS/SSCM)
 CREATE TABLE IF NOT EXISTS sectors (
   code VARCHAR(50) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
+  parent_sector_code VARCHAR(50) REFERENCES sectors(code) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -575,6 +576,17 @@ INSERT INTO sectors (code, name) VALUES
 ON CONFLICT (code) DO UPDATE SET
   name = EXCLUDED.name;
 
+-- SSC sub-sectors (Migration 049/050: parent_sector_code and SSC units)
+ALTER TABLE sectors
+  ADD COLUMN IF NOT EXISTS parent_sector_code VARCHAR(50) REFERENCES sectors(code) ON DELETE SET NULL;
+INSERT INTO sectors (code, name, parent_sector_code) VALUES
+  ('SSCT', 'SRI SURYAAS CAFE THANTHONDRIMALAI', 'SSC'),
+  ('CS', 'CANTEEN STORE', 'SSC'),
+  ('SSCM', 'SRI SURYAAS CAFE MAIN BRANCH', 'SSC')
+ON CONFLICT (code) DO UPDATE SET
+  name = EXCLUDED.name,
+  parent_sector_code = COALESCE(EXCLUDED.parent_sector_code, sectors.parent_sector_code);
+
 -- DEFAULT PRODUCTS FOR SSBM SECTOR
 INSERT INTO products (product_name, sector_code) VALUES
   ('Sholling', 'SSBM'),
@@ -618,6 +630,10 @@ CREATE INDEX IF NOT EXISTS idx_daily_income_expense_sector_date ON daily_income_
 -- ============================================
 -- These statements are safe to run on existing databases
 -- They use IF NOT EXISTS or handle errors gracefully
+
+-- Migration 049: Add parent_sector_code to sectors (sub-sectors)
+ALTER TABLE sectors
+  ADD COLUMN IF NOT EXISTS parent_sector_code VARCHAR(50) REFERENCES sectors(code) ON DELETE SET NULL;
 
 -- Migration 052: Make sales_details.name field optional
 DO $$ 

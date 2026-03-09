@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
 
 class AddStockItemDialog extends StatefulWidget {
@@ -23,7 +24,8 @@ class _AddStockItemDialogState extends State<AddStockItemDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedSectorCode = widget.preSelectedSector;
+    // No default sector: user must select (can change over time)
+    _selectedSectorCode = null;
     _loadSectors();
     // Check if user is admin (you may need to pass this from parent)
     // For now, we'll show fields for all users but backend will handle visibility
@@ -31,10 +33,8 @@ class _AddStockItemDialogState extends State<AddStockItemDialog> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      setState(() {
-        _sectors = sectors;
-      });
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

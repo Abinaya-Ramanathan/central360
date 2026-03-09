@@ -116,6 +116,15 @@ class FormatUtils {
     return '₹${amount.toStringAsFixed(decimals)}';
   }
 
+  /// Format a DateTime as local calendar date YYYY-MM-DD for API payloads.
+  /// Use this instead of date.toIso8601String().split('T')[0] to avoid timezone shifting the day.
+  static String formatDateForApi(DateTime date) {
+    final y = date.year;
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
   /// Format date to DD/MM/YYYY for display
   static String formatDateDisplay(dynamic dateValue) {
     final dateStr = formatDate(dateValue);

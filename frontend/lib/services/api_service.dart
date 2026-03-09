@@ -14,6 +14,7 @@ import '../models/driver_license.dart';
 import '../models/engine_oil_service.dart';
 
 import '../config/env_config.dart';
+import '../utils/format_utils.dart';
 
 class ApiService {
   static String get baseUrl => EnvConfig.apiEndpoint;
@@ -155,7 +156,7 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/sectors'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'code': sector.code, 'name': sector.name}),
+        body: json.encode(sector.toJson()),
       );
       
       
@@ -845,11 +846,11 @@ class ApiService {
 
     request.fields['issue_description'] = issueDescription ?? '';
     if (dateCreated != null) {
-      request.fields['date_created'] = dateCreated.toIso8601String().split('T')[0];
+      request.fields['date_created'] = FormatUtils.formatDateForApi(dateCreated);
     }
     request.fields['status'] = status ?? 'Not resolved';
     if (dateResolved != null) {
-      request.fields['date_resolved'] = dateResolved.toIso8601String().split('T')[0];
+      request.fields['date_resolved'] = FormatUtils.formatDateForApi(dateResolved);
     }
     request.fields['sector_code'] = sectorCode;
 
@@ -897,9 +898,9 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'issue_description': issueDescription,
-        'date_created': dateCreated?.toIso8601String().split('T')[0],
+        'date_created': dateCreated != null ? FormatUtils.formatDateForApi(dateCreated!) : null,
         'status': status ?? 'Not resolved',
-        'date_resolved': dateResolved?.toIso8601String().split('T')[0],
+        'date_resolved': dateResolved != null ? FormatUtils.formatDateForApi(dateResolved!) : null,
         'sector_code': sectorCode,
       }),
     );
@@ -1048,11 +1049,15 @@ class ApiService {
     throw Exception(errorMessage);
   }
 
-  static Future<MahalBooking> updateMahalBooking(MahalBooking booking) async {
+  static Future<MahalBooking> updateMahalBooking(MahalBooking booking, {String? oldBookingId}) async {
+    final body = booking.toJson();
+    if (oldBookingId != null && oldBookingId != booking.bookingId) {
+      body['old_booking_id'] = oldBookingId;
+    }
     final response = await http.post(
       Uri.parse('$baseUrl/mahal-bookings'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode(booking.toJson()),
+      body: json.encode(body),
     );
     if (response.statusCode == 201) {
       return MahalBooking.fromJson(json.decode(response.body));

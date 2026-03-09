@@ -3,10 +3,13 @@ import 'package:flutter/services.dart';
 import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../utils/format_utils.dart';
 
 class AttendanceTabContent extends StatefulWidget {
   final String? selectedSector;
+  /// When set (main sector page), load employees and attendance for these sector codes.
+  final List<String>? includedSectorCodes;
   final DateTime? selectedDate;
   final bool isAdmin;
   final bool isEditMode;
@@ -16,6 +19,7 @@ class AttendanceTabContent extends StatefulWidget {
   const AttendanceTabContent({
     super.key,
     this.selectedSector,
+    this.includedSectorCodes,
     this.selectedDate,
     this.isAdmin = false,
     this.isEditMode = false,
@@ -39,7 +43,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
     super.initState();
     _loadSectors();
     if (widget.selectedDate != null) {
-      if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
+      if (widget.includedSectorCodes != null || widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
         _loadData();
       }
     }
@@ -55,9 +59,10 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
   void didUpdateWidget(AttendanceTabContent oldWidget) {
     super.didUpdateWidget(oldWidget);
     if ((widget.selectedDate != oldWidget.selectedDate ||
-            widget.selectedSector != oldWidget.selectedSector) &&
+            widget.selectedSector != oldWidget.selectedSector ||
+            widget.includedSectorCodes != oldWidget.includedSectorCodes) &&
         widget.selectedDate != null) {
-      if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
+      if (widget.includedSectorCodes != null || widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null)) {
         _loadData();
       }
     }
@@ -65,15 +70,9 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -87,13 +86,15 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
 
   Future<void> _loadData() async {
     if (widget.selectedDate == null) return;
-    if (widget.selectedSector == null && !widget.isAdmin) return;
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !widget.isAdmin) return;
 
     setState(() => _isLoading = true);
     try {
       List<Employee> employees;
-      if (widget.selectedSector == null && widget.isAdmin) {
-        // Load all employees in a single call instead of per-sector
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        final all = await ApiService.getEmployees();
+        employees = all.where((e) => widget.includedSectorCodes!.contains(e.sector)).toList();
+      } else if (widget.selectedSector == null && widget.isAdmin) {
         employees = await ApiService.getEmployees();
       } else {
         employees = await ApiService.getEmployeesBySector(widget.selectedSector!);
@@ -121,7 +122,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
       // Get previous outstanding from the day BEFORE the selected date
       // This ensures we get the outstanding from the previous day, not from the current date's record
       final previousDate = widget.selectedDate!.subtract(const Duration(days: 1));
-      final previousDateStr = previousDate.toIso8601String().split('T')[0];
+      final previousDateStr = FormatUtils.formatDateForApi(previousDate);
       
       // First, reset status, advance_taken and advance_paid to 0/null for all employees
       // Status is date-specific and should be null for new dates
@@ -184,11 +185,14 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         }
       }
 
-      final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
-      final attendanceRecords = await ApiService.getAttendance(
-        sector: widget.selectedSector, // null for all sectors
+      final dateStr = FormatUtils.formatDateForApi(widget.selectedDate!);
+      var attendanceRecords = await ApiService.getAttendance(
+        sector: widget.includedSectorCodes != null ? null : widget.selectedSector,
         date: dateStr,
       );
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        attendanceRecords = attendanceRecords.where((r) => widget.includedSectorCodes!.contains(r['sector']?.toString())).toList();
+      }
 
       // If there's an existing record for this date, load its advance_taken and advance_paid
       // Otherwise, they remain 0 (only outstanding_advance and bulk_advance carry forward)
@@ -290,7 +294,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
   Future<bool> saveAttendance() async {
     if (widget.selectedDate == null) return false;
 
-    final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
+    final dateStr = FormatUtils.formatDateForApi(widget.selectedDate!);
 
     setState(() => _isLoading = true);
     try {
@@ -380,7 +384,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
       );
     }
 
-    if (widget.selectedSector == null && !widget.isAdmin) {
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !widget.isAdmin) {
       return const Center(
         child: Text(
           'Please select a sector from Home page',
@@ -389,7 +393,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
       );
     }
 
-    final showSectorColumn = widget.isAdmin && widget.selectedSector == null;
+    final showSectorColumn = (widget.isAdmin && widget.selectedSector == null) || widget.includedSectorCodes != null;
 
     return Column(
       children: [
@@ -399,7 +403,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
               : _employees.isEmpty
                   ? Center(
                       child: Text(
-                        widget.selectedSector == null && widget.isAdmin
+                        (widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null
                             ? 'No employees found'
                             : 'No employees in selected sector',
                         style: const TextStyle(fontSize: 16, color: Colors.grey),

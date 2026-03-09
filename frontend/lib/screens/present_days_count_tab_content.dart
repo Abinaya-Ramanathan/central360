@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/employee.dart';
 import '../services/api_service.dart';
+import '../utils/format_utils.dart';
 
 class PresentDaysCountTabContent extends StatefulWidget {
   final String? selectedSector;
@@ -252,7 +253,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
 
       // Query attendance for each date in range
       for (var date in dateRange) {
-        final dateStr = date.toIso8601String().split('T')[0];
+        final dateStr = FormatUtils.formatDateForApi(date);
         
         try {
           // Get employee attendance
@@ -418,7 +419,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                           ),
                           child: Text(
                             _fromDatePresent != null
-                                ? _fromDatePresent!.toIso8601String().split('T')[0]
+                                ? FormatUtils.formatDateForApi(_fromDatePresent!)
                                 : 'From Date',
                             style: TextStyle(
                               color: _fromDatePresent != null ? Colors.black : Colors.grey,
@@ -458,7 +459,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                           ),
                           child: Text(
                             _toDatePresent != null
-                                ? _toDatePresent!.toIso8601String().split('T')[0]
+                                ? FormatUtils.formatDateForApi(_toDatePresent!)
                                 : 'To Date',
                             style: TextStyle(
                               color: _toDatePresent != null ? Colors.black : Colors.grey,

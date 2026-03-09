@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/expense_details.dart';
 import '../services/api_service.dart';
+import '../utils/format_utils.dart';
 
 class AddExpenseDetailsDialog extends StatefulWidget {
   final String? bookingId;
@@ -109,7 +110,7 @@ class _AddExpenseDetailsDialogState extends State<AddExpenseDetailsDialog> {
       String bookingId = widget.bookingId ?? '';
       if (bookingId.isEmpty) {
         final cleanClientName = _clientNameController.text.trim().replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
-        bookingId = '${cleanClientName}_${_eventDate!.toIso8601String().split('T')[0]}';
+        bookingId = '${cleanClientName}_${FormatUtils.formatDateForApi(_eventDate!)}';
       }
 
       final expenseDetails = ExpenseDetails(
@@ -188,7 +189,7 @@ class _AddExpenseDetailsDialogState extends State<AddExpenseDetailsDialog> {
                   const SizedBox(height: 16),
                   InkWell(
                     onTap: _selectEventDate,
-                    child: InputDecorator(decoration: const InputDecoration(labelText: 'Event Date *'), child: Text(_eventDate != null ? _eventDate!.toIso8601String().split('T')[0] : 'Select Date')),
+                    child: InputDecorator(decoration: const InputDecoration(labelText: 'Event Date *'), child: Text(_eventDate != null ? FormatUtils.formatDateForApi(_eventDate!) : 'Select Date')),
                   ),
                 ],
                 const SizedBox(height: 16),

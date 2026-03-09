@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
 import 'home_screen.dart';
@@ -53,15 +54,9 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -102,7 +97,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
       });
       // Load previous outstanding advance for all employees in a single batch call
       if (_selectedDate != null && _employees.isNotEmpty) {
-        final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+        final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
         try {
           final ids = _employees.map((e) => e.id).toList();
           final outstandingMap = await ApiService.getOutstandingAdvanceBatch(ids, dateStr);
@@ -153,7 +148,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
     if (widget.selectedSector == null || _selectedDate == null) return;
 
     try {
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       final records = await ApiService.getAttendance(
         sector: widget.selectedSector,
         date: dateStr,
@@ -264,7 +259,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
       });
       // Reload previous outstanding for new date
       if (widget.selectedSector != null && _employees.isNotEmpty) {
-        final dateStr = picked.toIso8601String().split('T')[0];
+        final dateStr = FormatUtils.formatDateForApi(picked);
         for (var emp in _employees) {
           try {
             // Get the outstanding_advance from the most recent record BEFORE the new selected date
@@ -319,7 +314,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       
       // Only save employees that have a status selected or have been edited
       // Filter to include employees with status or with any advance changes
@@ -497,6 +492,26 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
         ),
         child: Column(
           children: [
+            // Action button: top-right in body, just below AppBar
+            if (_employees.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _isEditMode ? _saveAttendance : () => setState(() => _isEditMode = true),
+                      icon: Icon(_isEditMode ? Icons.save : Icons.edit, size: 18),
+                      label: Text(_isEditMode ? 'Save' : 'Edit', style: const TextStyle(fontSize: 13)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Date Selection - only show if not pre-selected
             if (widget.preSelectedMonth == null && widget.preSelectedDate == null)
               Container(
@@ -713,30 +728,6 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                 ],
               ),
             ),
-            // Edit/Save Button
-            if (_employees.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: 180,
-                  height: 48,
-                  child: FilledButton.icon(
-                    onPressed: _isEditMode ? _saveAttendance : () => setState(() => _isEditMode = true),
-                    icon: Icon(_isEditMode ? Icons.save : Icons.edit, size: 18),
-                    label: Text(
-                      _isEditMode ? 'Save Attendance' : 'Edit Attendance',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

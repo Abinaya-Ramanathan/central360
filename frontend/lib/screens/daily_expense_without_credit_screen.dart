@@ -4,7 +4,9 @@ import 'home_screen.dart';
 import 'login_screen.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
+import '../utils/format_utils.dart';
 
 class DailyExpenseWithoutCreditScreen extends StatefulWidget {
   final String username;
@@ -28,15 +30,9 @@ class _DailyExpenseWithoutCreditScreenState extends State<DailyExpenseWithoutCre
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -239,7 +235,7 @@ class _DailyExpenseWithoutCreditScreenState extends State<DailyExpenseWithoutCre
                       ),
                       child: Text(
                         _selectedDate != null
-                            ? _selectedDate!.toIso8601String().split('T')[0]
+                            ? FormatUtils.formatDateForApi(_selectedDate!)
                             : 'Select Date',
                         style: TextStyle(
                           color: _selectedDate != null ? Colors.black : Colors.grey,

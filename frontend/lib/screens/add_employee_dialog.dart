@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/employee.dart';
+import '../models/sector.dart';
+import '../services/api_service.dart';
 import '../services/sector_service.dart';
 
 class AddEmployeeDialog extends StatefulWidget {
@@ -25,7 +27,20 @@ class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
   String? _selectedSector;
   DateTime? _joiningDate;
   int? _joiningYear;
-  final SectorService _sectorService = SectorService();
+  List<Sector> _sectors = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSectors();
+  }
+
+  Future<void> _loadSectors() async {
+    try {
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -275,7 +290,7 @@ class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
                             borderSide: const BorderSide(color: Colors.blue, width: 2),
                           ),
                         ),
-                        items: _sectorService.sectors.map((sector) {
+                        items: _sectors.map((sector) {
                           return DropdownMenuItem<String>(
                             value: sector.code,
                             child: Text('${sector.code} - ${sector.name}'),

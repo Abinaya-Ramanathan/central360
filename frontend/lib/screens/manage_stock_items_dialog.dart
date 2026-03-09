@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
 import 'edit_stock_item_dialog.dart';
 
@@ -35,7 +36,7 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
     setState(() => _isLoading = true);
     try {
       final stockItems = await ApiService.getStockItems();
-      final sectors = await ApiService.getSectors();
+      final sectors = await SectorService().loadSectorsForScreen();
       if (mounted) {
         // Filter stock items by selected sector
         List<Map<String, dynamic>> filteredStockItems = stockItems;

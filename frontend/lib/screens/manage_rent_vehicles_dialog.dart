@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
 import 'edit_rent_vehicle_dialog.dart';
 
@@ -35,7 +36,7 @@ class _ManageRentVehiclesDialogState extends State<ManageRentVehiclesDialog> {
     setState(() => _isLoading = true);
     try {
       final vehicles = await ApiService.getRentVehicles();
-      final sectors = await ApiService.getSectors();
+      final sectors = await SectorService().loadSectorsForScreen();
       if (mounted) {
         // Filter vehicles by selected sector
         List<Map<String, dynamic>> filteredVehicles = vehicles;

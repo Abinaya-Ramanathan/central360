@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../models/sector.dart';
+import '../utils/format_utils.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -60,15 +62,9 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -208,7 +204,7 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
       final year = _selectedDate!.year;
       final month = _selectedMonth ?? _selectedDate!.month;
       final monthStr = '$year-${month.toString().padLeft(2, '0')}';
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       
       final records = await ApiService.getDailyProduction(month: monthStr, date: dateStr);
       
@@ -418,7 +414,7 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
               // Save all production data
               setState(() => _isLoading = true);
               try {
-                final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+                final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
                 
                 for (var record in _productionData) {
                   final productName = record['product_name']?.toString() ?? '';
@@ -613,6 +609,26 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
         ),
         child: Column(
           children: [
+            // Action button: top-right in body, just below AppBar
+            if (_productionData.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _isLoading ? null : _showEditProductionDialog,
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('Edit Production', style: TextStyle(fontSize: 13)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.orange.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Month and Date Selection - only show if not pre-selected
             if (widget.preSelectedMonth == null && widget.preSelectedDate == null)
               Container(
@@ -716,30 +732,6 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
                                 ],
                               );
                             }).toList(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // Edit Production Details Button
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _showEditProductionDialog,
-                  icon: const Icon(Icons.edit),
-                  label: const Text(
-                    'Edit Production Details',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange.shade700,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),

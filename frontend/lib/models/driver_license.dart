@@ -1,3 +1,5 @@
+import '../utils/format_utils.dart';
+
 class DriverLicense {
   final int? id;
   final String? sectorCode;
@@ -19,7 +21,7 @@ class DriverLicense {
       if (sectorCode != null) 'sector_code': sectorCode,
       'driver_name': driverName,
       'license_number': licenseNumber,
-      'expiry_date': expiryDate.toIso8601String().split('T')[0],
+      'expiry_date': FormatUtils.formatDateForApi(expiryDate),
     };
   }
 

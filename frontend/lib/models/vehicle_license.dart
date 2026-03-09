@@ -1,3 +1,5 @@
+import '../utils/format_utils.dart';
+
 class VehicleLicense {
   final int? id;
   final String? sectorCode;
@@ -30,11 +32,11 @@ class VehicleLicense {
       'name': name,
       'model': model,
       'registration_number': registrationNumber,
-      'permit_date': permitDate?.toIso8601String().split('T')[0],
-      'insurance_date': insuranceDate?.toIso8601String().split('T')[0],
-      'fitness_date': fitnessDate?.toIso8601String().split('T')[0],
-      'pollution_date': pollutionDate?.toIso8601String().split('T')[0],
-      'tax_date': taxDate?.toIso8601String().split('T')[0],
+      'permit_date': permitDate != null ? FormatUtils.formatDateForApi(permitDate!) : null,
+      'insurance_date': insuranceDate != null ? FormatUtils.formatDateForApi(insuranceDate!) : null,
+      'fitness_date': fitnessDate != null ? FormatUtils.formatDateForApi(fitnessDate!) : null,
+      'pollution_date': pollutionDate != null ? FormatUtils.formatDateForApi(pollutionDate!) : null,
+      'tax_date': taxDate != null ? FormatUtils.formatDateForApi(taxDate!) : null,
     };
   }
 

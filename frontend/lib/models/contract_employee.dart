@@ -1,3 +1,5 @@
+import '../utils/format_utils.dart';
+
 class ContractEmployee {
   final String id;
   final String name;
@@ -25,7 +27,7 @@ class ContractEmployee {
       'reason': reason,
       'salary_per_count': salaryPerCount,
       'total_salary': totalSalary,
-      'date': date.toIso8601String().split('T')[0],
+      'date': FormatUtils.formatDateForApi(date),
     };
   }
 

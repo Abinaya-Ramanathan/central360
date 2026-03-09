@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import 'add_employee_dialog.dart';
 import 'edit_employee_dialog.dart';
@@ -11,12 +12,16 @@ import 'login_screen.dart';
 class EmployeeDetailsScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  /// When set (e.g. from main sector page), show employees from these sector codes (main + sub-sectors).
+  /// When null, filter by [selectedSector] only (exact match).
+  final List<String>? includedSectorCodes;
   final bool isMainAdmin;
 
   const EmployeeDetailsScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.includedSectorCodes,
     this.isMainAdmin = false,
   });
 
@@ -40,8 +45,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   void initState() {
     super.initState();
     _isAdmin = AuthService.isAdmin;
-    _loadSectors();
-    _loadEmployees();
+    _loadSectorsAndEmployees();
     _searchController.addListener(_filterEmployees);
   }
 
@@ -67,16 +71,28 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
     });
   }
 
-  Future<void> _loadSectors() async {
+  Future<void> _loadSectorsAndEmployees() async {
+    setState(() => _isLoading = true);
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
+      final results = await Future.wait([
+        SectorService().loadSectorsForScreen(),
+        ApiService.getEmployees(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _sectors = results[0] as List<Sector>;
+        _employees = results[1] as List<Employee>;
+        _filteredEmployees = List.from(_employees);
+      });
     } catch (e) {
-      // Handle error silently
+      debugPrint('Error loading data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading: $e'), backgroundColor: Colors.red, duration: const Duration(seconds: 5)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -251,12 +267,17 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter employees by sector (case-insensitive comparison)
+    // Filter employees by sector: all if no sector; main+subs if includedSectorCodes set; else exact match
     final sectorFilteredEmployees = widget.selectedSector == null
         ? _filteredEmployees
-        : _filteredEmployees.where((e) => 
-            e.sector.toUpperCase().trim() == widget.selectedSector!.toUpperCase().trim()
-          ).toList();
+        : (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty)
+            ? _filteredEmployees.where((e) {
+                final code = e.sector.toUpperCase().trim();
+                return widget.includedSectorCodes!.any((s) => s.toUpperCase().trim() == code);
+              }).toList()
+            : _filteredEmployees.where((e) =>
+                e.sector.toUpperCase().trim() == widget.selectedSector!.toUpperCase().trim()
+              ).toList();
     
     final filteredEmployees = sectorFilteredEmployees;
     

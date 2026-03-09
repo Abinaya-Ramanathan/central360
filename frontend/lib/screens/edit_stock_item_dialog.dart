@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
 
 class EditStockItemDialog extends StatefulWidget {
@@ -43,10 +44,8 @@ class _EditStockItemDialogState extends State<EditStockItemDialog> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      setState(() {
-        _sectors = sectors;
-      });
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

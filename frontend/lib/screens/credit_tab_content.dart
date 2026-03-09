@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
+import '../utils/format_utils.dart';
 
 class CreditTabContent extends StatefulWidget {
   final String? selectedSector;
@@ -62,15 +64,9 @@ class _CreditTabContentState extends State<CreditTabContent> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -90,7 +86,7 @@ class _CreditTabContentState extends State<CreditTabContent> {
       final year = widget.selectedDate!.year;
       final month = widget.selectedMonth ?? widget.selectedDate!.month;
       final monthStr = '$year-${month.toString().padLeft(2, '0')}';
-      final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(widget.selectedDate!);
 
       final credits = await ApiService.getCreditDetails(
         sector: widget.selectedSector,
@@ -207,7 +203,7 @@ class _CreditTabContentState extends State<CreditTabContent> {
             : controllers['purchase_details']!.text.trim(),
         'credit_amount': _parseDoubleValue(controllers['credit_amount']!.text),
         'amount_settled': _parseDoubleValue(controllers['amount_settled']!.text),
-        'credit_date': widget.selectedDate!.toIso8601String().split('T')[0],
+        'credit_date': FormatUtils.formatDateForApi(widget.selectedDate!),
       };
 
       await ApiService.saveCreditDetails(updatedRecord);
@@ -389,7 +385,7 @@ class _CreditTabContentState extends State<CreditTabContent> {
         'purchase_details': purchaseDetails.isEmpty ? null : purchaseDetails,
         'credit_amount': creditAmount,
         'amount_settled': amountSettled,
-        'credit_date': widget.selectedDate!.toIso8601String().split('T')[0],
+        'credit_date': FormatUtils.formatDateForApi(widget.selectedDate!),
       };
 
       await ApiService.saveCreditDetails(record);

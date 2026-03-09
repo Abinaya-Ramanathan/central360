@@ -36,6 +36,7 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
     _loadIngredients();
   }
 
@@ -191,11 +192,45 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
           ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildExistingIngredientsTab(),
-          _buildCheckIngredientsTab(),
+          // Action button: top-right in body, just below AppBar
+          if (_tabController.index == 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => const AddIngredientDialog(),
+                      );
+                      if (result == true) {
+                        _loadIngredients();
+                      }
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add Ingredients', style: TextStyle(fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.brown.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildExistingIngredientsTab(),
+                _buildCheckIngredientsTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -238,27 +273,6 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
                   },
                 ),
               ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final result = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => const AddIngredientDialog(),
-                  );
-                  if (result == true) {
-                    _loadIngredients();
-                  }
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Add Ingredients'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.brown.shade700,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -276,6 +290,7 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
                   : ListView.builder(
                       padding: const EdgeInsets.all(16.0),
                       itemCount: _filteredIngredients.length,
+                      cacheExtent: 200,
                       itemBuilder: (context, index) {
                         final ingredient = _filteredIngredients[index];
                         return _buildIngredientNote(ingredient);

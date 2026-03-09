@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
 import '../utils/ui_helpers.dart';
@@ -17,12 +18,15 @@ import 'login_screen.dart';
 class SalesCreditDetailsScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  /// When set (e.g. main sector page), show data from these sector codes (main + sub-sectors).
+  final List<String>? includedSectorCodes;
   final bool isMainAdmin;
 
   const SalesCreditDetailsScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.includedSectorCodes,
     this.isMainAdmin = false,
   });
 
@@ -212,15 +216,9 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -278,18 +276,20 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   }
 
   Future<void> _loadSalesData() async {
-    if (widget.selectedSector == null && !_isAdmin) return;
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !_isAdmin) return;
     if (_selectedDate == null) return;
 
     setState(() => _isLoadingSales = true);
     try {
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
 
-      
-      final sales = await ApiService.getSalesDetails(
-        sector: widget.selectedSector,
-        date: dateStr, // Filter by exact date - only show records from this date
+      var sales = await ApiService.getSalesDetails(
+        sector: widget.includedSectorCodes != null ? null : widget.selectedSector,
+        date: dateStr,
       );
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        sales = sales.where((r) => widget.includedSectorCodes!.contains(r['sector_code']?.toString())).toList();
+      }
       
 
       setState(() {
@@ -316,20 +316,19 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   }
 
   Future<void> _loadCreditData() async {
-    if (widget.selectedSector == null && !_isAdmin) return;
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !_isAdmin) return;
 
     setState(() => _isLoadingCredit = true);
     try {
-      // For multiple months, we'll filter on the frontend
-      // since the backend only supports single month filter
-      // Pass null to backend when multiple months are selected, filter locally instead
-      String? monthFilter; // Always pass null, filter on frontend for multiple months
-      
-      final credits = await ApiService.getCreditDetailsFromSales(
-        sector: widget.selectedSector,
+      String? monthFilter;
+      var credits = await ApiService.getCreditDetailsFromSales(
+        sector: widget.includedSectorCodes != null ? null : widget.selectedSector,
         companyStaff: _selectedCompanyStaffFilterCredit,
         month: monthFilter,
       );
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        credits = credits.where((r) => widget.includedSectorCodes!.contains(r['sector_code']?.toString())).toList();
+      }
       
       // Load balance payments for each credit record (use original credits, not filtered)
       _balancePayments.clear();
@@ -794,7 +793,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   }
 
   Future<void> _showAddSalesDialog() async {
-    if (widget.selectedSector == null && !_isAdmin) {
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !_isAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a sector from Home page')),
       );
@@ -968,12 +967,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     required double creditAmount,
     required bool companyStaff,
   }) async {
-    if (widget.selectedSector == null && !_isAdmin) return;
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !_isAdmin) return;
     if (_selectedDate == null) return;
 
     setState(() => _isLoadingSales = true);
     try {
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       
       // All fields except sector_code and sale_date are optional
       final recordToSave = {
@@ -1038,7 +1037,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         // Entering edit mode
         final record = _salesData[index];
         final currentSaleDate = record['sale_date']?.toString().split('T')[0].split(' ')[0] ?? '';
-        final selectedDateStr = _selectedDate?.toIso8601String().split('T')[0] ?? '';
+        final selectedDateStr = (_selectedDate != null ? FormatUtils.formatDateForApi(_selectedDate!) : '');
         
         
         // Show a warning if the selected date is different from the record's sale_date
@@ -1090,7 +1089,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       // CRITICAL: Always use the selected date from the date picker as the sale_date
       // This ensures Credit Taken Date matches the date selected in Sales Details tab
       // When credit is added/updated, the sale_date MUST be updated to the selected date
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       final newCreditAmount = _parseDecimal(controllers['credit_amount']!.text);
       final oldSaleDate = record['sale_date']?.toString().split('T')[0].split(' ')[0] ?? '';
       
@@ -1169,28 +1168,44 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       };
 
       final savedRecord = await ApiService.saveSalesDetails(updatedRecord);
-      final savedSaleDate = savedRecord['sale_date']?.toString().split('T')[0].split(' ')[0] ?? 'N/A';
-      
-      if (savedSaleDate != saleDateToUse) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Warning: Date mismatch. Expected $saleDateToUse but got $savedSaleDate'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 5),
-            ),
-          );
+      final savedSaleDateRaw = savedRecord['sale_date']?.toString() ?? '';
+
+      // Compare in local date: API may return UTC (e.g. 2025-03-06T18:30:00Z = March 7 in IST)
+      String localSavedDate = '';
+      try {
+        final dt = DateTime.tryParse(savedSaleDateRaw);
+        if (dt != null) {
+          final local = dt.toLocal();
+          localSavedDate = '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
         }
+      } catch (_) {}
+      if (localSavedDate.isEmpty) {
+        final part = savedSaleDateRaw.split('T').first.split(' ').first.trim();
+        localSavedDate = part.length >= 10 ? part.substring(0, 10) : part;
       }
-      
+      final expectedDate = saleDateToUse.length >= 10 ? saleDateToUse.substring(0, 10) : saleDateToUse;
+
       // Reload data to reflect the updated sale_date
       await _loadSalesData();
       await _loadCreditData();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sales details saved successfully')),
+          const SnackBar(
+            content: Text('Sales details saved successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
+        // Only show date note if the local calendar date truly differs (ignore timezone artifacts)
+        if (localSavedDate != expectedDate && localSavedDate.isNotEmpty && expectedDate.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Note: Date was stored as $localSavedDate (expected $expectedDate).'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -1401,7 +1416,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                     ),
                     child: Text(
                       _selectedDate != null
-                          ? _selectedDate!.toIso8601String().split('T')[0]
+                          ? FormatUtils.formatDateForApi(_selectedDate!)
                           : 'Select Date',
                     ),
                   ),
@@ -1453,7 +1468,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                             child: DataTable(
                               columnSpacing: 20,
                               columns: [
-                                if (widget.selectedSector == null && _isAdmin)
+                                if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                   DataColumn(
                                     label: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -1497,7 +1512,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
 
                                 return DataRow(
                                   cells: [
-                                    if (widget.selectedSector == null && _isAdmin)
+                                    if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                       DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
                                     DataCell(
                                       isEditMode && _controllersSales.containsKey(index)
@@ -1800,7 +1815,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                             ),
                             child: Text(
                               _fromDateCredit != null
-                                  ? _fromDateCredit!.toIso8601String().split('T')[0]
+                                  ? FormatUtils.formatDateForApi(_fromDateCredit!)
                                   : 'From Date',
                               style: const TextStyle(fontSize: 14),
                             ),
@@ -1841,7 +1856,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                             ),
                             child: Text(
                               _toDateCredit != null
-                                  ? _toDateCredit!.toIso8601String().split('T')[0]
+                                  ? FormatUtils.formatDateForApi(_toDateCredit!)
                                   : 'To Date',
                               style: const TextStyle(fontSize: 14),
                               ),
@@ -1894,7 +1909,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                             child: DataTable(
                               columnSpacing: 20,
                               columns: [
-                                if (widget.selectedSector == null && _isAdmin)
+                                if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                   DataColumn(
                                     label: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -1983,7 +1998,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 rows.add(DataRow(
                                   color: WidgetStateProperty.all(Colors.blue.shade200),
                                   cells: [
-                                    if (widget.selectedSector == null && _isAdmin)
+                                    if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                       DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
                                     DataCell(Text(record['name']?.toString() ?? '')),
                                     DataCell(
@@ -2131,7 +2146,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                   rows.add(DataRow(
                                     cells: [
                                       // Sector (if visible)
-                                      if (widget.selectedSector == null && _isAdmin)
+                                      if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                         const DataCell(Text('')), // Empty cell
                                       // Name - empty
                                       const DataCell(Text('')),
@@ -2301,7 +2316,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                   
                                   rows.add(DataRow(
                                     cells: [
-                                      if (widget.selectedSector == null && _isAdmin)
+                                      if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                         const DataCell(Text('')),
                                       const DataCell(Text('')), // Name
                                       const DataCell(Text('')), // Company Staff
@@ -2431,7 +2446,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     color: WidgetStateProperty.all(Colors.blue.shade50),
                                     cells: [
                                       // Sector (if visible)
-                                      if (widget.selectedSector == null && _isAdmin)
+                                      if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                         const DataCell(Text('')),
                                       // Name
                                       const DataCell(
@@ -2511,22 +2526,28 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   }
 
   Future<void> _loadPurchaseData() async {
-    if (widget.selectedSector == null && !_isAdmin) return;
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !_isAdmin) return;
     if (_selectedDatePurchase == null) return;
 
     setState(() => _isLoadingPurchase = true);
     try {
-      final dateStr = _selectedDatePurchase!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDatePurchase!);
 
-      final purchases = await ApiService.getCompanyPurchaseDetails(
-        sector: widget.selectedSector,
+      var purchases = await ApiService.getCompanyPurchaseDetails(
+        sector: widget.includedSectorCodes != null ? null : widget.selectedSector,
         date: dateStr,
       );
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        purchases = purchases.where((p) => widget.includedSectorCodes!.contains(p['sector_code']?.toString())).toList();
+      }
       
       if (purchases.isEmpty) {
-        final allPurchases = await ApiService.getCompanyPurchaseDetails(
-          sector: widget.selectedSector,
+        var allPurchases = await ApiService.getCompanyPurchaseDetails(
+          sector: widget.includedSectorCodes != null ? null : widget.selectedSector,
         );
+        if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+          allPurchases = allPurchases.where((p) => widget.includedSectorCodes!.contains(p['sector_code']?.toString())).toList();
+        }
         final filteredPurchases = allPurchases.where((p) {
           final purchaseDate = p['purchase_date']?.toString().split('T')[0].split(' ')[0] ?? '';
           return purchaseDate == dateStr;
@@ -2584,7 +2605,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   }
 
   Future<void> _showAddPurchaseDialog() async {
-    if (widget.selectedSector == null && !_isAdmin) {
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !_isAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a sector from Home page')),
       );
@@ -2709,12 +2730,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     required double purchaseAmount,
     required double credit,
   }) async {
-    if (widget.selectedSector == null && !_isAdmin) return;
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !_isAdmin) return;
     if (_selectedDatePurchase == null) return;
 
     setState(() => _isLoadingPurchase = true);
     try {
-      final dateStr = _selectedDatePurchase!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDatePurchase!);
       final record = {
         'sector_code': widget.selectedSector,
         'item_name': itemName.isEmpty ? null : itemName,
@@ -2786,7 +2807,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         'purchase_details': _controllersPurchase[index]!['purchase_details']!.text.trim().isEmpty ? null : _controllersPurchase[index]!['purchase_details']!.text.trim(),
         'purchase_amount': FormatUtils.parseDecimal(_controllersPurchase[index]!['purchase_amount']!.text),
         'credit': FormatUtils.parseDecimal(_controllersPurchase[index]!['credit']!.text),
-        'purchase_date': _selectedDatePurchase!.toIso8601String().split('T')[0],
+        'purchase_date': FormatUtils.formatDateForApi(_selectedDatePurchase!),
       };
 
       await ApiService.saveCompanyPurchaseDetails(updatedRecord);
@@ -3082,7 +3103,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                     ),
                     child: Text(
                       _selectedDatePurchase != null
-                          ? _selectedDatePurchase!.toIso8601String().split('T')[0]
+                          ? FormatUtils.formatDateForApi(_selectedDatePurchase!)
                           : 'Select Date',
                     ),
                   ),
@@ -3133,7 +3154,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                             child: DataTable(
                               columnSpacing: 20,
                               columns: [
-                                if (widget.selectedSector == null && _isAdmin)
+                                if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                   DataColumn(
                                     label: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -3177,7 +3198,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
 
                                 return DataRow(
                                   cells: [
-                                    if (widget.selectedSector == null && _isAdmin)
+                                    if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                       DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
                                     DataCell(
                                       isEditMode && _controllersPurchase.containsKey(index)
@@ -3329,13 +3350,16 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   // ========== Company Credit Details Methods ==========
   
   Future<void> _loadCompanyCreditData() async {
-    if (widget.selectedSector == null && !_isAdmin) return;
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !_isAdmin) return;
 
     setState(() => _isLoadingCompanyCredit = true);
     try {
-      final credits = await ApiService.getCreditDetailsFromCompanyPurchases(
-        sector: widget.selectedSector,
+      var credits = await ApiService.getCreditDetailsFromCompanyPurchases(
+        sector: widget.includedSectorCodes != null ? null : widget.selectedSector,
       );
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        credits = credits.where((r) => widget.includedSectorCodes!.contains(r['sector_code']?.toString())).toList();
+      }
 
       setState(() {
         _companyCreditData = credits;
@@ -3894,7 +3918,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                               ),
                               child: Text(
                                 _fromDateCompanyCredit != null
-                                    ? _fromDateCompanyCredit!.toIso8601String().split('T')[0]
+                                    ? FormatUtils.formatDateForApi(_fromDateCompanyCredit!)
                                     : 'From Date',
                                 style: const TextStyle(fontSize: 14),
                               ),
@@ -3935,7 +3959,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                               ),
                               child: Text(
                                 _toDateCompanyCredit != null
-                                    ? _toDateCompanyCredit!.toIso8601String().split('T')[0]
+                                    ? FormatUtils.formatDateForApi(_toDateCompanyCredit!)
                                     : 'To Date',
                                 style: const TextStyle(fontSize: 14),
                               ),
@@ -3990,7 +4014,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                             child: DataTable(
                               columnSpacing: 20,
                               columns: [
-                                if (widget.selectedSector == null && _isAdmin)
+                                if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                   DataColumn(
                                     label: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -4070,7 +4094,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                   rows.add(DataRow(
                                     color: WidgetStateProperty.all(Colors.blue.shade200),
                                   cells: [
-                                    if (widget.selectedSector == null && _isAdmin)
+                                    if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                       DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
                                     DataCell(Text(record['item_name']?.toString() ?? '')),
                                     DataCell(Text(record['shop_name']?.toString() ?? '')),
@@ -4126,7 +4150,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     
                                     rows.add(DataRow(
                                       cells: [
-                                        if (widget.selectedSector == null && _isAdmin)
+                                        if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                           const DataCell(Text('')),
                                         const DataCell(Text('')), // Item Name
                                         const DataCell(Text('')), // Shop Name
@@ -4253,7 +4277,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                     
                                     rows.add(DataRow(
                                       cells: [
-                                        if (widget.selectedSector == null && _isAdmin)
+                                        if ((widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null)
                                           const DataCell(Text('')), // Sector
                                         const DataCell(Text('')), // Item Name
                                         const DataCell(Text('')), // Shop Name
@@ -4379,34 +4403,26 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
   // ========== Overall Income Expense and Credit Details Tab ==========
   
   Future<void> _loadAllDataForSummary() async {
-    if (widget.selectedSector == null && !_isAdmin) return;
+    if (widget.includedSectorCodes == null && widget.selectedSector == null && !_isAdmin) return;
 
     setState(() => _isLoadingSummary = true);
     try {
-      // Load all sales data without date filter
-      final allSales = await ApiService.getSalesDetails(
-        sector: widget.selectedSector,
-        // No date parameter to get all data
+      var allSales = await ApiService.getSalesDetails(sector: widget.includedSectorCodes != null ? null : widget.selectedSector);
+      var allPurchases = await ApiService.getCompanyPurchaseDetails(sector: widget.includedSectorCodes != null ? null : widget.selectedSector);
+      var allCredits = await ApiService.getCreditDetailsFromSales(
+        sector: widget.includedSectorCodes != null ? null : widget.selectedSector,
+        companyStaff: null,
+        month: null,
       );
-      
-      // Load all purchase data without date filter
-      final allPurchases = await ApiService.getCompanyPurchaseDetails(
-        sector: widget.selectedSector,
-        // No date parameter to get all data
+      var allCompanyCredits = await ApiService.getCreditDetailsFromCompanyPurchases(
+        sector: widget.includedSectorCodes != null ? null : widget.selectedSector,
       );
-
-      // Load all credit data for balance paid calculations
-      // Use getCreditDetailsFromSales to ensure balance_payments are included
-      final allCredits = await ApiService.getCreditDetailsFromSales(
-        sector: widget.selectedSector,
-        companyStaff: null, // Get all company staff for summary
-        month: null, // Get all months for summary
-      );
-      
-      // Load all company credit data for balance paid calculations
-      final allCompanyCredits = await ApiService.getCreditDetailsFromCompanyPurchases(
-        sector: widget.selectedSector,
-      );
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        allSales = allSales.where((r) => widget.includedSectorCodes!.contains(r['sector_code']?.toString())).toList();
+        allPurchases = allPurchases.where((r) => widget.includedSectorCodes!.contains(r['sector_code']?.toString())).toList();
+        allCredits = allCredits.where((r) => widget.includedSectorCodes!.contains(r['sector_code']?.toString())).toList();
+        allCompanyCredits = allCompanyCredits.where((r) => widget.includedSectorCodes!.contains(r['sector_code']?.toString())).toList();
+      }
 
       setState(() {
         _allSalesDataForSummary = allSales;
@@ -4599,7 +4615,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       final filePath = await PdfGenerator.generateSalesCreditDetailsPDFFromTable(
         creditData: dataToUse, // Use filtered data if available, otherwise use all credit data
         balancePayments: _balancePayments,
-        showSector: widget.selectedSector == null && _isAdmin,
+        showSector: (widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null,
         sectorNameMap: sectorNameMap,
         fileName: fileName,
       );
@@ -4775,7 +4791,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     }
     
     // Group by sector if all sectors is selected
-    final showSectorColumn = widget.selectedSector == null && _isAdmin;
+    final showSectorColumn = (widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null;
     Map<String, Map<String, double>> sectorData = {};
     
     if (showSectorColumn) {
@@ -5015,7 +5031,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 ),
                                 child: Text(
                                   _fromDate != null
-                                      ? _fromDate!.toIso8601String().split('T')[0]
+                                      ? FormatUtils.formatDateForApi(_fromDate!)
                                       : 'Select From Date',
                                 ),
                               ),
@@ -5052,7 +5068,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                                 ),
                                 child: Text(
                                   _toDate != null
-                                      ? _toDate!.toIso8601String().split('T')[0]
+                                      ? FormatUtils.formatDateForApi(_toDate!)
                                       : 'Select To Date',
                                 ),
                               ),

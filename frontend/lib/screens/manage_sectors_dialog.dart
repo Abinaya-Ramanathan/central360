@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
 
 class ManageSectorsDialog extends StatefulWidget {
@@ -24,12 +25,8 @@ class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
   Future<void> _loadSectors() async {
     setState(() => _isLoading = true);
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -37,9 +34,7 @@ class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

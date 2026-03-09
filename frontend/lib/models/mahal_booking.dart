@@ -1,3 +1,5 @@
+import '../utils/format_utils.dart';
+
 class MahalBooking {
   final String? bookingId;
   final String sectorCode;
@@ -42,7 +44,7 @@ class MahalBooking {
       'booking_id': bookingId,
       'sector_code': sectorCode,
       'mahal_detail': mahalDetail,
-      'event_date': eventDate.toIso8601String().split('T')[0],
+      'event_date': FormatUtils.formatDateForApi(eventDate),
       'event_timing': eventTiming,
       'event_name': eventName,
       'client_name': clientName,
@@ -64,7 +66,7 @@ class MahalBooking {
       bookingId: json['booking_id'] as String?,
       sectorCode: json['sector_code'] as String,
       mahalDetail: json['mahal_detail'] as String,
-      eventDate: DateTime.parse(json['event_date'] as String),
+      eventDate: FormatUtils.parseDate(json['event_date']?.toString()) ?? DateTime(2000, 1, 1),
       eventTiming: json['event_timing'] as String?,
       eventName: json['event_name'] as String?,
       clientName: json['client_name'] as String,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../utils/format_utils.dart';
 import '../utils/pdf_generator.dart';
 import 'home_screen.dart';
 import 'month_year_picker.dart';
@@ -48,6 +49,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
     if (widget.selectedSector != null) {
       _loadIncomeExpenseData();
     }
@@ -87,7 +89,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
 
     setState(() => _isLoadingIncomeExpense = true);
     try {
-      final dateStr = _selectedIncomeExpenseDate.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedIncomeExpenseDate);
       final data = await ApiService.getDailyIncomeExpense(
         sector: widget.selectedSector!,
         date: dateStr,
@@ -126,7 +128,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
     if (result != null) {
       setState(() => _isLoadingIncomeExpense = true);
       try {
-        final dateStr = _selectedIncomeExpenseDate.toIso8601String().split('T')[0];
+        final dateStr = FormatUtils.formatDateForApi(_selectedIncomeExpenseDate);
         await ApiService.saveDailyIncomeExpense({
           'sector_code': widget.selectedSector,
           'item_name': result['item_name'] ?? '',
@@ -179,7 +181,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
 
     setState(() => _isLoadingIncomeExpense = true);
     try {
-      final dateStr = _selectedIncomeExpenseDate.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedIncomeExpenseDate);
       await ApiService.saveDailyIncomeExpense({
         'id': item['id'],
         'sector_code': widget.selectedSector,
@@ -262,7 +264,6 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               TextButton.icon(
                 onPressed: () async {
@@ -282,15 +283,6 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
                 icon: const Icon(Icons.calendar_today),
                 label: Text(
                   '${_selectedIncomeExpenseDate.year}-${_selectedIncomeExpenseDate.month.toString().padLeft(2, '0')}-${_selectedIncomeExpenseDate.day.toString().padLeft(2, '0')}',
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: _addIncomeExpenseItem,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Income/Expense Item'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  foregroundColor: Colors.white,
                 ),
               ),
             ],
@@ -502,7 +494,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
     setState(() => _isLoadingOverall = true);
     try {
       final data = await ApiService.getOverallIncomeExpense(
-        dates: _selectedDates.map((d) => d.toIso8601String().split('T')[0]).toList(),
+        dates: _selectedDates.map((d) => FormatUtils.formatDateForApi(d)).toList(),
         months: _selectedMonths,
       );
       setState(() {
@@ -531,8 +523,8 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
     if (picked != null) {
       setState(() {
         _tempSelectedDate = picked;
-        final dateStr = picked.toIso8601String().split('T')[0];
-        if (!_selectedDates.any((d) => d.toIso8601String().split('T')[0] == dateStr)) {
+        final dateStr = FormatUtils.formatDateForApi(picked);
+        if (!_selectedDates.any((d) => FormatUtils.formatDateForApi(d) == dateStr)) {
           _selectedDates.add(picked);
           _selectedDates.sort();
         }
@@ -543,7 +535,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
 
   void _removeDate(DateTime date) {
     setState(() {
-      _selectedDates.removeWhere((d) => d.toIso8601String().split('T')[0] == date.toIso8601String().split('T')[0]);
+      _selectedDates.removeWhere((d) => FormatUtils.formatDateForApi(d) == FormatUtils.formatDateForApi(date));
     });
     _loadOverallData();
   }
@@ -684,19 +676,6 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
             ),
           ),
           const SizedBox(height: 16),
-          // PDF Download Button
-          if (_overallData.isNotEmpty)
-            ElevatedButton.icon(
-              onPressed: _downloadPDF,
-              icon: const Icon(Icons.download),
-              label: const Text('Download PDF'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            ),
-          const SizedBox(height: 16),
           // Table
           Expanded(
             child: _isLoadingOverall
@@ -818,11 +797,48 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
           ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildDailyIncomeExpenseTab(),
-          _buildOverallIncomeExpenseTab(),
+          // Action button: top-right in body, just below AppBar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (_tabController.index == 0)
+                  ElevatedButton.icon(
+                    onPressed: _addIncomeExpenseItem,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add Item', style: TextStyle(fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                if (_tabController.index == 1 && _overallData.isNotEmpty)
+                  ElevatedButton.icon(
+                    onPressed: _downloadPDF,
+                    icon: const Icon(Icons.download, size: 18),
+                    label: const Text('Download PDF', style: TextStyle(fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildDailyIncomeExpenseTab(),
+                _buildOverallIncomeExpenseTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );

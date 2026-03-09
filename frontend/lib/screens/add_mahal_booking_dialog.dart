@@ -81,17 +81,29 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
     super.dispose();
   }
 
-  void _onEventDateTextChanged(String value) {
-    if (value.trim().isEmpty) {
+  Future<void> _selectEventDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _eventDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
       setState(() {
-        _eventDate = null;
+        _eventDate = picked;
+        _eventDateController.text = FormatUtils.formatDateDisplay(picked);
       });
-      return;
     }
-    final parsedDate = FormatUtils.parseDate(value);
-    if (parsedDate != null) {
+  }
+
+  Future<void> _selectEventTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (picked != null) {
       setState(() {
-        _eventDate = parsedDate;
+        _eventTimingController.text = picked.format(context);
       });
     }
   }
@@ -127,14 +139,14 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
     setState(() => _isSubmitting = true);
 
     try {
-      // Generate booking_id: client_name + event_date
+      // Generate booking_id: client_name + event_date (use new date when editing so booking_id stays in sync)
       final clientName = _clientNameController.text.trim();
       final cleanClientName = clientName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
-      final bookingId = widget.booking?.bookingId ?? 
-          '${cleanClientName}_${_eventDate!.toIso8601String().split('T')[0]}';
+      final newBookingId = '${cleanClientName}_${FormatUtils.formatDateForApi(_eventDate!)}';
+      final oldBookingId = widget.booking?.bookingId;
 
       final booking = MahalBooking(
-        bookingId: widget.booking?.bookingId ?? bookingId,
+        bookingId: newBookingId,
         sectorCode: widget.selectedSector,
         mahalDetail: _selectedMahalDetail!,
         eventDate: _eventDate!,
@@ -165,13 +177,15 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
       );
 
       if (widget.booking != null) {
-        await ApiService.updateMahalBooking(booking);
+        await ApiService.updateMahalBooking(
+          booking,
+          oldBookingId: (oldBookingId != null && oldBookingId != newBookingId) ? oldBookingId : null,
+        );
       } else {
         await ApiService.createMahalBooking(booking);
       }
 
       if (mounted) {
-        Navigator.of(context).pop(booking);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(widget.booking != null
@@ -180,6 +194,8 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
             backgroundColor: Colors.green,
           ),
         );
+        await Future.delayed(const Duration(milliseconds: 150));
+        if (mounted) Navigator.of(context).pop(booking);
       }
     } catch (e) {
       String errorMessage = e.toString().replaceFirst('Exception: ', '');
@@ -259,37 +275,58 @@ class _AddMahalBookingDialogState extends State<AddMahalBookingDialog> {
                   },
                 ),
                 const SizedBox(height: 16),
-                // Event Date
-                TextFormField(
-                  controller: _eventDateController,
-                  decoration: InputDecoration(
-                    labelText: 'Event Date *',
-                    hintText: 'DD/MM/YYYY',
-                    prefixIcon: const Icon(Icons.calendar_today, color: Colors.purple),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                // Event Date - tap to open calendar
+                InkWell(
+                  onTap: _selectEventDate,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Event Date *',
+                      hintText: 'Tap to select date',
+                      prefixIcon: const Icon(Icons.calendar_today, color: Colors.purple),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.purple, width: 2),
+                      ),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.purple, width: 2),
+                    child: Text(
+                      _eventDate != null
+                          ? FormatUtils.formatDateDisplay(_eventDate!)
+                          : (_eventDateController.text.isEmpty ? 'Select date' : _eventDateController.text),
+                      style: TextStyle(
+                        color: _eventDate != null ? Colors.black87 : Colors.grey.shade600,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
-                  onChanged: _onEventDateTextChanged,
                 ),
                 const SizedBox(height: 16),
-                // Event Timing
-                TextFormField(
-                  controller: _eventTimingController,
-                  decoration: InputDecoration(
-                    labelText: 'Event Timing',
-                    hintText: 'e.g., 10:00 AM - 2:00 PM',
-                    prefixIcon: const Icon(Icons.access_time, color: Colors.purple),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                // Event Timing - tap to open clock
+                InkWell(
+                  onTap: _selectEventTime,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Event Timing',
+                      hintText: 'Tap to select time',
+                      prefixIcon: const Icon(Icons.access_time, color: Colors.purple),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.purple, width: 2),
+                      ),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.purple, width: 2),
+                    child: Text(
+                      _eventTimingController.text.isEmpty
+                          ? 'Select time'
+                          : _eventTimingController.text,
+                      style: TextStyle(
+                        color: _eventTimingController.text.isEmpty ? Colors.grey.shade600 : Colors.black87,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),

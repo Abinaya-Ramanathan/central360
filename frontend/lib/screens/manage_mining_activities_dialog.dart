@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
 import 'edit_mining_activity_dialog.dart';
 
@@ -35,7 +36,7 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
     setState(() => _isLoading = true);
     try {
       final miningActivities = await ApiService.getMiningActivities();
-      final sectors = await ApiService.getSectors();
+      final sectors = await SectorService().loadSectorsForScreen();
       if (mounted) {
         // Filter mining activities by selected sector
         List<Map<String, dynamic>> filteredActivities = miningActivities;

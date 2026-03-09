@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/employee.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../utils/format_utils.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'month_year_picker.dart';
@@ -49,7 +50,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
   String? _formatDateForApi(dynamic dateValue) {
     if (dateValue == null) return null;
     if (dateValue is DateTime) {
-      return dateValue.toIso8601String().split('T')[0];
+      return FormatUtils.formatDateForApi(dateValue);
     }
     if (dateValue is String) {
       // If it's already a string in YYYY-MM-DD format, return it
@@ -59,7 +60,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       // Try to parse it as DateTime and format it
       try {
         final dateTime = DateTime.parse(dateValue);
-        return dateTime.toIso8601String().split('T')[0];
+        return FormatUtils.formatDateForApi(dateTime);
       } catch (e) {
         return null;
       }
@@ -231,8 +232,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         'employee_id': int.parse(employeeId),
         'employee_name': employee.name,
         'sector': widget.selectedSector ?? employee.sector, // Use employee's sector if no sector selected
-        'week_start_date': weekStartDate.toIso8601String().split('T')[0],
-        'week_end_date': weekEndDate.toIso8601String().split('T')[0],
+        'week_start_date': FormatUtils.formatDateForApi(weekStartDate),
+        'week_end_date': FormatUtils.formatDateForApi(weekEndDate),
         'outstanding_advance': 0.0, // Not needed for simple view
         'days_present': 0, // Not needed for simple view
         'estimated_salary': 0.0, // Not needed for simple view
@@ -279,8 +280,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       final weekStartDate = DateTime(_selectedMonth!.year, _selectedMonth!.month, 1);
       final weekEndDate = DateTime(_selectedMonth!.year, _selectedMonth!.month + 1, 0);
       
-      final weekStartStr = weekStartDate.toIso8601String().split('T')[0];
-      final weekEndStr = weekEndDate.toIso8601String().split('T')[0];
+      final weekStartStr = FormatUtils.formatDateForApi(weekStartDate);
+      final weekEndStr = FormatUtils.formatDateForApi(weekEndDate);
       
       // Load existing salary expenses for the selected month
       final existingRecords = await ApiService.getSalaryExpenses(

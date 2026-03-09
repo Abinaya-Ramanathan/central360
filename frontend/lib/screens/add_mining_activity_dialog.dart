@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
 
 class AddMiningActivityDialog extends StatefulWidget {
@@ -22,16 +23,15 @@ class _AddMiningActivityDialogState extends State<AddMiningActivityDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedSectorCode = widget.preSelectedSector;
+    // No default sector: user must select (can change over time)
+    _selectedSectorCode = null;
     _loadSectors();
   }
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      setState(() {
-        _sectors = sectors;
-      });
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

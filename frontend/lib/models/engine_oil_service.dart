@@ -1,3 +1,5 @@
+import '../utils/format_utils.dart';
+
 class EngineOilService {
   final int? id;
   final String? sectorCode;
@@ -28,10 +30,10 @@ class EngineOilService {
       'vehicle_name': vehicleName,
       'model': model,
       'service_part_name': servicePartName,
-      'service_date': serviceDate.toIso8601String().split('T')[0],
+      'service_date': FormatUtils.formatDateForApi(serviceDate),
       'service_in_kms': serviceInKms,
       'service_in_hrs': serviceInHrs,
-      'next_service_date': nextServiceDate?.toIso8601String().split('T')[0],
+      'next_service_date': nextServiceDate != null ? FormatUtils.formatDateForApi(nextServiceDate!) : null,
     };
   }
 

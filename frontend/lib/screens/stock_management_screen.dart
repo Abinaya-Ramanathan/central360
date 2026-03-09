@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'production_tab_content.dart';
+import '../utils/format_utils.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
@@ -123,15 +125,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -778,7 +774,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                           ),
                           child: Text(
                             _selectedDate != null
-                                ? _selectedDate!.toIso8601String().split('T')[0]
+                                ? FormatUtils.formatDateForApi(_selectedDate!)
                                 : 'Select Date',
                             style: TextStyle(
                               color: _selectedDate != null ? Colors.black : Colors.grey,
@@ -832,7 +828,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                     Expanded(
                       child: TextField(
                         decoration: InputDecoration(
-                          hintText: 'Search by Item Name, Vehicle Type, or Part Number',
+                          hintText: 'Search...',
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1063,7 +1059,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                     Expanded(
                       child: TextField(
                         decoration: InputDecoration(
-                          hintText: 'Search by Item Name, Vehicle Type, or Part Number',
+                          hintText: 'Search...',
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),

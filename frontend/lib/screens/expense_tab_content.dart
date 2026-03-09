@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../models/sector.dart';
+import '../utils/format_utils.dart';
 import '../utils/pdf_generator.dart';
 
 class ExpenseTabContent extends StatefulWidget {
@@ -61,15 +63,9 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -89,7 +85,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
       final year = widget.selectedDate!.year;
       final month = widget.selectedMonth ?? widget.selectedDate!.month;
       final monthStr = '$year-${month.toString().padLeft(2, '0')}';
-      final dateStr = widget.selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(widget.selectedDate!);
 
       final expenses = await ApiService.getDailyExpenses(month: monthStr, date: dateStr, sector: widget.selectedSector);
 
@@ -577,7 +573,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
         'item_details': itemDetails,
         'amount': amount,
         'reason_for_purchase': reason.isEmpty ? null : reason,
-        'expense_date': widget.selectedDate!.toIso8601String().split('T')[0],
+        'expense_date': FormatUtils.formatDateForApi(widget.selectedDate!),
         'sector_code': sectorCode ?? widget.selectedSector,
       };
 
@@ -636,7 +632,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.calendar_today),
                     ),
-                    child: Text(fromDate != null ? fromDate!.toIso8601String().split('T')[0] : 'Select Date'),
+                    child: Text(fromDate != null ? FormatUtils.formatDateForApi(fromDate!) : 'Select Date'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -658,7 +654,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.calendar_today),
                     ),
-                    child: Text(toDate != null ? toDate!.toIso8601String().split('T')[0] : 'Select Date'),
+                    child: Text(toDate != null ? FormatUtils.formatDateForApi(toDate!) : 'Select Date'),
                   ),
                 ),
                 const SizedBox(height: 20),

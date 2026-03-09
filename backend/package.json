@@ -1,11 +1,12 @@
 {
   "name": "central360-backend",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "migrate": "node src/migrations/run_migration.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

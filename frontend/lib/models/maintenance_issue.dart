@@ -1,3 +1,5 @@
+import '../utils/format_utils.dart';
+
 class MaintenanceIssuePhoto {
   final int id;
   final String imageUrl;
@@ -47,10 +49,10 @@ class MaintenanceIssue {
     return {
       'id': id,
       'issue_description': issueDescription,
-      'date_created': dateCreated?.toIso8601String().split('T')[0],
+      'date_created': dateCreated != null ? FormatUtils.formatDateForApi(dateCreated!) : null,
       'image_url': imageUrl,
       'status': status,
-      'date_resolved': dateResolved?.toIso8601String().split('T')[0],
+      'date_resolved': dateResolved != null ? FormatUtils.formatDateForApi(dateResolved!) : null,
       'sector_code': sectorCode,
     };
   }

@@ -5,19 +5,24 @@ import 'daily_mining_activity_tab_content.dart';
 import '../models/employee.dart';
 import '../models/sector.dart';
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
+import '../utils/format_utils.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
 class AttendanceAdvanceScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  /// When set (e.g. main sector page), show data from these sector codes (main + sub-sectors).
+  final List<String>? includedSectorCodes;
   final bool isAdmin;
 
   const AttendanceAdvanceScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.includedSectorCodes,
     this.isAdmin = false,
   });
 
@@ -43,22 +48,21 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   Future<bool> Function()? _saveEmployeeAttendance;
 
   bool get _showMiningActivityTab {
-    // Show tab if All sector (null) or SSBM
+    // Show tab if All sector (null) or SSBM (not when showing SSC main+subs via includedSectorCodes)
+    if (widget.includedSectorCodes != null) return false;
     return widget.selectedSector == null || widget.selectedSector == 'SSBM';
   }
 
   @override
   void initState() {
     super.initState();
-    // Tab length: 4 base tabs + 1 mining activity tab (if visible)
     _tabController = TabController(length: _showMiningActivityTab ? 5 : 4, vsync: this);
     _selectedDate = DateTime.now();
-    _loadSectors();
-    _loadAdvanceDetails();
-    _loadRentVehicles();
+    _loadInitialData();
     
-    // Add listener to reload data when switching tabs
+    // Add listener to reload data when switching tabs and rebuild for AppBar actions
     _tabController.addListener(() {
+      setState(() {});
       if (_tabController.index == 2 && !_tabController.indexIsChanging) {
         // User switched to Advance Details tab
         _loadAdvanceDetails();
@@ -80,17 +84,21 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     super.dispose();
   }
 
+  Future<void> _loadInitialData() async {
+    try {
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (!mounted) return;
+      setState(() => _sectors = sectors);
+    } catch (_) {}
+    _loadAdvanceDetails();
+    _loadRentVehicles();
+  }
+
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -106,7 +114,10 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     setState(() => _isLoadingRentVehicles = true);
     try {
       List<Map<String, dynamic>> vehicles;
-      if (widget.selectedSector == null && widget.isAdmin) {
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        final all = await ApiService.getRentVehicles();
+        vehicles = all.where((v) => widget.includedSectorCodes!.contains(v['sector_code']?.toString())).toList();
+      } else if (widget.selectedSector == null && widget.isAdmin) {
         vehicles = await ApiService.getRentVehicles();
       } else if (widget.selectedSector != null) {
         vehicles = await ApiService.getRentVehicles(sector: widget.selectedSector);
@@ -143,9 +154,13 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     if (_selectedDate == null || _rentVehicles.isEmpty) return;
     
     try {
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       List<Map<String, dynamic>> attendance;
-      if (widget.selectedSector == null && widget.isAdmin) {
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        final all = await ApiService.getRentVehicleAttendance(date: dateStr);
+        final vehicleIds = _rentVehicles.map((v) => v['id'] as int).toSet();
+        attendance = all.where((a) => vehicleIds.contains(a['vehicle_id'] as int?)).toList();
+      } else if (widget.selectedSector == null && widget.isAdmin) {
         attendance = await ApiService.getRentVehicleAttendance(date: dateStr);
       } else if (widget.selectedSector != null) {
         attendance = await ApiService.getRentVehicleAttendance(sector: widget.selectedSector, date: dateStr);
@@ -203,7 +218,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     setState(() => _isLoadingRentVehicles = true);
     try {
       // Save rent vehicle attendance
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       final records = _rentVehicles.map((vehicle) {
         return {
           'vehicle_id': vehicle['id'] as int,
@@ -248,9 +263,12 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     
     setState(() => _isLoadingAdvance = true);
     try {
-      // Get all employees (filtered by sector if selected)
+      // Get all employees (filtered by sector if selected, or by includedSectorCodes when on main sector page)
       List<Employee> employees;
-      if (widget.selectedSector == null && widget.isAdmin) {
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        final all = await ApiService.getEmployees();
+        employees = all.where((e) => widget.includedSectorCodes!.contains(e.sector)).toList();
+      } else if (widget.selectedSector == null && widget.isAdmin) {
         employees = await ApiService.getEmployees();
       } else if (widget.selectedSector != null) {
         employees = await ApiService.getEmployeesBySector(widget.selectedSector!);
@@ -259,7 +277,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       }
 
       // Use the selected date (same as Attendance Entry tab)
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       final advanceList = <Map<String, dynamic>>[];
 
       if (employees.isNotEmpty) {
@@ -514,11 +532,45 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
           ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          // Staff Attendance Entry Tab
-          Column(
+          // Action button: top-right in body, just below AppBar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (_tabController.index == 0)
+                  FilledButton.icon(
+                    onPressed: _isEditMode ? _saveEmployeeAttendanceAction : () => setState(() => _isEditMode = true),
+                    icon: Icon(_isEditMode ? Icons.save : Icons.edit, size: 18),
+                    label: Text(_isEditMode ? 'Save' : 'Edit', style: const TextStyle(fontSize: 13)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                if (_tabController.index == 1)
+                  FilledButton.icon(
+                    onPressed: _isEditMode ? _saveVehicleAttendance : () => setState(() => _isEditMode = true),
+                    icon: Icon(_isEditMode ? Icons.save : Icons.edit, size: 18),
+                    label: Text(_isEditMode ? 'Save' : 'Edit', style: const TextStyle(fontSize: 13)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.teal.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Staff Attendance Entry Tab
+                Column(
             children: [
               // Date Selection and Edit Button in same row
               Container(
@@ -539,25 +591,12 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                           ),
                           child: Text(
                             _selectedDate != null
-                                ? _selectedDate!.toIso8601String().split('T')[0]
+                                ? FormatUtils.formatDateForApi(_selectedDate!)
                                 : 'Select Date',
                             style: TextStyle(
                               color: _selectedDate != null ? Colors.black : Colors.grey,
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton.icon(
-                      onPressed: _isEditMode ? _saveEmployeeAttendanceAction : () => setState(() => _isEditMode = true),
-                      icon: Icon(_isEditMode ? Icons.save : Icons.edit),
-                      label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.blue.shade700,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
@@ -568,6 +607,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
               Expanded(
                 child: AttendanceTabContent(
                   selectedSector: widget.selectedSector,
+                  includedSectorCodes: widget.includedSectorCodes,
                   selectedDate: _selectedDate,
                   isAdmin: widget.isAdmin,
                   isEditMode: _isEditMode,
@@ -605,25 +645,12 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                           ),
                           child: Text(
                             _selectedDate != null
-                                ? _selectedDate!.toIso8601String().split('T')[0]
+                                ? FormatUtils.formatDateForApi(_selectedDate!)
                                 : 'Select Date',
                             style: TextStyle(
                               color: _selectedDate != null ? Colors.black : Colors.grey,
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton.icon(
-                      onPressed: _isEditMode ? _saveVehicleAttendance : () => setState(() => _isEditMode = true),
-                      icon: Icon(_isEditMode ? Icons.save : Icons.edit),
-                      label: Text(_isEditMode ? 'Save Attendance' : 'Edit Attendance'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.teal.shade700,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
@@ -840,10 +867,10 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                                     headingRowColor: WidgetStateProperty.all(
                                       Colors.green.shade100,
                                     ),
-                                    sortColumnIndex: (widget.selectedSector == null && widget.isAdmin) ? 0 : null,
+                                    sortColumnIndex: ((widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null) ? 0 : null,
                                     sortAscending: _sortAscendingAdvance,
                                     columns: [
-                                      if (widget.selectedSector == null && widget.isAdmin)
+                                      if ((widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null)
                                         DataColumn(
                                           label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
                                           onSort: (columnIndex, ascending) {
@@ -888,7 +915,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                                         
                                         return DataRow(
                                           cells: [
-                                            if (widget.selectedSector == null && widget.isAdmin)
+                                            if ((widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null)
                                               DataCell(Text(_getSectorName(detail['sector_code']?.toString()))),
                                             DataCell(Text(detail['employee_name']?.toString() ?? 'N/A')),
                                             DataCell(
@@ -921,7 +948,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                                       final totalRow = DataRow(
                                         color: WidgetStateProperty.all(Colors.blue.shade50),
                                         cells: [
-                                          if (widget.selectedSector == null && widget.isAdmin)
+                                          if ((widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null)
                                             const DataCell(Text('')),
                                           const DataCell(
                                             Text(
@@ -980,6 +1007,9 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
               selectedSector: widget.selectedSector,
               isAdmin: widget.isAdmin,
             ),
+        ],
+            ),
+          ),
         ],
       ),
     );

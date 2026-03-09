@@ -81,7 +81,7 @@ When adding new features:
 
 ## Migration History
 
-- **Migrations 001-050**: Consolidated into the main schema and default data sections
+- **Migrations 001-050**: Consolidated into the main schema and default data sections (including 049 parent_sector_code, 050 SSC subsectors SSCT/CS/SSCM)
 - **Migration 051**: Performance indexes - Added to Part 6
 - **Migration 052**: Made sales_details.name optional - Added to Part 5
 - **Migration 053**: Created daily_income_expense table - Added to Part 4

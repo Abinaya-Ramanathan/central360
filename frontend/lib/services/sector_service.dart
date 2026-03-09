@@ -1,4 +1,5 @@
 import '../models/sector.dart';
+import 'api_service.dart';
 
 class SectorService {
   static final SectorService _instance = SectorService._internal();
@@ -11,6 +12,20 @@ class SectorService {
 
   set sectors(List<Sector> value) {
     _sectors = value;
+  }
+
+  /// Cache-first load: returns cached sectors immediately if available (instant UI), then refreshes from API in background.
+  /// Use in screen _loadSectors: final list = await SectorService().loadSectorsForScreen(); if (mounted) setState(() => _sectors = list);
+  Future<List<Sector>> loadSectorsForScreen() async {
+    if (_sectors.isNotEmpty) {
+      ApiService.getSectors().then((list) {
+        _sectors = list;
+      });
+      return List.from(_sectors);
+    }
+    final sectors = await ApiService.getSectors();
+    _sectors = sectors;
+    return sectors;
   }
 
   void addSector(Sector sector) {

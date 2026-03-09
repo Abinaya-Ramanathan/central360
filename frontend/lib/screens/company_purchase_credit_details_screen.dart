@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/api_service.dart';
+import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
@@ -124,15 +125,9 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
 
   Future<void> _loadSectors() async {
     try {
-      final sectors = await ApiService.getSectors();
-      if (mounted) {
-        setState(() {
-          _sectors = sectors;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
+      final sectors = await SectorService().loadSectorsForScreen();
+      if (mounted) setState(() => _sectors = sectors);
+    } catch (_) {}
   }
 
   String _getSectorName(String? sectorCode) {
@@ -165,7 +160,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
 
     setState(() => _isLoadingPurchase = true);
     try {
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
 
       
       // Load purchases - if date filter is used, it should match the selected date
@@ -1158,7 +1153,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
 
     setState(() => _isLoadingPurchase = true);
     try {
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       final record = {
         'sector_code': widget.selectedSector,
         'item_name': itemName.isEmpty ? null : itemName,
@@ -1207,7 +1202,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
         // Entering edit mode
         final record = _purchaseData[index];
         final currentPurchaseDate = record['purchase_date']?.toString().split('T')[0].split(' ')[0] ?? '';
-        final selectedDateStr = _selectedDate?.toIso8601String().split('T')[0] ?? '';
+        final selectedDateStr = (_selectedDate != null ? FormatUtils.formatDateForApi(_selectedDate!) : '');
         
         
         // Show a warning if the selected date is different from the record's purchase_date
@@ -1256,7 +1251,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
       // CRITICAL: Always use the selected date from the date picker as the purchase_date
       // This ensures Credit Taken Date matches the date selected in Purchase Details tab
       // When credit is added/updated, the purchase_date MUST be updated to the selected date
-      final dateStr = _selectedDate!.toIso8601String().split('T')[0];
+      final dateStr = FormatUtils.formatDateForApi(_selectedDate!);
       final newCredit = _parseDecimal(controllers['credit']!.text);
       final oldPurchaseDate = record['purchase_date']?.toString().split('T')[0].split(' ')[0] ?? '';
       
@@ -1786,7 +1781,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                     ),
                     child: Text(
                       _selectedDate != null
-                          ? _selectedDate!.toIso8601String().split('T')[0]
+                          ? FormatUtils.formatDateForApi(_selectedDate!)
                           : 'Select Date',
                     ),
                   ),

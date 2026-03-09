@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
 import '../models/sector.dart';
 import 'add_sector_dialog.dart';
 import 'add_product_dialog.dart';
@@ -11,7 +10,6 @@ import 'add_rent_vehicle_dialog.dart';
 import 'manage_rent_vehicles_dialog.dart';
 import 'add_mining_activity_dialog.dart';
 import 'manage_mining_activities_dialog.dart';
-import 'home_screen.dart';
 
 class NewEntryScreen extends StatefulWidget {
   final String username;
@@ -45,21 +43,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
         title: const Text('New Entry'),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => HomeScreen(
-                  username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
-                  initialSector: _selectedSector,
-                  isAdmin: AuthService.isAdmin,
-                  isMainAdmin: AuthService.isMainAdmin,
-                ),
-              ),
-            );
-          },
-        ),
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -86,7 +69,10 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(32.0),
-                    child: Column(
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.start,
                       children: [
                         _buildAdminButton(
                           icon: Icons.add_business,
@@ -99,7 +85,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
                         _buildAdminButton(
                           icon: Icons.business,
                           label: 'Manage Sectors',
@@ -111,7 +96,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
                         _buildAdminButton(
                           icon: Icons.add_shopping_cart,
                           label: 'Add Production Item',
@@ -126,7 +110,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             }
                           },
                         ),
-                        const SizedBox(height: 16),
                         _buildAdminButton(
                           icon: Icons.inventory_2,
                           label: 'Manage Production Item',
@@ -141,7 +124,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
                         _buildAdminButton(
                           icon: Icons.directions_car,
                           label: 'Add Rent Vehicle',
@@ -156,7 +138,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             }
                           },
                         ),
-                        const SizedBox(height: 16),
                         _buildAdminButton(
                           icon: Icons.car_rental,
                           label: 'Manage Rent Vehicle',
@@ -171,7 +152,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
                         _buildAdminButton(
                           icon: Icons.add_box,
                           label: 'Add Stock Item',
@@ -186,7 +166,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             }
                           },
                         ),
-                        const SizedBox(height: 16),
                         _buildAdminButton(
                           icon: Icons.inventory,
                           label: 'Manage Stock Item',
@@ -201,7 +180,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
                         _buildAdminButton(
                           icon: Icons.construction,
                           label: 'Add Mining Activity',
@@ -216,7 +194,6 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             }
                           },
                         ),
-                        const SizedBox(height: 16),
                         _buildAdminButton(
                           icon: Icons.settings,
                           label: 'Manage Mining Activity',
@@ -250,18 +227,18 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
     required VoidCallback onPressed,
   }) {
     return SizedBox(
-      width: double.infinity,
       height: 50,
       child: ElevatedButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon),
+        icon: Icon(icon, size: 20),
         label: Text(
           label,
-          style: const TextStyle(fontSize: 16),
+          style: const TextStyle(fontSize: 14),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

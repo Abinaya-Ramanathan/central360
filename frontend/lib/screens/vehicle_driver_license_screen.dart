@@ -198,7 +198,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                   MaterialPageRoute(
                     builder: (context) => HomeScreen(
                       username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
-                      initialSector: widget.selectedSector,
+                      initialSectorCodes: AuthService.initialSectorCodes,
                       isAdmin: AuthService.isAdmin,
                       isMainAdmin: AuthService.isMainAdmin,
                     ),

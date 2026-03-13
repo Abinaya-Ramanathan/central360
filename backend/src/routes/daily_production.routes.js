@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
     const startTime = Date.now();
     const { month, date } = req.query;
     // Optimized: Only select needed columns
-    let query = 'SELECT id, product_name, sector_code, morning_production, afternoon_production, evening_production, unit, production_date FROM daily_production WHERE 1=1';
+    let query = 'SELECT id, product_name, sector_code, morning_production, afternoon_production, evening_production, unit, unit_afternoon, unit_evening, unit_stock_in_canteen, production_date, stock_in_canteen FROM daily_production WHERE 1=1';
     const params = [];
     let paramCount = 1;
 
@@ -77,7 +77,11 @@ router.post('/', async (req, res) => {
       afternoon_production,
       evening_production,
       unit,
+      unit_afternoon,
+      unit_evening,
+      unit_stock_in_canteen,
       production_date,
+      stock_in_canteen,
     } = req.body;
 
     // Validation
@@ -92,6 +96,10 @@ router.post('/', async (req, res) => {
     const morningProd = parseNumeric(morning_production);
     const afternoonProd = parseNumeric(afternoon_production);
     const eveningProd = parseNumeric(evening_production);
+    // Treat missing/undefined as null (keep existing); treat 0 or number as explicit update
+    const stockInCanteen = stock_in_canteen !== undefined && stock_in_canteen !== null && stock_in_canteen !== ''
+      ? parseNumeric(stock_in_canteen)
+      : null;
 
     let rows;
     
@@ -100,7 +108,11 @@ router.post('/', async (req, res) => {
       const result = await db.query(
         `UPDATE daily_production SET
           product_name = $1, sector_code = $2, morning_production = $3, afternoon_production = $4,
-          evening_production = $5, unit = $6, production_date = $7, updated_at = CURRENT_TIMESTAMP
+          evening_production = $5, unit = $6, production_date = $7, updated_at = CURRENT_TIMESTAMP,
+          stock_in_canteen = COALESCE($9, stock_in_canteen),
+          unit_afternoon = COALESCE($10, unit_afternoon),
+          unit_evening = COALESCE($11, unit_evening),
+          unit_stock_in_canteen = COALESCE($12, unit_stock_in_canteen)
         WHERE id = $8
         RETURNING *`,
         [
@@ -112,6 +124,10 @@ router.post('/', async (req, res) => {
           unit || null,
           production_date,
           id,
+          stockInCanteen,
+          unit_afternoon ?? null,
+          unit_evening ?? null,
+          unit_stock_in_canteen ?? null,
         ]
       );
       rows = result.rows;
@@ -131,14 +147,22 @@ router.post('/', async (req, res) => {
         const result = await db.query(
           `UPDATE daily_production SET
             morning_production = $1, afternoon_production = $2,
-            evening_production = $3, unit = $4, updated_at = CURRENT_TIMESTAMP
-          WHERE id = $5
+            evening_production = $3, unit = $4, updated_at = CURRENT_TIMESTAMP,
+            stock_in_canteen = COALESCE($5, stock_in_canteen),
+            unit_afternoon = COALESCE($6, unit_afternoon),
+            unit_evening = COALESCE($7, unit_evening),
+            unit_stock_in_canteen = COALESCE($8, unit_stock_in_canteen)
+          WHERE id = $9
           RETURNING *`,
           [
             morningProd,
             afternoonProd,
             eveningProd,
             unit || null,
+            stockInCanteen,
+            unit_afternoon ?? null,
+            unit_evening ?? null,
+            unit_stock_in_canteen ?? null,
             existingId,
           ]
         );
@@ -148,8 +172,8 @@ router.post('/', async (req, res) => {
         const result = await db.query(
           `INSERT INTO daily_production (
             product_name, sector_code, morning_production, afternoon_production,
-            evening_production, unit, production_date
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            evening_production, unit, unit_afternoon, unit_evening, unit_stock_in_canteen, production_date, stock_in_canteen
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           RETURNING *`,
           [
             product_name,
@@ -158,7 +182,11 @@ router.post('/', async (req, res) => {
             afternoonProd,
             eveningProd,
             unit || null,
+            unit_afternoon ?? null,
+            unit_evening ?? null,
+            unit_stock_in_canteen ?? null,
             production_date,
+            stockInCanteen != null ? stockInCanteen : 0,
           ]
         );
         rows = result.rows;

@@ -39,6 +39,18 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Helper: add parsed quantity for a given unit into totals object
+function addToTotals(totals, qtyStr, unit) {
+  const val = parseNumeric(qtyStr);
+  if (!unit || val === 0) return;
+  const u = String(unit).trim();
+  if (u === 'gram') totals.gram += val;
+  else if (u === 'kg') totals.kg += val;
+  else if (u === 'Litre') totals.litre += val;
+  else if (u === 'pieces') totals.pieces += val;
+  else if (u === 'Boxes') totals.boxes += val;
+}
+
 // Helper function to recalculate overall stock remaining quantities
 async function recalculateOverallStock(itemId) {
   try {
@@ -52,44 +64,23 @@ async function recalculateOverallStock(itemId) {
       const newKg = parseNumeric(newStockQuery.rows[0].new_stock_kg);
       const newLitre = parseNumeric(newStockQuery.rows[0].new_stock_litre);
 
-      // Get total daily stock taken for each unit type
-      const dailyStockQuery = await db.query(
-        `SELECT 
-          COALESCE(SUM(CASE WHEN unit = 'gram' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_gram,
-          COALESCE(SUM(CASE WHEN unit = 'kg' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_kg,
-          COALESCE(SUM(CASE WHEN unit = 'Litre' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_litre,
-          COALESCE(SUM(CASE WHEN unit = 'pieces' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_pieces,
-          COALESCE(SUM(CASE WHEN unit = 'Boxes' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_boxes
-        FROM daily_stock 
-        WHERE item_id = $1`,
+      // Get all daily_stock rows for this item; sum quantity_taken + quantity_taken_main_branch + quantity_taken_thanthondrimalai by unit
+      const dailyStockRows = await db.query(
+        'SELECT quantity_taken, unit, quantity_taken_main_branch, unit_main_branch, quantity_taken_thanthondrimalai, unit_thanthondrimalai FROM daily_stock WHERE item_id = $1',
         [itemId]
       );
+      const totals = { gram: 0, kg: 0, litre: 0, pieces: 0, boxes: 0 };
+      for (const row of dailyStockRows.rows) {
+        addToTotals(totals, row.quantity_taken, row.unit);
+        addToTotals(totals, row.quantity_taken_main_branch, row.unit_main_branch);
+        addToTotals(totals, row.quantity_taken_thanthondrimalai, row.unit_thanthondrimalai);
+      }
 
-      const totalTakenGram = parseNumeric(dailyStockQuery.rows[0]?.total_gram || '0');
-      const totalTakenKg = parseNumeric(dailyStockQuery.rows[0]?.total_kg || '0');
-      const totalTakenLitre = parseNumeric(dailyStockQuery.rows[0]?.total_litre || '0');
-      const totalTakenPieces = parseNumeric(dailyStockQuery.rows[0]?.total_pieces || '0');
-      const totalTakenBoxes = parseNumeric(dailyStockQuery.rows[0]?.total_boxes || '0');
+      const totalTakenGram = totals.gram;
+      const totalTakenKg = totals.kg;
+      const totalTakenLitre = totals.litre;
+      const totalTakenPieces = totals.pieces;
+      const totalTakenBoxes = totals.boxes;
 
       // Convert everything to grams for unified calculation
       // 1 litre = 1000 gram, 1 kg = 1000 gram
@@ -173,59 +164,67 @@ router.put('/', async (req, res) => {
 
     const results = [];
     for (const update of updates) {
-      const { id, item_id, quantity_taken, unit, reason } = update;
+      const {
+        id,
+        item_id,
+        quantity_taken,
+        unit,
+        reason,
+        quantity_taken_main_branch,
+        unit_main_branch,
+        quantity_taken_thanthondrimalai,
+        unit_thanthondrimalai,
+      } = update;
 
       if (!item_id) {
         continue;
       }
 
-      // Parse numeric value (accepts both string and number)
-      const quantityTaken = parseNumeric(quantity_taken);
+      const quantityTaken = String(quantity_taken ?? '0').trim();
+      const qtyMain = quantity_taken_main_branch != null ? String(quantity_taken_main_branch).trim() : null;
+      const qtyThanth = quantity_taken_thanthondrimalai != null ? String(quantity_taken_thanthondrimalai).trim() : null;
 
-      // Get the date from query or use current date
-      const { date } = req.query;
       const stockDate = date || new Date().toISOString().split('T')[0];
 
       if (id) {
-        // Update existing record
         const existing = await db.query('SELECT * FROM daily_stock WHERE id = $1', [id]);
         if (existing.rows.length > 0) {
           const result = await db.query(
-            'UPDATE daily_stock SET quantity_taken = $1, unit = $2, reason = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
-            [quantityTaken, unit || null, reason || '', id]
+            `UPDATE daily_stock SET quantity_taken = $1, unit = $2, reason = $3,
+             quantity_taken_main_branch = COALESCE($4, quantity_taken_main_branch),
+             unit_main_branch = $5,
+             quantity_taken_thanthondrimalai = COALESCE($6, quantity_taken_thanthondrimalai),
+             unit_thanthondrimalai = $7,
+             updated_at = CURRENT_TIMESTAMP WHERE id = $8 RETURNING *`,
+            [quantityTaken, unit || null, reason || '', qtyMain, unit_main_branch || null, qtyThanth, unit_thanthondrimalai || null, id]
           );
           results.push(result.rows[0]);
-          
-          // Recalculate remaining stock in overall_stock after updating daily stock
-          const updateItemId = existing.rows[0].item_id;
-          await recalculateOverallStock(updateItemId);
+          await recalculateOverallStock(existing.rows[0].item_id);
         }
       } else {
-        // Create new record - check if one exists for this item and date
         const existing = await db.query(
           'SELECT * FROM daily_stock WHERE item_id = $1 AND stock_date = $2',
           [item_id, stockDate]
         );
-        
         if (existing.rows.length > 0) {
-          // Update existing record
           const result = await db.query(
-            'UPDATE daily_stock SET quantity_taken = $1, unit = $2, reason = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
-            [quantityTaken, unit || null, reason || '', existing.rows[0].id]
+            `UPDATE daily_stock SET quantity_taken = $1, unit = $2, reason = $3,
+             quantity_taken_main_branch = COALESCE($4, quantity_taken_main_branch),
+             unit_main_branch = $5,
+             quantity_taken_thanthondrimalai = COALESCE($6, quantity_taken_thanthondrimalai),
+             unit_thanthondrimalai = $7,
+             updated_at = CURRENT_TIMESTAMP WHERE id = $8 RETURNING *`,
+            [quantityTaken, unit || null, reason || '', qtyMain, unit_main_branch || null, qtyThanth, unit_thanthondrimalai || null, existing.rows[0].id]
           );
           results.push(result.rows[0]);
-          
-          // Recalculate remaining stock in overall_stock after updating daily stock
           await recalculateOverallStock(item_id);
         } else {
-          // Create new record
           const result = await db.query(
-            'INSERT INTO daily_stock (item_id, quantity_taken, unit, reason, stock_date) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [item_id, quantityTaken, unit || null, reason || '', stockDate]
+            `INSERT INTO daily_stock (item_id, quantity_taken, unit, reason, stock_date, quantity_taken_main_branch, unit_main_branch, quantity_taken_thanthondrimalai, unit_thanthondrimalai)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [item_id, quantityTaken, unit || null, reason || '', stockDate, qtyMain, unit_main_branch || null, qtyThanth, unit_thanthondrimalai || null]
           );
           results.push(result.rows[0]);
-          
-          // Recalculate remaining stock in overall_stock after saving daily stock
           await recalculateOverallStock(item_id);
         }
       }

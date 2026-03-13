@@ -786,7 +786,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
                 MaterialPageRoute(
                   builder: (context) => HomeScreen(
                     username: widget.username,
-                    initialSector: widget.selectedSector,
+                    initialSectorCodes: AuthService.initialSectorCodes,
                     isAdmin: AuthService.isAdmin,
                     isMainAdmin: widget.isMainAdmin,
                   ),

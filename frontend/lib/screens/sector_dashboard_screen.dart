@@ -27,6 +27,8 @@ class SectorDashboardScreen extends StatefulWidget {
   final String? selectedSector;
   final bool isAdmin;
   final bool isMainAdmin;
+  /// Sector codes the user can access (keyword login). If non-null and contains selectedSector, allows sub-sector chip selection.
+  final List<String>? userSectorCodes;
 
   const SectorDashboardScreen({
     super.key,
@@ -34,6 +36,7 @@ class SectorDashboardScreen extends StatefulWidget {
     required this.selectedSector,
     required this.isAdmin,
     required this.isMainAdmin,
+    this.userSectorCodes,
   });
 
   @override
@@ -214,7 +217,12 @@ class _SectorDashboardScreenState extends State<SectorDashboardScreen> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      widget.isAdmin ? 'Select unit:' : 'Unit:',
+                      (widget.isAdmin ||
+                              (widget.userSectorCodes != null &&
+                                  widget.selectedSector != null &&
+                                  widget.userSectorCodes!.contains(widget.selectedSector)))
+                          ? 'Select unit:'
+                          : 'Unit:',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                   ),
@@ -225,10 +233,16 @@ class _SectorDashboardScreenState extends State<SectorDashboardScreen> {
                     children: subSectorCodes.map((code) {
                       final isSelected = _selectedSscUnit == code;
                       final color = _sscUnitChipColor(code);
+                      // Allow sub-sector selection for admin OR for user whose allowed sectors include this one
+                      final canSelectSubSector = widget.isAdmin ||
+                          (widget.userSectorCodes != null &&
+                              widget.selectedSector != null &&
+                              widget.userSectorCodes!.contains(widget.selectedSector) &&
+                              hasSubSectors);
                       return ChoiceChip(
                         label: Text(_sectorDisplayName(code)),
                         selected: isSelected,
-                        onSelected: widget.isAdmin
+                        onSelected: canSelectSubSector
                             ? (selected) {
                                 setState(() {
                                   _selectedSscUnit = selected ? code : null;
@@ -374,6 +388,7 @@ class _SectorDashboardScreenState extends State<SectorDashboardScreen> {
       ),
     ]);
 
+    // Single sector (no subs) or specific unit selected: show combined button
     if (!showOnlySscRelated && effectiveSector != 'SSMMC') {
       buttons.addAll([
         const SizedBox(height: 10),

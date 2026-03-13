@@ -39,25 +39,29 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() => _isSubmitting = false);
         
-        final sectorCode = response['sectorCode'] as String?;
+        final sectorCodesRaw = response['sectorCodes'];
+        final List<String>? sectorCodes = sectorCodesRaw is List
+            ? (sectorCodesRaw)
+                .map((e) => e?.toString())
+                .whereType<String>()
+                .toList()
+            : null;
         final responseUsername = response['username'] as String? ?? username;
         final isAdmin = response['isAdmin'] as bool? ?? false;
         final isMainAdmin = response['isMainAdmin'] as bool? ?? false;
-        
-        // Store auth data for use across the app
+
         AuthService.setAuthData(
           username: responseUsername,
           isAdmin: isAdmin,
           isMainAdmin: isMainAdmin,
-          initialSector: sectorCode,
+          initialSectorCodes: sectorCodes,
         );
-        
-        // Navigate to home screen after successful login
+
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => HomeScreen(
               username: responseUsername,
-              initialSector: sectorCode,
+              initialSectorCodes: sectorCodes,
               isAdmin: isAdmin,
               isMainAdmin: isMainAdmin,
             ),

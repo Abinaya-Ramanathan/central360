@@ -11,14 +11,15 @@ import 'sector_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
-  final String? initialSector;
+  /// Sector codes the user can access (keyword login). Null for admin (sees all).
+  final List<String>? initialSectorCodes;
   final bool isAdmin;
   final bool isMainAdmin;
 
   const HomeScreen({
     super.key,
     required this.username,
-    this.initialSector,
+    this.initialSectorCodes,
     this.isAdmin = false,
     this.isMainAdmin = false,
   });
@@ -88,13 +89,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Sector values to show as buttons: New Entry first, then these (admin: All + displaySectors; non-admin: single).
+  /// Sector values to show as buttons: New Entry first, then these (admin: All + displaySectors; non-admin: from initialSectorCodes).
   List<String> get _sectorButtonValues {
     if (_isAdmin) {
       return [_allSectorsValue, ..._displaySectors.map((s) => s.code)];
     }
-    if (widget.initialSector != null) {
-      return [widget.initialSector!];
+    final codes = widget.initialSectorCodes;
+    if (codes != null && codes.isNotEmpty) {
+      return codes;
     }
     return [];
   }
@@ -310,6 +312,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 selectedSector: sector,
                                 isAdmin: _isAdmin,
                                 isMainAdmin: _isMainAdmin,
+                                userSectorCodes: widget.initialSectorCodes,
                               ),
                             ),
                           );

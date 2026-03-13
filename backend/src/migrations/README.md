@@ -2,13 +2,13 @@
 
 ## Overview
 
-This directory contains the consolidated database migrations for the Central360 application. All migrations have been consolidated into a single file for easier management.
+All backend database changes are in **one migration file**. There are no other migration files to run; previous standalone migration files have been removed and their changes are included in the consolidated file.
 
-## Current Active Migration
+## Single Migration File
 
 ### `000_consolidated_migrations.sql`
 
-**Purpose**: Complete database schema with all tables, indexes, default data, and all incremental updates in a single file.
+**Purpose**: The only migration file. Contains the full schema, all tables, indexes, default data, and every incremental change (ALTERs, new columns, SSC subsectors, daily_stock/daily_production/overall_stock updates, etc.).
 
 **Includes**:
 - Complete database schema with all tables (sectors, employees, attendance, salary_expenses, daily_production, products, daily_expenses, maintenance_issues, mahal_bookings, catering_details, expense_details, credit_details, vehicle_licenses, driver_licenses, engine_oil_services, stock_items, daily_stock, overall_stock, sales_details, sales_balance_payments, company_purchase_details, company_purchase_balance_payments, maintenance_issue_photos, company_purchase_photos, daily_income_expense, mahal_vessels, rent_vehicles, rent_vehicle_attendance, ingredient_menus, ingredient_items, mining_activities, daily_mining_activities)
@@ -64,11 +64,10 @@ Simply run:
 node src/migrations/run_migration.js 000_consolidated_migrations.sql
 ```
 
-## Archived Migrations
+## Other Files
 
-All historical migration files (001-050) have been archived in the `archive/` directory for reference. These are no longer needed for new installations but are kept for historical tracking.
-
-The individual migration files (051-055) have been consolidated into `000_consolidated_migrations.sql` and removed.
+- **`run_migration.js`** – Run this with the migration filename to execute it: `node run_migration.js 000_consolidated_migrations.sql`
+- **`archive/`** – Old migration files (001–050) kept only for reference. Do not run them; everything is in `000_consolidated_migrations.sql`.
 
 ## Maintenance
 

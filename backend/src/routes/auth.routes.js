@@ -13,27 +13,37 @@ router.post('/login', async (req, res) => {
   try {
     let isValid = false;
     let isAdmin = false;
-    let sectorCode = null;
+    let isMainAdmin = false;
+    /** @type {string[] | null} sector codes the user can access (keyword login); null for admin */
+    let sectorCodes = null;
 
-    // Check for admin login - based on PASSWORD, not username
-    // Admin privileges: password is "admin" OR "abinaya" (case insensitive) - username doesn't matter
-    // Main Admin (delete privileges): password is "abinaya" (case insensitive) - username doesn't matter
-    const passwordLower = password.toLowerCase();
-    
-    if (passwordLower === 'admin' || passwordLower === 'abinaya') {
+    const passwordLower = password.toLowerCase().trim();
+
+    // Admin: only password "surya" (case insensitive). "admin" is rejected.
+    if (passwordLower === 'surya') {
       isValid = true;
       isAdmin = true;
+      isMainAdmin = true;
+    } else if (passwordLower === 'abinaya') {
+      isValid = true;
+      isAdmin = true;
+      isMainAdmin = true;
+    } else if (passwordLower === 'admin') {
+      return res.status(401).json({ message: 'Invalid username or password' });
     } else {
-      // Check if password matches a sector code
-      const sectorResult = await db.query(
-        'SELECT code FROM sectors WHERE code = $1',
-        [password.toUpperCase()]
-      );
-      
-      if (sectorResult.rows.length > 0) {
+      // Keyword login: map password to sector codes (main + subsector access)
+      const keywordToSectorCodes = {
+        cafe: ['SSC'],                    // Sri Suryaas Cafe (main + subsector)
+        crusher: ['SSBM', 'SSEW'],        // Sri Surya Blue Metals, Sri Surya Engineering Works
+        mahal: ['SSMMC'],                 // Sri Surya Mahal Minihall and Catering
+        bunk: ['SSBP'],                   // Sri Surya Bharath Petroleum
+        ricemill: ['SSR'],                // Sri Surya Ricemill
+        farm: ['SSACF'],                  // Sri Suryaa Agro and Cattle Farm
+      };
+      const codes = keywordToSectorCodes[passwordLower];
+      if (codes && Array.isArray(codes) && codes.length > 0) {
         isValid = true;
-        isAdmin = false;
-        sectorCode = sectorResult.rows[0].code;
+        sectorCodes = codes;
       }
     }
 
@@ -41,21 +51,18 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
-    // Check if main admin - based on PASSWORD being "abinaya" (case insensitive)
-    const isMainAdmin = passwordLower === 'abinaya';
-
     const token = jwt.sign(
-      { sub: username, company: company || null, isAdmin, isMainAdmin, sectorCode },
+      { sub: username, company: company || null, isAdmin, isMainAdmin, sectorCodes },
       process.env.JWT_SECRET || 'dev-secret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
     );
 
-    res.json({ 
+    res.json({
       token,
       username,
       isAdmin,
       isMainAdmin,
-      sectorCode 
+      sectorCodes: sectorCodes,
     });
   } catch (err) {
     console.error('Login error:', err);

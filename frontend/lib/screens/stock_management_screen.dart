@@ -16,11 +16,17 @@ import 'package:pdf/widgets.dart' as pw;
 class StockManagementScreen extends StatefulWidget {
   final String username;
   final String? selectedSector;
+  /// When set, show consolidated data for main + subsectors with sector name column.
+  final List<String>? includedSectorCodes;
+  /// Initial tab: 0 = Production, 1 = Daily Stock, 2 = Overall Stock.
+  final int? initialTabIndex;
 
   const StockManagementScreen({
     super.key,
     required this.username,
     this.selectedSector,
+    this.includedSectorCodes,
+    this.initialTabIndex,
   });
 
   @override
@@ -37,6 +43,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   bool _isLoading = false;
   bool _isEditModeDaily = false;
   bool _isEditModeOverall = false;
+  bool _isProductionEditMode = false;
   bool _isAdmin = false;
   String _searchQuery = '';
   final TextEditingController _productionSearchController = TextEditingController();
@@ -46,6 +53,11 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   final Map<String, TextEditingController> _dailyQuantityControllers = {};
   final Map<String, TextEditingController> _dailyReasonControllers = {};
   final Map<String, String?> _dailyQuantityUnits = {}; // Store unit for each quantity
+  // Sri Suryaas Cafe: 3 quantity columns (canteen, main branch, thanthondrimalai)
+  final Map<String, TextEditingController> _dailyQuantityMainBranchControllers = {};
+  final Map<String, TextEditingController> _dailyQuantityThanthondrimalaiControllers = {};
+  final Map<String, String?> _dailyUnitMainBranch = {};
+  final Map<String, String?> _dailyUnitThanthondrimalai = {};
   final Map<String, TextEditingController> _overallNewStockControllers = {};
   final Map<String, String?> _overallNewStockUnits = {}; // Store unit for new stock (deprecated - keeping for compatibility)
   final Map<String, String?> _overallRemainingStockUnits = {}; // Store unit for remaining stock (deprecated)
@@ -69,7 +81,8 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    final initialIndex = widget.initialTabIndex ?? 0;
+    _tabController = TabController(length: 3, vsync: this, initialIndex: initialIndex.clamp(0, 2));
     _selectedDate = DateTime.now();
     final usernameLower = widget.username.toLowerCase();
     _isAdmin = usernameLower == 'admin' || usernameLower == 'abinaya' || usernameLower == 'srisurya';
@@ -85,6 +98,12 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       controller.dispose();
     }
     for (var controller in _dailyReasonControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _dailyQuantityMainBranchControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _dailyQuantityThanthondrimalaiControllers.values) {
       controller.dispose();
     }
     for (var controller in _overallNewStockControllers.values) {
@@ -141,10 +160,15 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
 
   Future<void> _loadStockItems() async {
     try {
-      final items = await ApiService.getStockItems(sector: widget.selectedSector);
+      final codes = widget.includedSectorCodes;
+      final sectorParam = (codes == null || codes.isEmpty) ? widget.selectedSector : null;
+      final items = await ApiService.getStockItems(sector: sectorParam);
       if (mounted) {
+        final filtered = (codes != null && codes.isNotEmpty)
+            ? items.where((i) => codes.contains(i['sector_code']?.toString())).toList()
+            : items;
         setState(() {
-          _stockItems = items;
+          _stockItems = filtered;
         });
         _loadDailyStock();
         _loadOverallStock();
@@ -164,11 +188,17 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     setState(() => _isLoading = true);
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
-      final stock = await ApiService.getDailyStock(
+      final sectorParam = (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty)
+          ? null
+          : widget.selectedSector;
+      var stock = await ApiService.getDailyStock(
         month: _selectedDate!.month,
         date: dateStr,
-        sector: widget.selectedSector,
+        sector: sectorParam,
       );
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        stock = stock.where((s) => widget.includedSectorCodes!.contains(s['sector_code']?.toString())).toList();
+      }
       if (mounted) {
         for (var controller in _dailyQuantityControllers.values) {
           controller.dispose();
@@ -176,8 +206,16 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         for (var controller in _dailyReasonControllers.values) {
           controller.dispose();
         }
+        for (var controller in _dailyQuantityMainBranchControllers.values) {
+          controller.dispose();
+        }
+        for (var controller in _dailyQuantityThanthondrimalaiControllers.values) {
+          controller.dispose();
+        }
         _dailyQuantityControllers.clear();
         _dailyReasonControllers.clear();
+        _dailyQuantityMainBranchControllers.clear();
+        _dailyQuantityThanthondrimalaiControllers.clear();
         
         final existingItemIds = stock.map((s) => s['item_id'] as int).toSet();
         final missingItems = _stockItems.where((item) => !existingItemIds.contains(item['id'] as int)).toList();
@@ -194,6 +232,8 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             'sector_name': sectorName,
             'quantity_taken': '0',
             'reason': '',
+            'quantity_taken_main_branch': '0',
+            'quantity_taken_thanthondrimalai': '0',
           });
         }
         
@@ -202,7 +242,6 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           for (var item in _dailyStock) {
             final id = item['id'] as int;
             final itemId = item['item_id'] as int;
-            // Use item_id as key to avoid conflicts with temporary -1 ids
             final key = '${itemId}_$id';
             _dailyQuantityControllers[key] = TextEditingController(
               text: item['quantity_taken']?.toString() ?? '',
@@ -211,6 +250,16 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
               text: item['reason']?.toString() ?? '',
             );
             _dailyQuantityUnits[key] = item['unit']?.toString();
+            if (_isCafeDailyStock) {
+              _dailyQuantityMainBranchControllers[key] = TextEditingController(
+                text: item['quantity_taken_main_branch']?.toString() ?? '0',
+              );
+              _dailyQuantityThanthondrimalaiControllers[key] = TextEditingController(
+                text: item['quantity_taken_thanthondrimalai']?.toString() ?? '0',
+              );
+              _dailyUnitMainBranch[key] = item['unit_main_branch']?.toString();
+              _dailyUnitThanthondrimalai[key] = item['unit_thanthondrimalai']?.toString();
+            }
           }
         });
       }
@@ -230,9 +279,15 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   Future<void> _loadOverallStock() async {
     setState(() => _isLoading = true);
     try {
-      final stock = await ApiService.getOverallStock(
-        sector: widget.selectedSector,
+      final sectorParam = (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty)
+          ? null
+          : widget.selectedSector;
+      var stock = await ApiService.getOverallStock(
+        sector: sectorParam,
       );
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        stock = stock.where((s) => widget.includedSectorCodes!.contains(s['sector_code']?.toString())).toList();
+      }
       if (mounted) {
         // Clear all controllers
         for (var controller in _overallNewStockControllers.values) {
@@ -404,13 +459,20 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         final reasonController = _dailyReasonControllers[key];
         
         if (quantityController != null && reasonController != null) {
-          updates.add({
+          final update = <String, dynamic>{
             'id': id == -1 ? null : id,
             'item_id': itemId,
             'quantity_taken': quantityController.text.trim(),
             'unit': _dailyQuantityUnits[key],
             'reason': reasonController.text.trim(),
-          });
+          };
+          if (_isCafeDailyStock) {
+            update['quantity_taken_main_branch'] = _dailyQuantityMainBranchControllers[key]?.text.trim() ?? '0';
+            update['unit_main_branch'] = _dailyUnitMainBranch[key];
+            update['quantity_taken_thanthondrimalai'] = _dailyQuantityThanthondrimalaiControllers[key]?.text.trim() ?? '0';
+            update['unit_thanthondrimalai'] = _dailyUnitThanthondrimalai[key];
+          }
+          updates.add(update);
         }
       }
       
@@ -512,7 +574,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   }
 
   List<Map<String, dynamic>> _filterStock(List<Map<String, dynamic>> stock) {
-    if (_searchQuery.isEmpty) return stock;
+    if (_searchQuery.isEmpty) return List.from(stock);
     final query = _searchQuery.toLowerCase();
     return stock.where((item) {
       final itemName = item['item_name']?.toString().toLowerCase() ?? '';
@@ -520,6 +582,38 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       final partNumber = item['part_number']?.toString().toLowerCase() ?? '';
       return itemName.contains(query) || vehicleType.contains(query) || partNumber.contains(query);
     }).toList();
+  }
+
+  static double _parseQty(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    final s = v.toString().trim();
+    if (s.isEmpty) return 0;
+    return double.tryParse(s) ?? 0;
+  }
+
+  bool _dailyStockRowHasValue(Map<String, dynamic> r) {
+    final q = _parseQty(r['quantity_taken']);
+    if (q > 0) return true;
+    if (_isCafeDailyStock) {
+      if (_parseQty(r['quantity_taken_main_branch']) > 0) return true;
+      if (_parseQty(r['quantity_taken_thanthondrimalai']) > 0) return true;
+    }
+    return false;
+  }
+
+  bool _overallStockRowHasValue(Map<String, dynamic> r) {
+    if (_parseQty(r['remaining_stock_gram']) > 0) return true;
+    if (_parseQty(r['remaining_stock_kg']) > 0) return true;
+    if (_parseQty(r['remaining_stock_litre']) > 0) return true;
+    if (_parseQty(r['remaining_stock_pieces']) > 0) return true;
+    if (_parseQty(r['remaining_stock_boxes']) > 0) return true;
+    if (_parseQty(r['new_stock_gram']) > 0) return true;
+    if (_parseQty(r['new_stock_kg']) > 0) return true;
+    if (_parseQty(r['new_stock_litre']) > 0) return true;
+    if (_parseQty(r['new_stock_pieces']) > 0) return true;
+    if (_parseQty(r['new_stock_boxes']) > 0) return true;
+    return false;
   }
 
   Future<void> _generateStatement() async {
@@ -622,18 +716,41 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   }
 
   bool _shouldShowVehicleFieldsForItem(String? sectorCode) {
-    // Show only for SSEW sector items
     return sectorCode == 'SSEW';
   }
+
+  static const _cafeSectorCodes = ['SSC', 'SSCT', 'CS', 'SSCM'];
+  bool get _isCafeDailyStock =>
+      (widget.selectedSector != null && _cafeSectorCodes.contains(widget.selectedSector)) ||
+      (widget.includedSectorCodes != null &&
+          widget.includedSectorCodes!.isNotEmpty &&
+          widget.includedSectorCodes!.every((c) => _cafeSectorCodes.contains(c)));
 
   @override
   Widget build(BuildContext context) {
     final filteredDailyStock = _filterStock(_dailyStock);
     final filteredOverallStock = _filterStock(_overallStock);
-    
-    // Show vehicle columns for SSEW sector or for admin when All Sectors is selected
-    final showVehicleColumns = (widget.selectedSector == 'SSEW') || 
-                               (widget.selectedSector == null && _isAdmin);
+    // Rows with entered value > 0 display first (all sectors)
+    filteredDailyStock.sort((a, b) {
+      final aHas = _dailyStockRowHasValue(a);
+      final bHas = _dailyStockRowHasValue(b);
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      return 0;
+    });
+    filteredOverallStock.sort((a, b) {
+      final aHas = _overallStockRowHasValue(a);
+      final bHas = _overallStockRowHasValue(b);
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      return 0;
+    });
+    // Show sector column when consolidated (includedSectorCodes) or All Sectors
+    final showSectorColumn = widget.selectedSector == null || widget.includedSectorCodes != null;
+    // Show vehicle columns for SSEW sector or for admin when All Sectors is selected or when consolidated view includes SSEW
+    final showVehicleColumns = (widget.selectedSector == 'SSEW') ||
+                               (widget.selectedSector == null && _isAdmin) ||
+                               (widget.includedSectorCodes != null && widget.includedSectorCodes!.contains('SSEW'));
 
     return Scaffold(
       appBar: AppBar(
@@ -641,7 +758,22 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         backgroundColor: Colors.amber.shade700,
         foregroundColor: Colors.white,
         actions: [
-          if (widget.selectedSector != null)
+          if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.business, size: 18),
+                  const SizedBox(width: 4),
+                  Text(
+                    _getSectorName(widget.selectedSector) + ' (consolidated)',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            )
+          else if (widget.selectedSector != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
@@ -687,7 +819,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                 MaterialPageRoute(
                   builder: (context) => HomeScreen(
                     username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
-                    initialSector: widget.selectedSector,
+                    initialSectorCodes: AuthService.initialSectorCodes,
                     isAdmin: AuthService.isAdmin,
                     isMainAdmin: AuthService.isMainAdmin,
                   ),
@@ -784,23 +916,49 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                       ),
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      onPressed: _isLoading ? null : () {
-                        // Trigger edit in ProductionTabContent
-                        final state = _productionTabKey.currentState;
-                        if (state != null) {
-                          // Use dynamic to call the method since the state class is private
-                          (state as dynamic).showEditDialog();
-                        }
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edit', style: TextStyle(fontSize: 16)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange.shade700,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    if (_isProductionEditMode)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : () {
+                              final state = _productionTabKey.currentState;
+                              if (state != null) (state as dynamic).cancelEdit();
+                              setState(() => _isProductionEditMode = false);
+                            },
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : () async {
+                              final state = _productionTabKey.currentState;
+                              if (state != null) await (state as dynamic).saveProduction();
+                              // Child calls onEditModeChanged(false) when done
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Save'),
+                          ),
+                        ],
+                      )
+                    else
+                      ElevatedButton.icon(
+                        onPressed: _isLoading ? null : () {
+                          final state = _productionTabKey.currentState;
+                          if (state != null) {
+                            (state as dynamic).showEditDialog();
+                          }
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit', style: TextStyle(fontSize: 16)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange.shade700,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -809,9 +967,13 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                 child: ProductionTabContent(
                   key: _productionTabKey,
                   selectedSector: widget.selectedSector,
+                  includedSectorCodes: widget.includedSectorCodes,
                   selectedDate: _selectedDate,
                   isAdmin: _isAdmin,
                   searchController: _productionSearchController,
+                  onEditModeChanged: (isEditMode) {
+                    setState(() => _isProductionEditMode = isEditMode);
+                  },
                 ),
               ),
             ],
@@ -925,10 +1087,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                 controller: _stockHorizontalScrollController,
                                 child: DataTable(
                                 columnSpacing: 12,
-                                sortColumnIndex: widget.selectedSector == null ? 0 : null,
+                                sortColumnIndex: showSectorColumn ? 0 : null,
                                 sortAscending: _sortAscendingDaily,
                               columns: [
-                                if (widget.selectedSector == null)
+                                if (showSectorColumn)
                                   DataColumn(
                                     label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
                                     onSort: (columnIndex, ascending) {
@@ -944,16 +1106,30 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                       });
                                     },
                                   ),
+                                const DataColumn(label: Text('SI.NO', style: TextStyle(fontWeight: FontWeight.bold))),
                                 const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 if (showVehicleColumns) ...[
                                   const DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
                                   const DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
                                 ],
-                                const DataColumn(label: Text('Quantity Taken', style: TextStyle(fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                  label: Text(
+                                    _isCafeDailyStock ? 'Canteen' : 'Quantity Taken',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                                 const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+                                if (_isCafeDailyStock) ...[
+                                  const DataColumn(label: Text('Main branch', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  const DataColumn(label: Text('Thanthondrimalai branch', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+                                ],
                                 const DataColumn(label: Text('Reason', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
-                              rows: filteredDailyStock.map((record) {
+                              rows: filteredDailyStock.asMap().entries.map((entry) {
+                                final siNo = entry.key + 1;
+                                final record = entry.value;
                                 final id = record['id'] as int;
                                 final itemId = record['item_id'] as int;
                                 final key = '${itemId}_$id';
@@ -964,8 +1140,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                 
                                 return DataRow(
                                   cells: [
-                                    if (widget.selectedSector == null)
+                                    if (showSectorColumn)
                                       DataCell(Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')),
+                                    DataCell(Text('$siNo')),
                                     DataCell(Text(record['item_name']?.toString() ?? 'N/A')),
                                     if (showVehicleColumns) ...[
                                       DataCell(Text(showVehicleForThisItem ? (record['vehicle_type']?.toString() ?? '') : '')),
@@ -1022,6 +1199,110 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                             )
                                           : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
                                     ),
+                                    if (_isCafeDailyStock) ...[
+                                      DataCell(
+                                        _isEditModeDaily
+                                            ? SizedBox(
+                                                width: 90,
+                                                child: TextField(
+                                                  controller: _dailyQuantityMainBranchControllers[key],
+                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                  ],
+                                                  decoration: const InputDecoration(
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                  ),
+                                                ),
+                                              )
+                                            : Text(record['quantity_taken_main_branch']?.toString() ?? '0'),
+                                      ),
+                                      DataCell(
+                                        _isEditModeDaily
+                                            ? ConstrainedBox(
+                                                constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
+                                                child: DropdownButtonFormField<String>(
+                                                  initialValue: _dailyUnitMainBranch[key],
+                                                  isDense: true,
+                                                  isExpanded: true,
+                                                  decoration: const InputDecoration(
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                                                  ),
+                                                  style: const TextStyle(fontSize: 11, color: Colors.black),
+                                                  dropdownColor: Colors.white,
+                                                  items: const [
+                                                    DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                  ],
+                                                  onChanged: (value) {
+                                                    setState(() {
+                                                      _dailyUnitMainBranch[key] = value;
+                                                    });
+                                                  },
+                                                ),
+                                              )
+                                            : Text(record['unit_main_branch']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
+                                      ),
+                                      DataCell(
+                                        _isEditModeDaily
+                                            ? SizedBox(
+                                                width: 90,
+                                                child: TextField(
+                                                  controller: _dailyQuantityThanthondrimalaiControllers[key],
+                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                  ],
+                                                  decoration: const InputDecoration(
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                  ),
+                                                ),
+                                              )
+                                            : Text(record['quantity_taken_thanthondrimalai']?.toString() ?? '0'),
+                                      ),
+                                      DataCell(
+                                        _isEditModeDaily
+                                            ? ConstrainedBox(
+                                                constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
+                                                child: DropdownButtonFormField<String>(
+                                                  initialValue: _dailyUnitThanthondrimalai[key],
+                                                  isDense: true,
+                                                  isExpanded: true,
+                                                  decoration: const InputDecoration(
+                                                    border: OutlineInputBorder(),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                                                  ),
+                                                  style: const TextStyle(fontSize: 11, color: Colors.black),
+                                                  dropdownColor: Colors.white,
+                                                  items: const [
+                                                    DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                    DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 11, color: Colors.black))),
+                                                  ],
+                                                  onChanged: (value) {
+                                                    setState(() {
+                                                      _dailyUnitThanthondrimalai[key] = value;
+                                                    });
+                                                  },
+                                                ),
+                                              )
+                                            : Text(record['unit_thanthondrimalai']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
+                                      ),
+                                    ],
                                     DataCell(
                                       _isEditModeDaily
                                           ? SizedBox(
@@ -1147,10 +1428,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                 controller: _overallStockHorizontalScrollController,
                                 child: DataTable(
                               columnSpacing: 12,
-                              sortColumnIndex: widget.selectedSector == null ? 0 : null,
+                              sortColumnIndex: showSectorColumn ? 0 : null,
                               sortAscending: _sortAscendingOverall,
                               columns: [
-                                if (widget.selectedSector == null)
+                                if (showSectorColumn)
                                   DataColumn(
                                     label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
                                     onSort: (columnIndex, ascending) {
@@ -1282,7 +1563,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                                 
                                 return DataRow(
                                   cells: [
-                                    if (widget.selectedSector == null)
+                                    if (showSectorColumn)
                                       DataCell(Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')),
                                     DataCell(Text(record['item_name']?.toString() ?? 'N/A')),
                                     if (showVehicleColumns) ...[

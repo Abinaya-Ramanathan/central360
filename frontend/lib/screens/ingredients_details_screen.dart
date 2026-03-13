@@ -155,7 +155,7 @@ class _IngredientsDetailsScreenState extends State<IngredientsDetailsScreen> wit
                 MaterialPageRoute(
                   builder: (context) => HomeScreen(
                     username: AuthService.username.isNotEmpty ? AuthService.username : widget.username,
-                    initialSector: 'SSC',
+                    initialSectorCodes: AuthService.initialSectorCodes,
                     isAdmin: AuthService.isAdmin,
                     isMainAdmin: AuthService.isMainAdmin,
                   ),

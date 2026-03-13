@@ -2,30 +2,31 @@ class AuthService {
   static bool _isAdmin = false;
   static bool _isMainAdmin = false;
   static String? _username;
-  static String? _initialSector;
+  /// Sector codes the user can access (keyword login: cafe, crusher, etc.). Null for admin.
+  static List<String>? _initialSectorCodes;
 
   static void setAuthData({
     required String username,
     required bool isAdmin,
     required bool isMainAdmin,
-    String? initialSector,
+    List<String>? initialSectorCodes,
   }) {
     _username = username;
     _isAdmin = isAdmin;
     _isMainAdmin = isMainAdmin;
-    _initialSector = initialSector;
+    _initialSectorCodes = initialSectorCodes;
   }
 
   static String get username => _username ?? '';
   static bool get isAdmin => _isAdmin;
   static bool get isMainAdmin => _isMainAdmin;
-  static String? get initialSector => _initialSector;
+  static List<String>? get initialSectorCodes => _initialSectorCodes;
 
   static void clear() {
     _username = null;
     _isAdmin = false;
     _isMainAdmin = false;
-    _initialSector = null;
+    _initialSectorCodes = null;
   }
 }
 

@@ -652,6 +652,9 @@ WHERE name = '' OR name IS NULL;
 ALTER TABLE mahal_bookings 
 ADD COLUMN IF NOT EXISTS final_settlement_amount DECIMAL(10, 2);
 
+-- Add details column to mahal_bookings (fixes "column details does not exist")
+ALTER TABLE mahal_bookings ADD COLUMN IF NOT EXISTS details TEXT;
+
 -- Migration 055: Make sales_details.product_name and quantity fields optional
 DO $$ 
 BEGIN
@@ -660,6 +663,10 @@ BEGIN
 EXCEPTION
   WHEN OTHERS THEN NULL;
 END $$;
+
+-- Migration 047: Add boxes columns to overall_stock (fixes "remaining_stock_boxes/new_stock_boxes does not exist")
+ALTER TABLE overall_stock ADD COLUMN IF NOT EXISTS remaining_stock_boxes DECIMAL(10, 2) DEFAULT 0;
+ALTER TABLE overall_stock ADD COLUMN IF NOT EXISTS new_stock_boxes DECIMAL(10, 2) DEFAULT 0;
 
 -- ============================================
 -- PART 6: ADDITIONAL PERFORMANCE INDEXES (Migration 051)
@@ -695,6 +702,20 @@ CREATE INDEX IF NOT EXISTS idx_credit_details_date_sector ON credit_details(cred
 -- Salary expenses composite indexes for faster filtering
 CREATE INDEX IF NOT EXISTS idx_salary_expenses_employee_week ON salary_expenses(employee_id, week_start_date, week_end_date);
 CREATE INDEX IF NOT EXISTS idx_salary_expenses_sector_week ON salary_expenses(sector, week_start_date);
+
+-- Canteen Store (CS) production: stock_in_canteen column
+ALTER TABLE daily_production ADD COLUMN IF NOT EXISTS stock_in_canteen DECIMAL(10, 2) DEFAULT 0;
+
+-- Per-column units for cafe production (unit = first column; unit_afternoon, unit_evening, unit_stock_in_canteen)
+ALTER TABLE daily_production ADD COLUMN IF NOT EXISTS unit_afternoon VARCHAR(20) CHECK (unit_afternoon IN ('gram', 'kg', 'Litre', 'pieces', 'Boxes') OR unit_afternoon IS NULL);
+ALTER TABLE daily_production ADD COLUMN IF NOT EXISTS unit_evening VARCHAR(20) CHECK (unit_evening IN ('gram', 'kg', 'Litre', 'pieces', 'Boxes') OR unit_evening IS NULL);
+ALTER TABLE daily_production ADD COLUMN IF NOT EXISTS unit_stock_in_canteen VARCHAR(20) CHECK (unit_stock_in_canteen IN ('gram', 'kg', 'Litre', 'pieces', 'Boxes') OR unit_stock_in_canteen IS NULL);
+
+-- Sri Suryaas Cafe daily stock: 3 quantity columns for canteen / main branch / thanthondrimalai
+ALTER TABLE daily_stock ADD COLUMN IF NOT EXISTS quantity_taken_main_branch VARCHAR(255) DEFAULT '0';
+ALTER TABLE daily_stock ADD COLUMN IF NOT EXISTS quantity_taken_thanthondrimalai VARCHAR(255) DEFAULT '0';
+ALTER TABLE daily_stock ADD COLUMN IF NOT EXISTS unit_main_branch VARCHAR(20);
+ALTER TABLE daily_stock ADD COLUMN IF NOT EXISTS unit_thanthondrimalai VARCHAR(20);
 
 -- Analyze tables to update statistics for query planner
 ANALYZE employees;

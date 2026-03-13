@@ -32,10 +32,11 @@ router.get('/', async (req, res) => {
         s.name as sector_name,
         COALESCE(SUM(
           CASE 
+            WHEN ds.quantity_taken IS NULL OR TRIM(COALESCE(ds.quantity_taken, '')) = '' THEN 0
             WHEN ds.quantity_taken LIKE '%/%' THEN
               CAST(SPLIT_PART(ds.quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(ds.quantity_taken, '/', 2) AS DECIMAL), 0)
             ELSE
-              CAST(ds.quantity_taken AS DECIMAL)
+              CAST(NULLIF(TRIM(ds.quantity_taken), '') AS DECIMAL)
           END
         ), 0) as total_taken
       FROM overall_stock os
@@ -136,6 +137,33 @@ function parseNumeric(value) {
   return 0;
 }
 
+// Sum quantity by unit (for daily_stock: quantity_taken + main_branch + thanthondrimalai)
+function addToTotals(totals, qtyStr, unit) {
+  const val = parseNumeric(qtyStr);
+  if (!unit || val === 0) return;
+  const u = String(unit).trim();
+  if (u === 'gram') totals.gram += val;
+  else if (u === 'kg') totals.kg += val;
+  else if (u === 'Litre') totals.litre += val;
+  else if (u === 'pieces') totals.pieces += val;
+  else if (u === 'Boxes') totals.boxes += val;
+}
+
+async function getDailyStockTotalsForItem(db, itemId) {
+  const dailyStockRows = await db.query(
+    `SELECT quantity_taken, unit, quantity_taken_main_branch, unit_main_branch, quantity_taken_thanthondrimalai, unit_thanthondrimalai 
+     FROM daily_stock WHERE item_id = $1`,
+    [itemId]
+  );
+  const totals = { gram: 0, kg: 0, litre: 0, pieces: 0, boxes: 0 };
+  for (const row of dailyStockRows.rows) {
+    addToTotals(totals, row.quantity_taken, row.unit);
+    addToTotals(totals, row.quantity_taken_main_branch, row.unit_main_branch);
+    addToTotals(totals, row.quantity_taken_thanthondrimalai, row.unit_thanthondrimalai);
+  }
+  return totals;
+}
+
 // Update overall stock records
 router.put('/', async (req, res) => {
   try {
@@ -190,47 +218,13 @@ router.put('/', async (req, res) => {
         continue;
       }
       
-      // Note: It's perfectly fine to fill only one column (e.g., only litre or only kg)
-      // The remaining stock will be calculated automatically based on what you enter
-
-      // Get total daily stock taken for each unit type
-      const dailyStockQuery = await db.query(
-        `SELECT 
-          COALESCE(SUM(CASE WHEN unit = 'gram' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_gram,
-          COALESCE(SUM(CASE WHEN unit = 'kg' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_kg,
-          COALESCE(SUM(CASE WHEN unit = 'Litre' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_litre,
-          COALESCE(SUM(CASE WHEN unit = 'pieces' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_pieces,
-          COALESCE(SUM(CASE WHEN unit = 'Boxes' THEN 
-            CASE WHEN quantity_taken LIKE '%/%' THEN
-              CAST(SPLIT_PART(quantity_taken, '/', 1) AS DECIMAL) / NULLIF(CAST(SPLIT_PART(quantity_taken, '/', 2) AS DECIMAL), 0)
-            ELSE CAST(quantity_taken AS DECIMAL) END
-          ELSE 0 END), 0) as total_boxes
-        FROM daily_stock 
-        WHERE item_id = $1`,
-        [finalItemId]
-      );
-
-      const totalTakenGram = parseNumeric(dailyStockQuery.rows[0]?.total_gram || '0');
-      const totalTakenKg = parseNumeric(dailyStockQuery.rows[0]?.total_kg || '0');
-      const totalTakenLitre = parseNumeric(dailyStockQuery.rows[0]?.total_litre || '0');
-      const totalTakenPieces = parseNumeric(dailyStockQuery.rows[0]?.total_pieces || '0');
-      const totalTakenBoxes = parseNumeric(dailyStockQuery.rows[0]?.total_boxes || '0');
+      // Total daily stock taken (all 3 columns: quantity_taken + main_branch + thanthondrimalai) by unit
+      const totals = await getDailyStockTotalsForItem(db, finalItemId);
+      const totalTakenGram = totals.gram;
+      const totalTakenKg = totals.kg;
+      const totalTakenLitre = totals.litre;
+      const totalTakenPieces = totals.pieces;
+      const totalTakenBoxes = totals.boxes;
 
       // Convert everything to grams for unified calculation
       // 1 litre = 1000 gram (for ghee/liquids, assuming similar density to water)

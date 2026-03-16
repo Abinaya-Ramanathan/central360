@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../models/product.dart';
 import '../models/sector.dart';
+import '../widgets/fixed_header_table.dart';
 import 'edit_product_dialog.dart';
 
 class ManageProductsDialog extends StatefulWidget {
@@ -26,11 +27,18 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
   bool _isLoading = false;
   bool _sortAscending = true; // Sort direction for Sector column
   String? _searchSectorCode; // Selected sector for search filter
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -235,37 +243,49 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
                             style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
                         )
-                      : SingleChildScrollView(
-                          child: DataTable(
-                            columnSpacing: 20,
-                            sortColumnIndex: 1,
-                            sortAscending: _sortAscending,
-                            columns: [
-                              const DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(
-                                label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                onSort: (columnIndex, ascending) {
-                                  setState(() {
-                                    _sortAscending = ascending;
-                                    _products.sort((a, b) {
-                                      final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                                      final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                                      return ascending
-                                          ? aName.compareTo(bName)
-                                          : bName.compareTo(aName);
-                                    });
-                                  });
-                                },
-                              ),
-                              const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
-                            ],
-                            rows: _filteredProducts.map((product) {
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text(product['product_name']?.toString() ?? 'N/A')),
-                                  DataCell(Text(_getSectorName(product['sector_code']?.toString()))),
-                                  DataCell(
-                                    Row(
+                      : FixedHeaderTable(
+                          horizontalScrollController: _horizontalScrollController,
+                          totalWidth: 400,
+                          headerHeight: 48,
+                          headerBuilder: (context) => SizedBox(
+                            height: 48,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                const SizedBox(width: 180, child: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                SizedBox(
+                                  width: 120,
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _sortAscending = !_sortAscending;
+                                        _filteredProducts.sort((a, b) {
+                                          final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                                          final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                                          return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                                        });
+                                      });
+                                    },
+                                    child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                                const SizedBox(width: 100, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                              ],
+                            ),
+                          ),
+                          rowCount: _filteredProducts.length,
+                          rowBuilder: (context, index) {
+                            final product = _filteredProducts[index];
+                            return SizedBox(
+                              height: 48,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  SizedBox(width: 180, child: Text(product['product_name']?.toString() ?? 'N/A')),
+                                  SizedBox(width: 120, child: Text(_getSectorName(product['sector_code']?.toString()))),
+                                  SizedBox(
+                                    width: 100,
+                                    child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
@@ -286,9 +306,9 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
                                     ),
                                   ),
                                 ],
-                              );
-                            }).toList(),
-                          ),
+                              ),
+                            );
+                          },
                         ),
             ),
           ],

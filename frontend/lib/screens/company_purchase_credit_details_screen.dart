@@ -11,6 +11,7 @@ import '../utils/format_utils.dart';
 import '../utils/ui_helpers.dart';
 import '../utils/pdf_generator.dart';
 import '../config/env_config.dart';
+import '../widgets/fixed_header_table.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -1801,240 +1802,17 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
                       style: TextStyle(fontSize: 16, color: Colors.grey),
                     ),
                   )
-                  : Scrollbar(
-                      thumbVisibility: true,
-                      interactive: true,
-                      controller: _purchaseHorizontalScrollController,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        controller: _purchaseHorizontalScrollController,
-                        child: SingleChildScrollView(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: DataTable(
-                                columnSpacing: 20,
-                                columns: [
-                                if (widget.selectedSector == null && _isAdmin)
-                                  DataColumn(
-                                    label: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        IconButton(
-                                          icon: Icon(
-                                            _purchasesSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                                            size: 16,
-                                          ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _purchasesSectorSortAscending = !_purchasesSectorSortAscending;
-                                              _purchaseData.sort((a, b) {
-                                                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                                                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                                                return _purchasesSectorSortAscending
-                                                    ? aName.compareTo(bName)
-                                                    : bName.compareTo(aName);
-                                              });
-                                            });
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Shop Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Purchase Amount', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Amount Paid', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Credit', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Bill Image', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
-                              ],
-                              rows: _purchaseData.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final record = entry.value;
-                                final isEditMode = _editModePurchase[index] == true;
-                                final purchaseId = record['id'] as int?;
-                                final photos = purchaseId != null ? (_purchasePhotos[purchaseId] ?? []) : <Map<String, dynamic>>[];
-
-                                return DataRow(
-                                  cells: [
-                                    if (widget.selectedSector == null && _isAdmin)
-                                      DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
-                                    // Item Name
-                                    DataCell(
-                                      isEditMode && _controllersPurchase.containsKey(index)
-                                          ? SizedBox(
-                                              width: 150,
-                                              child: TextFormField(
-                                                controller: _controllersPurchase[index]!['item_name'],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                              ),
-                                            )
-                                          : Text(record['item_name']?.toString() ?? ''),
-                                    ),
-                                    // Shop Name
-                                    DataCell(
-                                      isEditMode && _controllersPurchase.containsKey(index)
-                                          ? SizedBox(
-                                              width: 150,
-                                              child: TextFormField(
-                                                controller: _controllersPurchase[index]!['shop_name'],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                              ),
-                                            )
-                                          : Text(record['shop_name']?.toString() ?? ''),
-                                    ),
-                                    // Purchase Details
-                                    DataCell(
-                                      SizedBox(
-                                        width: 200,
-                                        child: isEditMode && _controllersPurchase.containsKey(index)
-                                            ? TextFormField(
-                                                controller: _controllersPurchase[index]!['purchase_details'],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                                maxLines: 2,
-                                              )
-                                            : Text(
-                                                record['purchase_details']?.toString() ?? '',
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                      ),
-                                    ),
-                                    // Purchase Amount
-                                    DataCell(
-                                      isEditMode && _controllersPurchase.containsKey(index)
-                                          ? SizedBox(
-                                              width: 120,
-                                              child: TextFormField(
-                                                controller: _controllersPurchase[index]!['purchase_amount'],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                                keyboardType: TextInputType.number,
-                                                inputFormatters: [
-                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                ],
-                                              ),
-                                            )
-                                          : Text('₹${_parseDecimal(record['purchase_amount']).toStringAsFixed(2)}'),
-                                    ),
-                                    // Amount Paid
-                                    DataCell(
-                                      isEditMode && _controllersPurchase.containsKey(index)
-                                          ? SizedBox(
-                                              width: 120,
-                                              child: TextFormField(
-                                                controller: _controllersPurchase[index]!['amount_paid'],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                                keyboardType: TextInputType.number,
-                                                inputFormatters: [
-                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                ],
-                                              ),
-                                            )
-                                          : Text('₹${_parseDecimal(record['amount_paid']).toStringAsFixed(2)}'),
-                                    ),
-                                    // Credit
-                                    DataCell(
-                                      isEditMode && _controllersPurchase.containsKey(index)
-                                          ? SizedBox(
-                                              width: 120,
-                                              child: TextFormField(
-                                                controller: _controllersPurchase[index]!['credit'],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                                keyboardType: TextInputType.number,
-                                                inputFormatters: [
-                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                ],
-                                              ),
-                                            )
-                                          : Text('₹${_parseDecimal(record['credit']).toStringAsFixed(2)}'),
-                                    ),
-                                    // Bill Image
-                                    DataCell(
-                                      purchaseId != null
-                                          ? ConstrainedBox(
-                                              constraints: const BoxConstraints(
-                                                maxWidth: 150,
-                                                maxHeight: 60,
-                                              ),
-                                              child: _buildPhotoCell(purchaseId, photos, isEditMode),
-                                            )
-                                          : const SizedBox(width: 150, height: 60),
-                                    ),
-                                    // Action
-                                    DataCell(
-                                      isEditMode
-                                          ? Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.save, color: Colors.green, size: 20),
-                                                  tooltip: 'Save',
-                                                  onPressed: () => _savePurchaseRecord(index),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
-                                                  tooltip: 'Cancel',
-                                                  onPressed: () => _toggleEditModePurchase(index),
-                                                ),
-                                              ],
-                                            )
-                                          : Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                                  tooltip: 'Edit',
-                                                  onPressed: () => _toggleEditModePurchase(index),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(Icons.upload, color: Colors.orange, size: 20),
-                                                  tooltip: 'Upload Photos',
-                                                  onPressed: purchaseId != null ? () => _uploadPhotos(purchaseId) : null,
-                                                ),
-                                                if (widget.isMainAdmin)
-                                                  IconButton(
-                                                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                                    tooltip: 'Delete',
-                                                    onPressed: () => _deletePurchaseRecord(index),
-                                                  ),
-                                              ],
-                                            ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
+                  : Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: _buildCompanyPurchaseFixedHeaderTable(),
                       ),
                     ),
                   ),
-        ),
         // Add Purchase Button
         Padding(
           padding: const EdgeInsets.all(16.0),
@@ -2055,6 +1833,82 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
         ),
       ],
     );
+  }
+
+  static const double _companyPurchaseSp = 20;
+  static const double _companyPurchaseWSector = 120, _companyPurchaseWItem = 150, _companyPurchaseWShop = 150, _companyPurchaseWDetails = 200, _companyPurchaseWAmount = 120, _companyPurchaseWPaid = 120, _companyPurchaseWCredit = 120, _companyPurchaseWBill = 150, _companyPurchaseWAction = 180;
+
+  Widget _buildCompanyPurchaseFixedHeaderTable() {
+    final showSector = widget.selectedSector == null && _isAdmin;
+    final totalWidth = showSector
+        ? (_companyPurchaseWSector + _companyPurchaseSp + _companyPurchaseWItem + _companyPurchaseSp + _companyPurchaseWShop + _companyPurchaseSp + _companyPurchaseWDetails + _companyPurchaseSp + _companyPurchaseWAmount + _companyPurchaseSp + _companyPurchaseWPaid + _companyPurchaseSp + _companyPurchaseWCredit + _companyPurchaseSp + _companyPurchaseWBill + _companyPurchaseSp + _companyPurchaseWAction)
+        : (_companyPurchaseWItem + _companyPurchaseSp + _companyPurchaseWShop + _companyPurchaseSp + _companyPurchaseWDetails + _companyPurchaseSp + _companyPurchaseWAmount + _companyPurchaseSp + _companyPurchaseWPaid + _companyPurchaseSp + _companyPurchaseWCredit + _companyPurchaseSp + _companyPurchaseWBill + _companyPurchaseSp + _companyPurchaseWAction);
+    return FixedHeaderTable(
+      horizontalScrollController: _purchaseHorizontalScrollController,
+      totalWidth: totalWidth,
+      headerHeight: 48,
+      headerBuilder: (ctx) => Row(
+        children: [
+          if (showSector) ...[
+            SizedBox(width: _companyPurchaseWSector, height: 48, child: InkWell(onTap: () => setState(() {
+              _purchasesSectorSortAscending = !_purchasesSectorSortAscending;
+              _purchaseData.sort((a, b) {
+                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                return _purchasesSectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+              });
+            }), child: Align(alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_purchasesSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])))),
+            SizedBox(width: _companyPurchaseSp),
+          ],
+          SizedBox(width: _companyPurchaseWItem, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _companyPurchaseSp),
+          SizedBox(width: _companyPurchaseWShop, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Shop Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _companyPurchaseSp),
+          SizedBox(width: _companyPurchaseWDetails, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _companyPurchaseSp),
+          SizedBox(width: _companyPurchaseWAmount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Purchase Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _companyPurchaseSp),
+          SizedBox(width: _companyPurchaseWPaid, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Amount Paid', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _companyPurchaseSp),
+          SizedBox(width: _companyPurchaseWCredit, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Credit', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _companyPurchaseSp),
+          SizedBox(width: _companyPurchaseWBill, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Bill Image', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _companyPurchaseSp),
+          SizedBox(width: _companyPurchaseWAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+        ],
+      ),
+      rowCount: _purchaseData.length,
+      rowBuilder: (ctx, index) => _buildCompanyPurchaseDataRow(ctx, index),
+    );
+  }
+
+  Widget _buildCompanyPurchaseDataRow(BuildContext ctx, int index) {
+    final record = _purchaseData[index];
+    final isEditMode = _editModePurchase[index] == true;
+    final purchaseId = record['id'] as int?;
+    final photos = purchaseId != null ? (_purchasePhotos[purchaseId] ?? []) : <Map<String, dynamic>>[];
+    final showSector = widget.selectedSector == null && _isAdmin;
+    final cells = <Widget>[
+      if (showSector) ...[
+        SizedBox(width: _companyPurchaseWSector, child: Text(_getSectorName(record['sector_code']?.toString()))),
+        SizedBox(width: _companyPurchaseSp),
+      ],
+      SizedBox(width: _companyPurchaseWItem, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersPurchase[index]!['item_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['item_name']?.toString() ?? '')),
+      SizedBox(width: _companyPurchaseSp),
+      SizedBox(width: _companyPurchaseWShop, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersPurchase[index]!['shop_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['shop_name']?.toString() ?? '')),
+      SizedBox(width: _companyPurchaseWDetails, child: SizedBox(width: 200, child: isEditMode && _controllersPurchase.containsKey(index) ? TextFormField(controller: _controllersPurchase[index]!['purchase_details'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), maxLines: 2) : Text(record['purchase_details']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis))),
+      SizedBox(width: _companyPurchaseSp),
+      SizedBox(width: _companyPurchaseWAmount, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 120, child: TextFormField(controller: _controllersPurchase[index]!['purchase_amount'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))])) : Text('₹${_parseDecimal(record['purchase_amount']).toStringAsFixed(2)}')),
+      SizedBox(width: _companyPurchaseSp),
+      SizedBox(width: _companyPurchaseWPaid, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 120, child: TextFormField(controller: _controllersPurchase[index]!['amount_paid'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))])) : Text('₹${_parseDecimal(record['amount_paid']).toStringAsFixed(2)}')),
+      SizedBox(width: _companyPurchaseSp),
+      SizedBox(width: _companyPurchaseWCredit, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 120, child: TextFormField(controller: _controllersPurchase[index]!['credit'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))])) : Text('₹${_parseDecimal(record['credit']).toStringAsFixed(2)}')),
+      SizedBox(width: _companyPurchaseSp),
+      SizedBox(width: _companyPurchaseWBill, child: purchaseId != null ? ConstrainedBox(constraints: const BoxConstraints(maxWidth: 150, maxHeight: 60), child: _buildPhotoCell(purchaseId, photos, isEditMode)) : const SizedBox(width: 150, height: 60)),
+      SizedBox(width: _companyPurchaseSp),
+      SizedBox(width: _companyPurchaseWAction, child: Row(mainAxisSize: MainAxisSize.min, children: isEditMode ? [IconButton(icon: const Icon(Icons.save, color: Colors.green, size: 20), tooltip: 'Save', onPressed: () => _savePurchaseRecord(index)), IconButton(icon: const Icon(Icons.cancel, color: Colors.grey, size: 20), tooltip: 'Cancel', onPressed: () => _toggleEditModePurchase(index))] : [IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), tooltip: 'Edit', onPressed: () => _toggleEditModePurchase(index)), IconButton(icon: const Icon(Icons.upload, color: Colors.orange, size: 20), tooltip: 'Upload Photos', onPressed: purchaseId != null ? () => _uploadPhotos(purchaseId) : null), if (widget.isMainAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deletePurchaseRecord(index))])),
+    ];
+    return Row(children: cells);
   }
 
   Widget _buildCreditDetailsTab() {

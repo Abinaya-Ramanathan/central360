@@ -66,9 +66,14 @@ router.get('/', async (req, res) => {
       query += `, os.new_stock_boxes`;
     }
     
-    query += `, os.created_at, os.updated_at, os.new_stock_date,
-      si.id, si.item_name, si.sector_code, si.vehicle_type, si.part_number, 
-      s.code, s.name 
+    query += `, os.created_at, os.updated_at, os.new_stock_date`;
+    const hasMinStockColumn = await db.query(`
+      SELECT 1 FROM information_schema.columns WHERE table_name = 'overall_stock' AND column_name = 'is_minimum_stock'
+    `);
+    if (hasMinStockColumn.rows.length > 0) {
+      query += `, os.is_minimum_stock`;
+    }
+    query += `, si.id, si.item_name, si.sector_code, si.vehicle_type, si.part_number, s.code, s.name 
       ORDER BY si.sector_code, si.item_name`;
     const { rows } = await db.query(query, params);
     
@@ -163,6 +168,36 @@ async function getDailyStockTotalsForItem(db, itemId) {
   }
   return totals;
 }
+
+// Set or remove minimum stock flag for a row (for red highlight in UI)
+router.patch('/:id/minimum', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { is_minimum_stock } = req.body;
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'Invalid id' });
+    }
+    const flag = is_minimum_stock === true || is_minimum_stock === 'true';
+    const colCheck = await db.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'overall_stock' AND column_name = 'is_minimum_stock'
+    `);
+    if (colCheck.rows.length === 0) {
+      return res.status(500).json({ message: 'Column is_minimum_stock does not exist. Run migration.' });
+    }
+    const result = await db.query(
+      'UPDATE overall_stock SET is_minimum_stock = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, item_id, is_minimum_stock',
+      [flag, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Overall stock record not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating minimum stock:', err);
+    res.status(500).json({ message: 'Error updating minimum stock' });
+  }
+});
 
 // Update overall stock records
 router.put('/', async (req, res) => {

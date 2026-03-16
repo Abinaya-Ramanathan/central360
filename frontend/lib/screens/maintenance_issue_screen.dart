@@ -6,6 +6,7 @@ import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../config/env_config.dart';
 import '../utils/format_utils.dart';
+import '../widgets/fixed_header_table.dart';
 import 'add_issue_dialog.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -44,6 +45,16 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
   
   // Horizontal ScrollController for draggable scrollbar
   final ScrollController _photoHorizontalScrollController = ScrollController();
+  final ScrollController _tableHorizontalScrollController = ScrollController();
+
+  static const double _tableHeaderHeight = 48;
+  static const double _colSector = 100;
+  static const double _colDesc = 200;
+  static const double _colDate = 110;
+  static const double _colStatus = 100;
+  static const double _colPhotos = 150;
+  static const double _colAction = 180;
+  static const double _colSpacing = 20;
 
   @override
   void initState() {
@@ -55,6 +66,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
   @override
   void dispose() {
     _photoHorizontalScrollController.dispose();
+    _tableHorizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -304,6 +316,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
 
     return Scrollbar(
       thumbVisibility: true,
+      interactive: true,
       controller: _photoHorizontalScrollController,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
@@ -461,6 +474,131 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
     }
   }
 
+  double _issuesTableWidth() {
+    final showSector = widget.selectedSector == null || widget.includedSectorCodes != null;
+    final n = showSector ? 7 : 6;
+    double w = _colDesc + _colDate + _colStatus + _colDate + _colPhotos + _colAction;
+    if (showSector) w += _colSector;
+    return w + (n - 1) * _colSpacing;
+  }
+
+  Widget _buildIssuesTable() {
+    final showSector = widget.selectedSector == null || widget.includedSectorCodes != null;
+    const bold = TextStyle(fontWeight: FontWeight.bold);
+    final issues = _issues.where((issue) => issue.id != null).toList();
+    final List<Widget> headerChildren = [];
+    void addCol(double w, Widget c) {
+      if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _colSpacing));
+      headerChildren.add(SizedBox(width: w, child: c));
+    }
+    if (showSector) {
+      addCol(_colSector, InkWell(
+        onTap: () {
+          setState(() {
+            _sortAscending = !_sortAscending;
+            _issues.sort((a, b) {
+              final aName = _getSectorName(a.sectorCode).toLowerCase();
+              final bName = _getSectorName(b.sectorCode).toLowerCase();
+              return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+            });
+          });
+        },
+        child: const Text('Sector', style: bold),
+      ));
+    }
+    addCol(_colDesc, const Text('Issue Description', style: bold));
+    addCol(_colDate, const Text('Date Created', style: bold));
+    addCol(_colStatus, const Text('Status', style: bold));
+    addCol(_colDate, const Text('Date Resolved', style: bold));
+    addCol(_colPhotos, const Text('Photos', style: bold));
+    addCol(_colAction, const Text('Action', style: bold));
+
+    return FixedHeaderTable(
+      horizontalScrollController: _tableHorizontalScrollController,
+      totalWidth: _issuesTableWidth(),
+      headerHeight: _tableHeaderHeight,
+      headerBuilder: (context) => Row(children: headerChildren),
+      rowCount: issues.length,
+      rowBuilder: (context, index) {
+        final issue = issues[index];
+        final issueId = issue.id!;
+        final isEditMode = _editMode[issueId] == true;
+        final List<Widget> rowChildren = [];
+        void addCell(double w, Widget c) {
+          if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _colSpacing));
+          rowChildren.add(SizedBox(width: w, child: c));
+        }
+        if (showSector) {
+          addCell(_colSector, isEditMode
+              ? DropdownButton<String>(
+                  value: _editSectorCode[issueId] ?? issue.sectorCode,
+                  items: _sectors.map((s) => DropdownMenuItem<String>(value: s.code, child: Text(s.name))).toList(),
+                  onChanged: (value) => setState(() => _editSectorCode[issueId] = value!),
+                  isExpanded: true,
+                )
+              : Text(_getSectorName(issue.sectorCode)));
+        }
+        addCell(_colDesc, isEditMode
+            ? SizedBox(
+                width: 200,
+                child: TextFormField(
+                  initialValue: _editIssueDescription[issueId] ?? issue.issueDescription ?? '',
+                  maxLines: 3,
+                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                  onChanged: (value) => setState(() => _editIssueDescription[issueId] = value),
+                ),
+              )
+            : SizedBox(width: 200, child: Text(issue.issueDescription ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis)));
+        addCell(_colDate, isEditMode
+            ? InkWell(
+                onTap: () => _selectDateCreated(issueId),
+                child: InputDecorator(
+                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                  child: Text(_editDateCreated[issueId] != null ? _editDateCreated[issueId]!.toIso8601String().split('T')[0] : issue.dateCreated != null ? FormatUtils.formatDateForApi(issue.dateCreated!) : 'Select date'),
+                ),
+              )
+            : Text(issue.dateCreated != null ? FormatUtils.formatDateForApi(issue.dateCreated!) : 'N/A'));
+        addCell(_colStatus, isEditMode
+            ? DropdownButton<String>(
+                value: _editStatus[issueId] ?? issue.status,
+                items: const [DropdownMenuItem(value: 'Resolved', child: Text('Resolved')), DropdownMenuItem(value: 'Not resolved', child: Text('Not resolved'))],
+                onChanged: (value) => setState(() => _editStatus[issueId] = value!),
+              )
+            : Text(issue.status));
+        addCell(_colDate, isEditMode
+            ? InkWell(
+                onTap: () => _selectDateResolved(issueId),
+                child: InputDecorator(
+                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                  child: Text(_editDateResolved[issueId] != null ? _editDateResolved[issueId]!.toIso8601String().split('T')[0] : 'Select date'),
+                ),
+              )
+            : Text(issue.dateResolved != null ? FormatUtils.formatDateForApi(issue.dateResolved!) : 'N/A'));
+        addCell(_colPhotos, SizedBox(width: 150, height: 60, child: _buildPhotosCell(issue)));
+        addCell(_colAction, Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isEditMode)
+              IconButton(icon: const Icon(Icons.save, color: Colors.green), onPressed: () => _saveIssue(issueId))
+            else
+              IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _toggleEditMode(issueId)),
+            IconButton(
+              icon: const Icon(Icons.upload, color: Colors.orange),
+              tooltip: 'Upload Photos',
+              onPressed: () async {
+                final result = await showDialog<bool>(context: context, builder: (context) => UploadPhotosDialog(issueId: issueId));
+                if (result == true) await _loadIssues();
+              },
+            ),
+            if (widget.isMainAdmin)
+              IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteIssue(issueId)),
+          ],
+        ));
+        return Row(children: rowChildren);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -612,224 +750,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
                             ),
                           ),
                         )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: Scrollbar(
-                            thumbVisibility: true,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: DataTable(
-                                columnSpacing: 20,
-                                sortColumnIndex: (widget.selectedSector == null || widget.includedSectorCodes != null) ? 0 : null,
-                                sortAscending: _sortAscending,
-                                columns: [
-                                if ((widget.selectedSector == null || widget.includedSectorCodes != null))
-                                  DataColumn(
-                                    label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    onSort: (columnIndex, ascending) {
-                                      setState(() {
-                                        _sortAscending = ascending;
-                                        _issues.sort((a, b) {
-                                          final aName = _getSectorName(a.sectorCode).toLowerCase();
-                                          final bName = _getSectorName(b.sectorCode).toLowerCase();
-                                          return ascending
-                                              ? aName.compareTo(bName)
-                                              : bName.compareTo(aName);
-                                        });
-                                      });
-                                    },
-                                  ),
-                                const DataColumn(label: Text('Issue Description', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Date Created', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Date Resolved', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Photos', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
-                              ],
-                              rows: _issues.where((issue) => issue.id != null).map((issue) {
-                                final issueId = issue.id!;
-                                final isEditMode = _editMode[issueId] == true;
-                                return DataRow(
-                                  cells: [
-                                    if ((widget.selectedSector == null || widget.includedSectorCodes != null))
-                                      DataCell(
-                                        isEditMode
-                                            ? DropdownButton<String>(
-                                                value: _editSectorCode[issueId] ?? issue.sectorCode,
-                                                items: _sectors.map((sector) {
-                                                  return DropdownMenuItem<String>(
-                                                    value: sector.code,
-                                                    child: Text(sector.name),
-                                                  );
-                                                }).toList(),
-                                                onChanged: (value) {
-                                                  setState(() {
-                                                    _editSectorCode[issueId] = value!;
-                                                  });
-                                                },
-                                                isExpanded: true,
-                                              )
-                                            : Text(_getSectorName(issue.sectorCode)),
-                                      ),
-                                    DataCell(
-                                      isEditMode
-                                          ? SizedBox(
-                                              width: 200,
-                                              child: TextFormField(
-                                                initialValue: _editIssueDescription[issueId] ?? issue.issueDescription ?? '',
-                                                maxLines: 3,
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  contentPadding: EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                                ),
-                                                onChanged: (value) {
-                                                  setState(() {
-                                                    _editIssueDescription[issueId] = value;
-                                                  });
-                                                },
-                                              ),
-                                            )
-                                          : SizedBox(
-                                              width: 200,
-                                              child: Text(
-                                                issue.issueDescription ?? 'N/A',
-                                                maxLines: 3,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                    ),
-                                    DataCell(
-                                      isEditMode
-                                          ? InkWell(
-                                              onTap: () => _selectDateCreated(issueId),
-                                              child: InputDecorator(
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  contentPadding: EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 8,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  _editDateCreated[issueId] != null
-                                                      ? _editDateCreated[issueId]!
-                                                          .toIso8601String()
-                                                          .split('T')[0]
-                                                      : issue.dateCreated != null
-                                                          ? FormatUtils.formatDateForApi(issue.dateCreated!)
-                                                          : 'Select date',
-                                                ),
-                                              ),
-                                            )
-                                          : Text(
-                                              issue.dateCreated != null
-                                                  ? FormatUtils.formatDateForApi(issue.dateCreated!)
-                                                  : 'N/A',
-                                            ),
-                                    ),
-                                    DataCell(
-                                      isEditMode
-                                          ? DropdownButton<String>(
-                                              value: _editStatus[issueId] ?? issue.status,
-                                              items: const [
-                                                DropdownMenuItem(
-                                                  value: 'Resolved',
-                                                  child: Text('Resolved'),
-                                                ),
-                                                DropdownMenuItem(
-                                                  value: 'Not resolved',
-                                                  child: Text('Not resolved'),
-                                                ),
-                                              ],
-                                              onChanged: (value) {
-                                                setState(() {
-                                                  _editStatus[issueId] = value!;
-                                                });
-                                              },
-                                            )
-                                          : Text(issue.status),
-                                    ),
-                                    DataCell(
-                                      isEditMode
-                                          ? InkWell(
-                                              onTap: () => _selectDateResolved(issueId),
-                                              child: InputDecorator(
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  contentPadding: EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 8,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  _editDateResolved[issueId] != null
-                                                      ? _editDateResolved[issueId]!
-                                                          .toIso8601String()
-                                                          .split('T')[0]
-                                                      : 'Select date',
-                                                ),
-                                              ),
-                                            )
-                                          : Text(
-                                              issue.dateResolved != null
-                                                  ? FormatUtils.formatDateForApi(issue.dateResolved!)
-                                                  : 'N/A',
-                                            ),
-                                    ),
-                                    DataCell(
-                                      SizedBox(
-                                        width: 150,
-                                        height: 60,
-                                        child: _buildPhotosCell(issue),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          if (isEditMode)
-                                            IconButton(
-                                              icon: const Icon(Icons.save, color: Colors.green),
-                                              onPressed: () => _saveIssue(issueId),
-                                            )
-                                          else
-                                            IconButton(
-                                              icon: const Icon(Icons.edit, color: Colors.blue),
-                                              onPressed: () => _toggleEditMode(issueId),
-                                            ),
-                                          IconButton(
-                                            icon: const Icon(Icons.upload, color: Colors.orange),
-                                            tooltip: 'Upload Photos',
-                                            onPressed: () async {
-                                              final result = await showDialog<bool>(
-                                                context: context,
-                                                builder: (context) => UploadPhotosDialog(
-                                                  issueId: issueId,
-                                                ),
-                                              );
-                                              if (result == true) {
-                                                await _loadIssues();
-                                              }
-                                            },
-                                          ),
-                                          if (widget.isMainAdmin)
-                                            IconButton(
-                                              icon: const Icon(Icons.delete, color: Colors.red),
-                                              onPressed: () => _deleteIssue(issueId),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ),
+                      : _buildIssuesTable(),
                 ),
             ],
           ),

@@ -5,6 +5,7 @@ import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
+import '../widgets/fixed_header_table.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -36,6 +37,12 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
   
   // Horizontal ScrollController for draggable scrollbar
   final ScrollController _horizontalScrollController = ScrollController();
+
+  static const double _headerHeight = 48;
+  static const double _colProduct = 150;
+  static const double _colNum = 120;
+  static const double _colSpacing = 20;
+  static const double _totalTableWidth = _colProduct + _colSpacing + _colNum * 3;
 
   @override
   void initState() {
@@ -688,58 +695,65 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
               )
             else
               Expanded(
-                child: Scrollbar(
-                  thumbVisibility: true,
-                  interactive: true,
-                  controller: _horizontalScrollController,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    controller: _horizontalScrollController,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                      columnSpacing: 20,
-                      columns: const [
-                        DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text('Morning Production', style: TextStyle(fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text('Afternoon Production', style: TextStyle(fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text('Evening Production', style: TextStyle(fontWeight: FontWeight.bold))),
-                      ],
-                      rows: _productionData.isEmpty
-                          ? [
-                              DataRow(
-                                cells: [
-                                  DataCell(
-                                    Text(
-                                      widget.selectedSector == null
-                                          ? 'Please select a sector from Home page'
-                                          : 'No products available for this sector',
-                                      style: const TextStyle(fontStyle: FontStyle.italic),
-                                    ),
-                                  ),
-                                  const DataCell(SizedBox.shrink()),
-                                  const DataCell(SizedBox.shrink()),
-                                  const DataCell(SizedBox.shrink()),
-                                ],
-                              ),
-                            ]
-                          : _productionData.map((record) {
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text(record['product_name']?.toString() ?? '')),
-                                  DataCell(Text('${_parseIntFromDynamic(record['morning_production'])}')),
-                                  DataCell(Text('${_parseIntFromDynamic(record['afternoon_production'])}')),
-                                  DataCell(Text('${_parseIntFromDynamic(record['evening_production'])}')),
-                                ],
-                              );
-                            }).toList(),
-                    ),
-                  ),
-                ),
+                child: _buildProductionTable(),
               ),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildProductionTable() {
+    final rowCount = _productionData.isEmpty ? 1 : _productionData.length;
+    return FixedHeaderTable(
+      horizontalScrollController: _horizontalScrollController,
+      totalWidth: _totalTableWidth,
+      headerHeight: _headerHeight,
+      headerBuilder: (context) => Row(
+        children: [
+          SizedBox(width: _colProduct, child: const Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colNum, child: const Text('Morning Production', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colNum, child: const Text('Afternoon Production', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colNum, child: const Text('Evening Production', style: TextStyle(fontWeight: FontWeight.bold))),
+        ],
+      ),
+      rowCount: rowCount,
+      rowBuilder: (context, index) {
+        if (_productionData.isEmpty) {
+          return Row(
+            children: [
+              SizedBox(
+                width: _colProduct,
+                child: Text(
+                  widget.selectedSector == null ? 'Please select a sector from Home page' : 'No products available for this sector',
+                  style: const TextStyle(fontStyle: FontStyle.italic),
+                ),
+              ),
+              SizedBox(width: _colSpacing),
+              const SizedBox(width: _colNum),
+              SizedBox(width: _colSpacing),
+              const SizedBox(width: _colNum),
+              SizedBox(width: _colSpacing),
+              const SizedBox(width: _colNum),
+            ],
+          );
+        }
+        final record = _productionData[index];
+        return Row(
+          children: [
+            SizedBox(width: _colProduct, child: Text(record['product_name']?.toString() ?? '')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colNum, child: Text('${_parseIntFromDynamic(record['morning_production'])}')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colNum, child: Text('${_parseIntFromDynamic(record['afternoon_production'])}')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colNum, child: Text('${_parseIntFromDynamic(record['evening_production'])}')),
+          ],
+        );
+      },
     );
   }
 }

@@ -4,6 +4,7 @@ import '../models/employee.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
+import '../widgets/fixed_header_table.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'month_year_picker.dart';
@@ -34,6 +35,14 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
   
   // Horizontal ScrollController for draggable scrollbar
   final ScrollController _horizontalScrollController = ScrollController();
+
+  static const double _headerHeight = 48;
+  static const double _colName = 120;
+  static const double _colSalary = 120;
+  static const double _colDate = 120;
+  static const double _colActions = 100;
+  static const double _colSpacing = 15;
+  static const double _salaryTableTotalWidth = _colName + _colSpacing + _colSalary + _colSpacing + _colDate + _colSpacing + _colActions;
   
   int _parseIntValue(dynamic value) {
     if (value == null) return 0;
@@ -552,6 +561,144 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     );
   }
 
+  List<({Employee employee, Map<String, dynamic>? data, int recordIndex, bool isAddRow})> _getSalaryTableRows() {
+    final List<({Employee employee, Map<String, dynamic>? data, int recordIndex, bool isAddRow})> rows = [];
+    for (var employee in _employees) {
+      final records = _salaryData[employee.id] ?? [];
+      if (records.isEmpty) {
+        rows.add((employee: employee, data: null, recordIndex: -1, isAddRow: false));
+      } else {
+        for (int i = 0; i < records.length; i++) {
+          rows.add((employee: employee, data: records[i], recordIndex: i, isAddRow: false));
+        }
+        rows.add((employee: employee, data: null, recordIndex: -1, isAddRow: true));
+      }
+    }
+    return rows;
+  }
+
+  Widget _buildSalaryTable() {
+    final flatRows = _getSalaryTableRows();
+    return FixedHeaderTable(
+      horizontalScrollController: _horizontalScrollController,
+      totalWidth: _salaryTableTotalWidth,
+      headerHeight: _headerHeight,
+      headerBuilder: (context) => Row(
+        children: [
+          SizedBox(width: _colName, child: const Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colSalary, child: const Text('Salary Issued', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colDate, child: const Text('Salary Date', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colActions, child: const Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+        ],
+      ),
+      rowCount: flatRows.length,
+      rowBuilder: (context, index) {
+        final r = flatRows[index];
+        if (r.isAddRow) {
+          return Row(
+            children: [
+              SizedBox(width: _colName, child: Row(children: [const Icon(Icons.add_circle, color: Colors.green, size: 20), const SizedBox(width: 8), Text('Add Entry', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold))])),
+              SizedBox(width: _colSpacing),
+              SizedBox(width: _colSalary, child: const Text('')),
+              SizedBox(width: _colSpacing),
+              SizedBox(width: _colDate, child: const Text('')),
+              SizedBox(width: _colSpacing),
+              SizedBox(width: _colActions, child: IconButton(icon: const Icon(Icons.add, color: Colors.green), tooltip: 'Add New Entry', onPressed: () => _addNewEntryForEmployee(r.employee.id))),
+            ],
+          );
+        }
+        final data = r.data;
+        final isEditMode = data?['isEditMode'] == true;
+        return Row(
+          children: [
+            SizedBox(width: _colName, child: Text(r.employee.name)),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colSalary,
+              child: isEditMode
+                  ? SizedBox(
+                      width: 100,
+                      child: TextFormField(
+                        initialValue: (data?['salary_issued'] ?? 0).toString(),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        onChanged: (value) {
+                          final records = _salaryData[r.employee.id] ?? [];
+                          int actualIndex = r.recordIndex >= 0 && r.recordIndex < records.length ? r.recordIndex : records.length - 1;
+                          if (actualIndex >= 0 && actualIndex < records.length) {
+                            records[actualIndex]['salary_issued'] = int.tryParse(value) ?? 0;
+                          }
+                        },
+                      ),
+                    )
+                  : Text('₹${_parseIntValue(data?['salary_issued'])}'),
+            ),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colDate,
+              child: isEditMode
+                  ? InkWell(
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: _parseDateFromApi(data?['salary_issued_date']) ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          final records = _salaryData[r.employee.id] ?? [];
+                          int actualIndex = r.recordIndex >= 0 && r.recordIndex < records.length ? r.recordIndex : records.length - 1;
+                          if (actualIndex >= 0 && actualIndex < records.length) {
+                            records[actualIndex]['salary_issued_date'] = picked;
+                            setState(() {});
+                          }
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
+                        child: Text(_formatDateForApi(data?['salary_issued_date']) ?? 'Select Date', style: const TextStyle(fontSize: 12)),
+                      ),
+                    )
+                  : Text(_formatDateForApi(data?['salary_issued_date']) ?? '-', style: const TextStyle(fontSize: 12)),
+            ),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colActions,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isEditMode)
+                    IconButton(icon: const Icon(Icons.save, color: Colors.green, size: 20), tooltip: 'Save', onPressed: () => _saveSalaryDataForEmployee(r.employee.id, r.recordIndex))
+                  else
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                      tooltip: 'Edit',
+                      onPressed: () {
+                        final records = _salaryData[r.employee.id] ?? [];
+                        if (data == null || r.recordIndex < 0) {
+                          if (!_salaryData.containsKey(r.employee.id)) _salaryData[r.employee.id] = [];
+                          _salaryData[r.employee.id]!.add({'salary_issued': 0, 'salary_issued_date': null, 'isNew': true, 'isEditMode': true});
+                        } else if (r.recordIndex >= 0 && r.recordIndex < records.length) {
+                          records[r.recordIndex]['isEditMode'] = true;
+                        }
+                        setState(() {});
+                      },
+                    ),
+                  if (data != null && data['id'] != null)
+                    IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteSalaryDataForEmployee(r.employee.id, r.recordIndex, data['id'])),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -685,28 +832,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
               )
             else
               Expanded(
-                child: Scrollbar(
-                  thumbVisibility: true,
-                  interactive: true,
-                  controller: _horizontalScrollController,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    controller: _horizontalScrollController,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                      columnSpacing: 15,
-                      columns: const [
-                        DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text('Salary Issued', style: TextStyle(fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text('Salary Date', style: TextStyle(fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-                      ],
-                      rows: _buildTableRows(),
-                    ),
-                  ),
-                ),
+                child: _buildSalaryTable(),
               ),
-            ),
           ],
         ),
       ),

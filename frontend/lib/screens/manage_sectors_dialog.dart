@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../models/sector.dart';
+import '../widgets/fixed_header_table.dart';
 
 class ManageSectorsDialog extends StatefulWidget {
   final bool isMainAdmin;
@@ -15,11 +16,18 @@ class ManageSectorsDialog extends StatefulWidget {
 class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
   List<Sector> _sectors = [];
   bool _isLoading = false;
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadSectors();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSectors() async {
@@ -145,21 +153,34 @@ class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
                             style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
                         )
-                      : SingleChildScrollView(
-                          child: DataTable(
-                            columnSpacing: 20,
-                            columns: const [
-                              DataColumn(label: Text('Sector Code', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
-                            ],
-                            rows: _sectors.map((sector) {
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text(sector.code)),
-                                  DataCell(Text(sector.name)),
-                                  DataCell(
-                                    Row(
+                      : FixedHeaderTable(
+                          horizontalScrollController: _horizontalScrollController,
+                          totalWidth: 420,
+                          headerHeight: 48,
+                          headerBuilder: (context) => SizedBox(
+                            height: 48,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: const [
+                                SizedBox(width: 120, child: Text('Sector Code', style: TextStyle(fontWeight: FontWeight.bold))),
+                                SizedBox(width: 180, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                SizedBox(width: 120, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                              ],
+                            ),
+                          ),
+                          rowCount: _sectors.length,
+                          rowBuilder: (context, index) {
+                            final sector = _sectors[index];
+                            return SizedBox(
+                              height: 48,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  SizedBox(width: 120, child: Text(sector.code)),
+                                  SizedBox(width: 180, child: Text(sector.name)),
+                                  SizedBox(
+                                    width: 120,
+                                    child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
@@ -177,9 +198,9 @@ class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
                                     ),
                                   ),
                                 ],
-                              );
-                            }).toList(),
-                          ),
+                              ),
+                            );
+                          },
                         ),
             ),
           ],

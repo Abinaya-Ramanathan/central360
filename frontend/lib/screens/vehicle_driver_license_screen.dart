@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/fixed_header_table.dart';
 import '../models/vehicle_license.dart';
 import '../models/driver_license.dart';
 import '../models/engine_oil_service.dart';
@@ -55,6 +56,10 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
   bool _sectorSortAscendingDriver = true;
   bool _sectorSortAscendingService = true;
 
+  final ScrollController _vehicleHorizontalScrollController = ScrollController();
+  final ScrollController _driverHorizontalScrollController = ScrollController();
+  final ScrollController _serviceHorizontalScrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +86,9 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _vehicleHorizontalScrollController.dispose();
+    _driverHorizontalScrollController.dispose();
+    _serviceHorizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -294,6 +302,30 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
     );
   }
 
+  Widget _vehicleSortHeader(String label, String columnKey, double width) {
+    return InkWell(
+      onTap: () => setState(() {
+        if (_vehicleSortColumn == columnKey) {
+          _vehicleSortAscending = !_vehicleSortAscending;
+        } else {
+          _vehicleSortColumn = columnKey;
+          _vehicleSortAscending = true;
+        }
+      }),
+      child: SizedBox(
+        width: width,
+        height: 48,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Icon(_vehicleSortColumn == columnKey ? (_vehicleSortAscending ? Icons.arrow_upward : Icons.arrow_downward) : Icons.sort, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildVehicleLicenseTab() {
     List<VehicleLicense> sortedLicenses = List.from(_vehicleLicenses);
     
@@ -339,211 +371,84 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
         Expanded(
           child: _vehicleLicenses.isEmpty
               ? Center(child: Text('No vehicle license details found', style: TextStyle(color: Colors.grey.shade600)))
-              : Scrollbar(
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                        dataTextStyle: const TextStyle(color: Colors.black87),
-                      sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
-                      sortAscending: _sectorSortAscendingVehicle,
-                      columns: [
-                        if (widget.selectedSector == null && _isAdmin)
-                          DataColumn(
-                            label: const Text('Sector'),
-                            onSort: (columnIndex, ascending) {
-                              setState(() {
-                                _sectorSortAscendingVehicle = ascending;
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    const double sp = 16;
+                    const double wSector = 100, wName = 120, wModel = 100, wRegNo = 140, wDate = 100, wAction = 120;
+                    final showSector = widget.selectedSector == null && _isAdmin;
+                    final totalWidth = (showSector ? wSector + sp : 0) + wName + wModel + wRegNo + wDate * 6 + wAction + (showSector ? 10 : 9) * sp;
+                    return FixedHeaderTable(
+                      horizontalScrollController: _vehicleHorizontalScrollController,
+                      totalWidth: totalWidth,
+                      headerHeight: 48,
+                      headerBuilder: (ctx) {
+                        final headers = <Widget>[
+                          if (showSector)
+                            InkWell(
+                              onTap: () => setState(() {
+                                _sectorSortAscendingVehicle = !_sectorSortAscendingVehicle;
                                 sortedLicenses.sort((a, b) {
                                   final aName = _getSectorName(a.sectorCode).toLowerCase();
                                   final bName = _getSectorName(b.sectorCode).toLowerCase();
-                                  return ascending
-                                      ? aName.compareTo(bName)
-                                      : bName.compareTo(aName);
+                                  return _sectorSortAscendingVehicle ? aName.compareTo(bName) : bName.compareTo(aName);
                                 });
-                              });
-                            },
-                          ),
-                        const DataColumn(label: Text('Name')),
-                        const DataColumn(label: Text('Model')),
-                        const DataColumn(label: Text('Registration Number')),
-                        DataColumn(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Permit Date'),
-                              IconButton(
-                                icon: Icon(
-                                  _vehicleSortColumn == 'permit'
-                                      ? (_vehicleSortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                                      : Icons.sort,
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    if (_vehicleSortColumn == 'permit') {
-                                      _vehicleSortAscending = !_vehicleSortAscending;
-                                    } else {
-                                      _vehicleSortColumn = 'permit';
-                                      _vehicleSortAscending = true;
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        DataColumn(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Insurance Date'),
-                              IconButton(
-                                icon: Icon(
-                                  _vehicleSortColumn == 'insurance'
-                                      ? (_vehicleSortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                                      : Icons.sort,
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    if (_vehicleSortColumn == 'insurance') {
-                                      _vehicleSortAscending = !_vehicleSortAscending;
-                                    } else {
-                                      _vehicleSortColumn = 'insurance';
-                                      _vehicleSortAscending = true;
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        DataColumn(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Fitness Date'),
-                              IconButton(
-                                icon: Icon(
-                                  _vehicleSortColumn == 'fitness'
-                                      ? (_vehicleSortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                                      : Icons.sort,
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    if (_vehicleSortColumn == 'fitness') {
-                                      _vehicleSortAscending = !_vehicleSortAscending;
-                                    } else {
-                                      _vehicleSortColumn = 'fitness';
-                                      _vehicleSortAscending = true;
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        DataColumn(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Pollution Date'),
-                              IconButton(
-                                icon: Icon(
-                                  _vehicleSortColumn == 'pollution'
-                                      ? (_vehicleSortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                                      : Icons.sort,
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    if (_vehicleSortColumn == 'pollution') {
-                                      _vehicleSortAscending = !_vehicleSortAscending;
-                                    } else {
-                                      _vehicleSortColumn = 'pollution';
-                                      _vehicleSortAscending = true;
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        DataColumn(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Tax Date'),
-                              IconButton(
-                                icon: Icon(
-                                  _vehicleSortColumn == 'tax'
-                                      ? (_vehicleSortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                                      : Icons.sort,
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    if (_vehicleSortColumn == 'tax') {
-                                      _vehicleSortAscending = !_vehicleSortAscending;
-                                    } else {
-                                      _vehicleSortColumn = 'tax';
-                                      _vehicleSortAscending = true;
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const DataColumn(label: Text('Action')),
-                      ],
-                      rows: sortedLicenses.map((license) {
-                        return DataRow(
-                          cells: [
-                            if (widget.selectedSector == null && _isAdmin)
-                              DataCell(Text(_getSectorName(license.sectorCode))),
-                            DataCell(Text(license.name)),
-                            DataCell(Text(license.model)),
-                            DataCell(Text(license.registrationNumber)),
-                            DataCell(Text(FormatUtils.formatDateDisplay(license.permitDate))),
-                            DataCell(Text(FormatUtils.formatDateDisplay(license.insuranceDate))),
-                            DataCell(Text(FormatUtils.formatDateDisplay(license.fitnessDate))),
-                            DataCell(Text(FormatUtils.formatDateDisplay(license.pollutionDate))),
-                            DataCell(Text(FormatUtils.formatDateDisplay(license.taxDate))),
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.visibility, color: Colors.green, size: 20),
-                                    tooltip: 'View',
-                                    onPressed: () => _viewVehicleLicense(license),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                    tooltip: 'Edit',
-                                    onPressed: () => _editVehicleLicense(license),
-                                  ),
-                                  if (_isAdmin)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                      tooltip: 'Delete',
-                                      onPressed: () => _deleteVehicleLicense(license),
-                                    ),
-                                ],
-                              ),
+                              }),
+                              child: SizedBox(width: wSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
                             ),
-                          ],
-                        );
-                      }).toList(),
-                    ),
-                  ),
+                          if (showSector) const SizedBox(width: sp),
+                          SizedBox(width: wName, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wModel, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Model', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wRegNo, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Registration Number', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          _vehicleSortHeader('Permit Date', 'permit', wDate),
+                          const SizedBox(width: sp),
+                          _vehicleSortHeader('Insurance Date', 'insurance', wDate),
+                          const SizedBox(width: sp),
+                          _vehicleSortHeader('Fitness Date', 'fitness', wDate),
+                          const SizedBox(width: sp),
+                          _vehicleSortHeader('Pollution Date', 'pollution', wDate),
+                          const SizedBox(width: sp),
+                          _vehicleSortHeader('Tax Date', 'tax', wDate),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                        ];
+                        return Row(children: headers);
+                      },
+                      rowCount: sortedLicenses.length,
+                      rowBuilder: (ctx, index) {
+                        final license = sortedLicenses[index];
+                        final cells = <Widget>[
+                          if (showSector) SizedBox(width: wSector, child: Text(_getSectorName(license.sectorCode))),
+                          if (showSector) const SizedBox(width: sp),
+                          SizedBox(width: wName, child: Text(license.name)),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wModel, child: Text(license.model)),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wRegNo, child: Text(license.registrationNumber)),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wDate, child: Text(FormatUtils.formatDateDisplay(license.permitDate))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wDate, child: Text(FormatUtils.formatDateDisplay(license.insuranceDate))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wDate, child: Text(FormatUtils.formatDateDisplay(license.fitnessDate))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wDate, child: Text(FormatUtils.formatDateDisplay(license.pollutionDate))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wDate, child: Text(FormatUtils.formatDateDisplay(license.taxDate))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewVehicleLicense(license)),
+                            IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), tooltip: 'Edit', onPressed: () => _editVehicleLicense(license)),
+                            if (_isAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteVehicleLicense(license)),
+                          ])),
+                        ];
+                        return Row(children: cells);
+                      },
+                    );
+                  },
                 ),
-              ),
         ),
       ],
     );
@@ -561,96 +466,93 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
         Expanded(
           child: _driverLicenses.isEmpty
               ? Center(child: Text('No driver license details found', style: TextStyle(color: Colors.grey.shade600)))
-              : Scrollbar(
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                        dataTextStyle: const TextStyle(color: Colors.black87),
-                      sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
-                      sortAscending: _sectorSortAscendingDriver,
-                      columns: [
-                        if (widget.selectedSector == null && _isAdmin)
-                          DataColumn(
-                            label: const Text('Sector'),
-                            onSort: (columnIndex, ascending) {
-                              setState(() {
-                                _sectorSortAscendingDriver = ascending;
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    const double sp = 16;
+                    const double wSector = 100, wDriverName = 140, wLicenseNo = 140, wExpiry = 110, wAction = 120;
+                    final showSector = widget.selectedSector == null && _isAdmin;
+                    final totalWidth = (showSector ? wSector + sp : 0) + wDriverName + wLicenseNo + wExpiry + wAction + (showSector ? 4 : 3) * sp;
+                    return FixedHeaderTable(
+                      horizontalScrollController: _driverHorizontalScrollController,
+                      totalWidth: totalWidth,
+                      headerHeight: 48,
+                      headerBuilder: (ctx) {
+                        final headers = <Widget>[
+                          if (showSector)
+                            InkWell(
+                              onTap: () => setState(() {
+                                _sectorSortAscendingDriver = !_sectorSortAscendingDriver;
                                 sortedLicenses.sort((a, b) {
                                   final aName = _getSectorName(a.sectorCode).toLowerCase();
                                   final bName = _getSectorName(b.sectorCode).toLowerCase();
-                                  return ascending
-                                      ? aName.compareTo(bName)
-                                      : bName.compareTo(aName);
+                                  return _sectorSortAscendingDriver ? aName.compareTo(bName) : bName.compareTo(aName);
                                 });
-                              });
-                            },
-                          ),
-                        const DataColumn(label: Text('Driver Name')),
-                        const DataColumn(label: Text('License Number')),
-                        DataColumn(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Expiry Date'),
-                              IconButton(
-                                icon: Icon(
-                                  _driverSortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _driverSortAscending = !_driverSortAscending;
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const DataColumn(label: Text('Action')),
-                      ],
-                      rows: sortedLicenses.map((license) {
-                        return DataRow(
-                          cells: [
-                            if (widget.selectedSector == null && _isAdmin)
-                              DataCell(Text(_getSectorName(license.sectorCode))),
-                            DataCell(Text(license.driverName)),
-                            DataCell(Text(license.licenseNumber)),
-                            DataCell(Text(FormatUtils.formatDateDisplay(license.expiryDate))),
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.visibility, color: Colors.green, size: 20),
-                                    tooltip: 'View',
-                                    onPressed: () => _viewDriverLicense(license),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                    tooltip: 'Edit',
-                                    onPressed: () => _editDriverLicense(license),
-                                  ),
-                                  if (widget.isMainAdmin)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                      tooltip: 'Delete',
-                                      onPressed: () => _deleteDriverLicense(license),
-                                    ),
-                                ],
-                              ),
+                              }),
+                              child: SizedBox(width: wSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
                             ),
-                          ],
-                        );
-                      }).toList(),
-                    ),
-                  ),
+                          if (showSector) const SizedBox(width: sp),
+                          SizedBox(width: wDriverName, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Driver Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wLicenseNo, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('License Number', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          InkWell(
+                            onTap: () => setState(() => _driverSortAscending = !_driverSortAscending),
+                            child: SizedBox(width: wExpiry, height: 48, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Expiry Date', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_driverSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])),
+                          ),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                        ];
+                        return Row(children: headers);
+                      },
+                      rowCount: sortedLicenses.length,
+                      rowBuilder: (ctx, index) {
+                        final license = sortedLicenses[index];
+                        final cells = <Widget>[
+                          if (showSector) SizedBox(width: wSector, child: Text(_getSectorName(license.sectorCode))),
+                          if (showSector) const SizedBox(width: sp),
+                          SizedBox(width: wDriverName, child: Text(license.driverName)),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wLicenseNo, child: Text(license.licenseNumber)),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wExpiry, child: Text(FormatUtils.formatDateDisplay(license.expiryDate))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewDriverLicense(license)),
+                            IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), tooltip: 'Edit', onPressed: () => _editDriverLicense(license)),
+                            if (widget.isMainAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteDriverLicense(license)),
+                          ])),
+                        ];
+                        return Row(children: cells);
+                      },
+                    );
+                  },
                 ),
-              ),
         ),
       ],
+    );
+  }
+
+  Widget _serviceSortHeader(String label, String columnKey, double width) {
+    return InkWell(
+      onTap: () => setState(() {
+        if (_serviceSortColumn == columnKey) {
+          _serviceSortAscending = !_serviceSortAscending;
+        } else {
+          _serviceSortColumn = columnKey;
+          _serviceSortAscending = true;
+        }
+      }),
+      child: SizedBox(
+        width: width,
+        height: 48,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Icon(_serviceSortColumn == columnKey ? (_serviceSortAscending ? Icons.arrow_upward : Icons.arrow_downward) : Icons.sort, size: 16),
+          ],
+        ),
+      ),
     );
   }
 
@@ -684,134 +586,80 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
         Expanded(
           child: _engineOilServices.isEmpty
               ? Center(child: Text('No vehicle service details found', style: TextStyle(color: Colors.grey.shade600)))
-              : Scrollbar(
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                        dataTextStyle: const TextStyle(color: Colors.black87),
-                      sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
-                      sortAscending: _sectorSortAscendingService,
-                      columns: [
-                        if (widget.selectedSector == null && _isAdmin)
-                          DataColumn(
-                            label: const Text('Sector'),
-                            onSort: (columnIndex, ascending) {
-                              setState(() {
-                                _sectorSortAscendingService = ascending;
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    const double sp = 16;
+                    const double wSector = 100, wVehicle = 120, wModel = 90, wPart = 140, wDate = 110, wKms = 100, wHrs = 90, wAction = 120;
+                    final showSector = widget.selectedSector == null && _isAdmin;
+                    final totalWidth = (showSector ? wSector + sp : 0) + wVehicle + wModel + wPart + wDate + wKms + wHrs + wDate + wAction + (showSector ? 8 : 7) * sp;
+                    return FixedHeaderTable(
+                      horizontalScrollController: _serviceHorizontalScrollController,
+                      totalWidth: totalWidth,
+                      headerHeight: 48,
+                      headerBuilder: (ctx) {
+                        final headers = <Widget>[
+                          if (showSector)
+                            InkWell(
+                              onTap: () => setState(() {
+                                _sectorSortAscendingService = !_sectorSortAscendingService;
                                 sortedServices.sort((a, b) {
                                   final aName = _getSectorName(a.sectorCode).toLowerCase();
                                   final bName = _getSectorName(b.sectorCode).toLowerCase();
-                                  return ascending
-                                      ? aName.compareTo(bName)
-                                      : bName.compareTo(aName);
+                                  return _sectorSortAscendingService ? aName.compareTo(bName) : bName.compareTo(aName);
                                 });
-                              });
-                            },
-                          ),
-                        const DataColumn(label: Text('Vehicle Name')),
-                        const DataColumn(label: Text('Model')),
-                        const DataColumn(label: Text('Service Part Name')),
-                        DataColumn(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Service Date'),
-                              IconButton(
-                                icon: Icon(
-                                  _serviceSortColumn == 'service'
-                                      ? (_serviceSortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                                      : Icons.sort,
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    if (_serviceSortColumn == 'service') {
-                                      _serviceSortAscending = !_serviceSortAscending;
-                                    } else {
-                                      _serviceSortColumn = 'service';
-                                      _serviceSortAscending = true;
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const DataColumn(label: Text('Service in Kms')),
-                        const DataColumn(label: Text('Service in Hrs')),
-                        DataColumn(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Next Service Date'),
-                              IconButton(
-                                icon: Icon(
-                                  _serviceSortColumn == 'next'
-                                      ? (_serviceSortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                                      : Icons.sort,
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    if (_serviceSortColumn == 'next') {
-                                      _serviceSortAscending = !_serviceSortAscending;
-                                    } else {
-                                      _serviceSortColumn = 'next';
-                                      _serviceSortAscending = true;
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const DataColumn(label: Text('Action')),
-                      ],
-                      rows: sortedServices.map((service) {
-                        return DataRow(
-                          cells: [
-                            if (widget.selectedSector == null && _isAdmin)
-                              DataCell(Text(_getSectorName(service.sectorCode))),
-                            DataCell(Text(service.vehicleName)),
-                            DataCell(Text(service.model)),
-                            DataCell(Text(service.servicePartName)),
-                            DataCell(Text(FormatUtils.formatDateDisplay(service.serviceDate))),
-                            DataCell(Text(service.serviceInKms?.toString() ?? 'N/A')),
-                            DataCell(Text(service.serviceInHrs?.toString() ?? 'N/A')),
-                            DataCell(Text(FormatUtils.formatDateDisplay(service.nextServiceDate))),
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.visibility, color: Colors.green, size: 20),
-                                    tooltip: 'View',
-                                    onPressed: () => _viewEngineOilService(service),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                    tooltip: 'Edit',
-                                    onPressed: () => _editEngineOilService(service),
-                                  ),
-                                  if (widget.isMainAdmin)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                      tooltip: 'Delete',
-                                      onPressed: () => _deleteEngineOilService(service),
-                                    ),
-                                ],
-                              ),
+                              }),
+                              child: SizedBox(width: wSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
                             ),
-                          ],
-                        );
-                      }).toList(),
-                    ),
-                  ),
+                          if (showSector) const SizedBox(width: sp),
+                          SizedBox(width: wVehicle, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wModel, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Model', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wPart, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Service Part Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          _serviceSortHeader('Service Date', 'service', wDate),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wKms, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Service in Kms', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wHrs, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Service in Hrs', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          _serviceSortHeader('Next Service Date', 'next', wDate),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                        ];
+                        return Row(children: headers);
+                      },
+                      rowCount: sortedServices.length,
+                      rowBuilder: (ctx, index) {
+                        final service = sortedServices[index];
+                        final cells = <Widget>[
+                          if (showSector) SizedBox(width: wSector, child: Text(_getSectorName(service.sectorCode))),
+                          if (showSector) const SizedBox(width: sp),
+                          SizedBox(width: wVehicle, child: Text(service.vehicleName)),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wModel, child: Text(service.model)),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wPart, child: Text(service.servicePartName)),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wDate, child: Text(FormatUtils.formatDateDisplay(service.serviceDate))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wKms, child: Text(service.serviceInKms?.toString() ?? 'N/A')),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wHrs, child: Text(service.serviceInHrs?.toString() ?? 'N/A')),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wDate, child: Text(FormatUtils.formatDateDisplay(service.nextServiceDate))),
+                          const SizedBox(width: sp),
+                          SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewEngineOilService(service)),
+                            IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), tooltip: 'Edit', onPressed: () => _editEngineOilService(service)),
+                            if (widget.isMainAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteEngineOilService(service)),
+                          ])),
+                        ];
+                        return Row(children: cells);
+                      },
+                    );
+                  },
                 ),
-              ),
         ),
       ],
     );

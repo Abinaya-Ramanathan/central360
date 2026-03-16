@@ -711,11 +711,40 @@ ALTER TABLE daily_production ADD COLUMN IF NOT EXISTS unit_afternoon VARCHAR(20)
 ALTER TABLE daily_production ADD COLUMN IF NOT EXISTS unit_evening VARCHAR(20) CHECK (unit_evening IN ('gram', 'kg', 'Litre', 'pieces', 'Boxes') OR unit_evening IS NULL);
 ALTER TABLE daily_production ADD COLUMN IF NOT EXISTS unit_stock_in_canteen VARCHAR(20) CHECK (unit_stock_in_canteen IN ('gram', 'kg', 'Litre', 'pieces', 'Boxes') OR unit_stock_in_canteen IS NULL);
 
+-- Overall stock: mark row as minimum stock (red highlight in UI)
+ALTER TABLE overall_stock ADD COLUMN IF NOT EXISTS is_minimum_stock BOOLEAN DEFAULT false;
+
 -- Sri Suryaas Cafe daily stock: 3 quantity columns for canteen / main branch / thanthondrimalai
 ALTER TABLE daily_stock ADD COLUMN IF NOT EXISTS quantity_taken_main_branch VARCHAR(255) DEFAULT '0';
 ALTER TABLE daily_stock ADD COLUMN IF NOT EXISTS quantity_taken_thanthondrimalai VARCHAR(255) DEFAULT '0';
 ALTER TABLE daily_stock ADD COLUMN IF NOT EXISTS unit_main_branch VARCHAR(20);
 ALTER TABLE daily_stock ADD COLUMN IF NOT EXISTS unit_thanthondrimalai VARCHAR(20);
+
+-- Item names (for Item Price page; same concept as stock items but separate list)
+CREATE TABLE IF NOT EXISTS item_names (
+  id SERIAL PRIMARY KEY,
+  item_name VARCHAR(255) NOT NULL,
+  sector_code VARCHAR(50) NOT NULL REFERENCES sectors(code) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(item_name, sector_code)
+);
+
+-- Item prices (quantity, unit, new_price, old_price per item_name)
+CREATE TABLE IF NOT EXISTS item_prices (
+  id SERIAL PRIMARY KEY,
+  item_name_id INTEGER NOT NULL REFERENCES item_names(id) ON DELETE CASCADE,
+  quantity VARCHAR(100) DEFAULT '0',
+  unit VARCHAR(20) CHECK (unit IN ('gram', 'kg', 'Litre', 'pieces', 'Boxes') OR unit IS NULL),
+  new_price DECIMAL(12, 2) DEFAULT 0,
+  old_price DECIMAL(12, 2) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(item_name_id)
+);
+
+ALTER TABLE item_names ADD COLUMN IF NOT EXISTS vehicle_type VARCHAR(255);
+ALTER TABLE item_names ADD COLUMN IF NOT EXISTS part_number VARCHAR(255);
 
 -- Analyze tables to update statistics for query planner
 ANALYZE employees;

@@ -1913,6 +1913,107 @@ class ApiService {
   }
 
   // Stock Items
+  // Item Names (for Item Price page)
+  static Future<List<Map<String, dynamic>>> getItemNames({String? sector}) async {
+    final queryParams = <String, String>{};
+    if (sector != null) queryParams['sector'] = sector;
+    final uri = Uri.parse('$baseUrl/item-names').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load item names');
+  }
+
+  static Future<Map<String, dynamic>> createItemName(
+    String itemName,
+    String sectorCode, {
+    String? vehicleType,
+    String? partNumber,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/item-names'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'item_name': itemName,
+        'sector_code': sectorCode,
+        if (vehicleType != null && vehicleType.isNotEmpty) 'vehicle_type': vehicleType,
+        if (partNumber != null && partNumber.isNotEmpty) 'part_number': partNumber,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    throw Exception(response.body.isNotEmpty ? response.body : 'Failed to create item name');
+  }
+
+  static Future<Map<String, dynamic>> updateItemName(
+    int id,
+    String itemName, {
+    String? sectorCode,
+    String? vehicleType,
+    String? partNumber,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/item-names/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'item_name': itemName,
+        if (sectorCode != null) 'sector_code': sectorCode,
+        if (vehicleType != null) 'vehicle_type': vehicleType,
+        if (partNumber != null) 'part_number': partNumber,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    throw Exception(response.body.isNotEmpty ? response.body : 'Failed to update item name');
+  }
+
+  static Future<void> deleteItemName(int id) async {
+    final response = await http.delete(Uri.parse('$baseUrl/item-names/$id'));
+    if (response.statusCode != 200) {
+      throw Exception(response.body.isNotEmpty ? response.body : 'Failed to delete item name');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getItemPrices({String? sector}) async {
+    final queryParams = <String, String>{};
+    if (sector != null) queryParams['sector'] = sector;
+    final uri = Uri.parse('$baseUrl/item-prices').replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    }
+    throw Exception('Failed to load item prices');
+  }
+
+  static Future<Map<String, dynamic>> updateItemPrice({
+    int? id,
+    int? itemNameId,
+    String? quantity,
+    String? unit,
+    double? newPrice,
+    double? oldPrice,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/item-prices'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        if (id != null) 'id': id,
+        if (itemNameId != null) 'item_name_id': itemNameId,
+        if (quantity != null) 'quantity': quantity,
+        if (unit != null) 'unit': unit,
+        if (newPrice != null) 'new_price': newPrice,
+        if (oldPrice != null) 'old_price': oldPrice,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    }
+    throw Exception(response.body.isNotEmpty ? response.body : 'Failed to update item price');
+  }
+
   static Future<List<Map<String, dynamic>>> getStockItems({String? sector}) async {
     final queryParams = <String, String>{};
     if (sector != null) queryParams['sector'] = sector;
@@ -2068,6 +2169,18 @@ class ApiService {
       return List<Map<String, dynamic>>.from(json.decode(response.body));
     }
     throw Exception('Failed to load overall stock');
+  }
+
+  static Future<void> setOverallStockMinimum(int id, bool isMinimum) async {
+    final uri = Uri.parse('$baseUrl/overall-stock/$id/minimum');
+    final response = await http.patch(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'is_minimum_stock': isMinimum}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception(response.body.isNotEmpty ? response.body : 'Failed to update minimum stock');
+    }
   }
 
   static Future<void> updateOverallStock(List<Map<String, dynamic>> updates) async {

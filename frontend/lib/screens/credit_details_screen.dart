@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../widgets/fixed_header_table.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../models/sector.dart';
@@ -1028,6 +1029,76 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
     }
   }
 
+  Widget _buildCreditDateCell(int index, Map<String, dynamic> record, bool isEditMode, double width) {
+    if (isEditMode && _controllers.containsKey(index)) {
+      return SizedBox(
+        width: width,
+        child: InkWell(
+          onTap: () async {
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: _controllers[index]!['credit_date']!.text.isNotEmpty ? DateTime.tryParse(_controllers[index]!['credit_date']!.text) ?? DateTime.now() : DateTime.now(),
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+            );
+            if (picked != null) _controllers[index]!['credit_date']!.text = FormatUtils.formatDateForApi(picked);
+          },
+          child: InputDecorator(
+            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, suffixIcon: Icon(Icons.calendar_today, size: 16)),
+            child: Text(_controllers[index]!['credit_date']!.text.isEmpty ? 'Select Date' : _controllers[index]!['credit_date']!.text),
+          ),
+        ),
+      );
+    }
+    return SizedBox(width: width, child: Text(_formatDate(record['credit_date'])));
+  }
+
+  Widget _buildFullSettlementDateCell(int index, Map<String, dynamic> record, bool isEditMode, double width) {
+    if (isEditMode && _controllers.containsKey(index)) {
+      return SizedBox(
+        width: width,
+        child: InkWell(
+          onTap: () async {
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: _controllers[index]!['full_settlement_date']!.text.isNotEmpty ? DateTime.tryParse(_controllers[index]!['full_settlement_date']!.text) ?? DateTime.now() : DateTime.now(),
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+            );
+            if (picked != null) setState(() => _controllers[index]!['full_settlement_date']!.text = FormatUtils.formatDateForApi(picked));
+          },
+          child: InputDecorator(
+            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, suffixIcon: Icon(Icons.calendar_today, size: 16)),
+            child: Text(_controllers[index]!['full_settlement_date']!.text.isEmpty ? 'Select Date' : _controllers[index]!['full_settlement_date']!.text),
+          ),
+        ),
+      );
+    }
+    return SizedBox(width: width, child: Text(_formatDate(record['full_settlement_date'])));
+  }
+
+  Widget _buildActionCell(int index, bool isEditMode, double width) {
+    return SizedBox(
+      width: width,
+      child: isEditMode
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(icon: const Icon(Icons.save, color: Colors.green, size: 20), tooltip: 'Save', onPressed: () => _saveRecord(index)),
+                IconButton(icon: const Icon(Icons.cancel, color: Colors.grey, size: 20), tooltip: 'Cancel', onPressed: () => _toggleEditMode(index)),
+              ],
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewCreditRecord(index)),
+                IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), tooltip: 'Edit', onPressed: () => _toggleEditMode(index)),
+                if (widget.isMainAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteCreditRecord(index)),
+              ],
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1290,353 +1361,125 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                           style: TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                       )
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: Scrollbar(
-                          thumbVisibility: true,
-                          interactive: true,
-                          controller: _tableHorizontalScrollController,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            controller: _tableHorizontalScrollController,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Card(
-                                elevation: 4,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: DataTable(
-                                columnSpacing: 20,
-                                sortColumnIndex: (widget.selectedSector == null && _isAdmin) ? 0 : null,
-                                sortAscending: _sectorSortAscending,
-                                columns: [
-                                  if (widget.selectedSector == null && _isAdmin)
-                                    DataColumn(
-                                      label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      onSort: (columnIndex, ascending) {
-                                        setState(() {
-                                          _sectorSortAscending = ascending;
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          const double colSpace = 20;
+                          const double wSector = 120;
+                          const double wName = 150;
+                          const double wCompanyStaff = 100;
+                          const double wPhone = 150;
+                          const double wAddress = 200;
+                          const double wPurchaseDetails = 200;
+                          const double wCreditAmount = 120;
+                          const double wCreditDate = 140;
+                          const double wAmountSettled = 120;
+                          const double wFullSettlementDate = 120;
+                          const double wPendingAmount = 120;
+                          const double wComments = 200;
+                          const double wAction = 150;
+                          final showSector = widget.selectedSector == null && _isAdmin;
+                          final colCount = showSector ? 13 : 12;
+                          final totalWidth = (showSector ? wSector + colSpace : 0) + wName + wCompanyStaff + wPhone + wAddress + wPurchaseDetails + wCreditAmount + wCreditDate + wAmountSettled + wFullSettlementDate + wPendingAmount + wComments + wAction + (colCount - 1) * colSpace;
+                          return Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: FixedHeaderTable(
+                                horizontalScrollController: _tableHorizontalScrollController,
+                                totalWidth: totalWidth,
+                                headerHeight: 48,
+                                headerBuilder: (ctx) {
+                                  final headers = <Widget>[
+                                    if (showSector)
+                                      InkWell(
+                                        onTap: () => setState(() {
+                                          _sectorSortAscending = !_sectorSortAscending;
                                           _filteredCreditData.sort((a, b) {
                                             final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
                                             final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                                            return ascending
-                                                ? aName.compareTo(bName)
-                                                : bName.compareTo(aName);
+                                            return _sectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
                                           });
-                                        });
-                                      },
-                                    ),
-                                  const DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Company Staff', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Address', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Credit Amount', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  DataColumn(
-                                    label: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
+                                        }),
+                                        child: SizedBox(width: wSector, height: 48, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                                      ),
+                                    if (showSector) const SizedBox(width: colSpace),
+                                    SizedBox(width: wName, height: 48, child: const Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wCompanyStaff, height: 48, child: const Text('Company Staff', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wPhone, height: 48, child: const Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wAddress, height: 48, child: const Text('Address', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wPurchaseDetails, height: 48, child: const Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wCreditAmount, height: 48, child: const Text('Credit Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    InkWell(
+                                      onTap: () => setState(() {
+                                        _creditDateSortAscending = !_creditDateSortAscending;
+                                        _sortCreditData();
+                                      }),
+                                      child: SizedBox(width: wCreditDate, height: 48, child: Row(mainAxisSize: MainAxisSize.min, children: [
                                         const Text('Credit Date', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        IconButton(
-                                          icon: Icon(
-                                            _creditDateSortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                                            size: 16,
-                                          ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _creditDateSortAscending = !_creditDateSortAscending;
-                                              _sortCreditData();
-                                            });
-                                          },
-                                        ),
-                                      ],
+                                        Icon(_creditDateSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
+                                      ])),
                                     ),
-                                  ),
-                                  const DataColumn(label: Text('Amount Settled', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Full Settlement Date', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Pending Amount', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Comments', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
-                                ],
-                                rows: _filteredCreditData.asMap().entries.map((entry) {
-                                  final index = entry.key;
-                                  final record = entry.value;
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wAmountSettled, height: 48, child: const Text('Amount Settled', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wFullSettlementDate, height: 48, child: const Text('Full Settlement Date', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wPendingAmount, height: 48, child: const Text('Pending Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wComments, height: 48, child: const Text('Comments', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wAction, height: 48, child: const Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  ];
+                                  return Row(children: headers);
+                                },
+                                rowCount: _filteredCreditData.length,
+                                rowBuilder: (ctx, index) {
+                                  final record = _filteredCreditData[index];
                                   final isEditMode = _editMode[index] == true;
-
-                                  return DataRow(
-                                    color: WidgetStateProperty.all(Colors.blue.shade200),
-                                    cells: [
-                                      if (widget.selectedSector == null && _isAdmin)
-                                        DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
-                                      DataCell(
-                                        isEditMode && _controllers.containsKey(index)
-                                            ? SizedBox(
-                                                width: 150,
-                                                child: TextFormField(
-                                                  controller: _controllers[index]!['name'],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                  ),
-                                                ),
-                                              )
-                                            : Text(record['name']?.toString() ?? ''),
-                                      ),
-                                      DataCell(
-                                        Text(
-                                          (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? 'Yes' : 'No',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? Colors.green.shade700 : Colors.grey,
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        isEditMode && _controllers.containsKey(index)
-                                            ? SizedBox(
-                                                width: 150,
-                                                child: TextFormField(
-                                                  controller: _controllers[index]!['phone_number'],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                  ),
-                                                  keyboardType: TextInputType.phone,
-                                                ),
-                                              )
-                                            : Text(record['phone_number']?.toString() ?? 'N/A'),
-                                      ),
-                                      DataCell(
-                                        SizedBox(
-                                          width: 200,
-                                          child: isEditMode && _controllers.containsKey(index)
-                                              ? TextFormField(
-                                                  controller: _controllers[index]!['address'],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                  ),
-                                                  maxLines: 2,
-                                                )
-                                              : Text(
-                                                  record['address']?.toString() ?? 'N/A',
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        SizedBox(
-                                          width: 200,
-                                          child: isEditMode && _controllers.containsKey(index)
-                                              ? TextFormField(
-                                                  controller: _controllers[index]!['purchase_details'],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                  ),
-                                                  maxLines: 2,
-                                                )
-                                              : Text(
-                                                  record['purchase_details']?.toString() ?? 'N/A',
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        isEditMode && _controllers.containsKey(index)
-                                            ? SizedBox(
-                                                width: 120,
-                                                child: TextFormField(
-                                                  controller: _controllers[index]!['credit_amount'],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                  ),
-                                                  keyboardType: TextInputType.number,
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                  ],
-                                                ),
-                                              )
-                                            : Text(_parseDecimalFromDynamic(record['credit_amount']).toStringAsFixed(2)),
-                                      ),
-                                      DataCell(
-                                        isEditMode && _controllers.containsKey(index)
-                                            ? SizedBox(
-                                                width: 120,
-                                                child: InkWell(
-                                                  onTap: () async {
-                                                    final DateTime? picked = await showDatePicker(
-                                                      context: context,
-                                                      initialDate: _controllers[index]!['credit_date']!.text.isNotEmpty
-                                                          ? DateTime.tryParse(_controllers[index]!['credit_date']!.text) ?? DateTime.now()
-                                                          : DateTime.now(),
-                                                      firstDate: DateTime(2000),
-                                                      lastDate: DateTime(2100),
-                                                    );
-                                                    if (picked != null) {
-                                                      _controllers[index]!['credit_date']!.text = FormatUtils.formatDateForApi(picked);
-                                                    }
-                                                  },
-                                                  child: InputDecorator(
-                                                    decoration: const InputDecoration(
-                                                      border: OutlineInputBorder(),
-                                                      isDense: true,
-                                                      suffixIcon: Icon(Icons.calendar_today, size: 16),
-                                                    ),
-                                                    child: Text(
-                                                      _controllers[index]!['credit_date']!.text.isEmpty
-                                                          ? 'Select Date'
-                                                          : _controllers[index]!['credit_date']!.text,
-                                                    ),
-                                                  ),
-                                                ),
-                                              )
-                                            : Text(
-                                                _formatDate(record['credit_date']),
-                                              ),
-                                      ),
-                                      DataCell(
-                                        isEditMode && _controllers.containsKey(index)
-                                            ? SizedBox(
-                                                width: 120,
-                                                child: TextFormField(
-                                                  controller: _controllers[index]!['amount_settled'],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                  ),
-                                                  keyboardType: TextInputType.number,
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                  ],
-                                                ),
-                                              )
-                                            : Text(_parseDecimalFromDynamic(record['amount_settled']).toStringAsFixed(2)),
-                                      ),
-                                      DataCell(
-                                        isEditMode && _controllers.containsKey(index)
-                                            ? SizedBox(
-                                                width: 120,
-                                                child: InkWell(
-                                                  onTap: () async {
-                                                    final DateTime? picked = await showDatePicker(
-                                                      context: context,
-                                                      initialDate: _controllers[index]!['full_settlement_date']!.text.isNotEmpty
-                                                          ? DateTime.tryParse(_controllers[index]!['full_settlement_date']!.text) ?? DateTime.now()
-                                                          : DateTime.now(),
-                                                      firstDate: DateTime(2000),
-                                                      lastDate: DateTime(2100),
-                                                    );
-                                                    if (picked != null) {
-                                                      setState(() {
-                                                        _controllers[index]!['full_settlement_date']!.text = FormatUtils.formatDateForApi(picked);
-                                                      });
-                                                    }
-                                                  },
-                                                  child: InputDecorator(
-                                                    decoration: const InputDecoration(
-                                                      border: OutlineInputBorder(),
-                                                      isDense: true,
-                                                      suffixIcon: Icon(Icons.calendar_today, size: 16),
-                                                    ),
-                                                    child: Text(
-                                                      _controllers[index]!['full_settlement_date']!.text.isEmpty
-                                                          ? 'Select Date'
-                                                          : _controllers[index]!['full_settlement_date']!.text,
-                                                    ),
-                                                  ),
-                                                ),
-                                              )
-                                            : Text(
-                                                _formatDate(record['full_settlement_date']),
-                                              ),
-                                      ),
-                                      DataCell(
-                                        Text(
-                                          (_parseDecimalFromDynamic(record['credit_amount']) - _parseDecimalFromDynamic(record['amount_settled'])).toStringAsFixed(2),
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: (_parseDecimalFromDynamic(record['credit_amount']) - _parseDecimalFromDynamic(record['amount_settled'])) > 0
-                                                ? Colors.red
-                                                : Colors.green,
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        isEditMode && _controllers.containsKey(index)
-                                            ? SizedBox(
-                                                width: 200,
-                                                child: TextFormField(
-                                                  controller: _controllers[index]!['comments'],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                  ),
-                                                  maxLines: 2,
-                                                ),
-                                              )
-                                            : SizedBox(
-                                                width: 200,
-                                                child: Text(
-                                                  record['comments']?.toString() ?? 'N/A',
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                      ),
-                                      DataCell(
-                                        isEditMode
-                                            ? Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  IconButton(
-                                                    icon: const Icon(Icons.save, color: Colors.green, size: 20),
-                                                    tooltip: 'Save',
-                                                    onPressed: () => _saveRecord(index),
-                                                  ),
-                                                  IconButton(
-                                                    icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
-                                                    tooltip: 'Cancel',
-                                                    onPressed: () => _toggleEditMode(index),
-                                                  ),
-                                                ],
-                                              )
-                                            : Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  IconButton(
-                                                    icon: const Icon(Icons.visibility, color: Colors.green, size: 20),
-                                                    tooltip: 'View',
-                                                    onPressed: () => _viewCreditRecord(index),
-                                                  ),
-                                                  IconButton(
-                                                    icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                                    tooltip: 'Edit',
-                                                    onPressed: () => _toggleEditMode(index),
-                                                  ),
-                                                  if (widget.isMainAdmin)
-                                                    IconButton(
-                                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                                      tooltip: 'Delete',
-                                                      onPressed: () => _deleteCreditRecord(index),
-                                                    ),
-                                                ],
-                                              ),
-                                      ),
-                                    ],
-                                  );
-                                }).toList(),
+                                  final cells = <Widget>[
+                                    if (showSector) SizedBox(width: wSector, child: Text(_getSectorName(record['sector_code']?.toString()))),
+                                    if (showSector) const SizedBox(width: colSpace),
+                                    SizedBox(width: wName, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true)) : Text(record['name']?.toString() ?? '')),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wCompanyStaff, child: Text((record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? 'Yes' : 'No', style: TextStyle(fontWeight: FontWeight.bold, color: (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? Colors.green.shade700 : Colors.grey))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wPhone, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['phone_number'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.phone) : Text(record['phone_number']?.toString() ?? 'N/A')),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wAddress, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['address'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), maxLines: 2) : Text(record['address']?.toString() ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis)),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wPurchaseDetails, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['purchase_details'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), maxLines: 2) : Text(record['purchase_details']?.toString() ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis)),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wCreditAmount, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['credit_amount'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))]) : Text(_parseDecimalFromDynamic(record['credit_amount']).toStringAsFixed(2))),
+                                    const SizedBox(width: colSpace),
+                                    _buildCreditDateCell(index, record, isEditMode, wCreditDate),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wAmountSettled, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['amount_settled'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))]) : Text(_parseDecimalFromDynamic(record['amount_settled']).toStringAsFixed(2))),
+                                    const SizedBox(width: colSpace),
+                                    _buildFullSettlementDateCell(index, record, isEditMode, wFullSettlementDate),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wPendingAmount, child: Text((_parseDecimalFromDynamic(record['credit_amount']) - _parseDecimalFromDynamic(record['amount_settled'])).toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, color: (_parseDecimalFromDynamic(record['credit_amount']) - _parseDecimalFromDynamic(record['amount_settled'])) > 0 ? Colors.red : Colors.green))),
+                                    const SizedBox(width: colSpace),
+                                    SizedBox(width: wComments, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['comments'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), maxLines: 2) : Text(record['comments']?.toString() ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis)),
+                                    const SizedBox(width: colSpace),
+                                    _buildActionCell(index, isEditMode, wAction),
+                                  ];
+                                  return Container(color: Colors.blue.shade200, child: Row(children: cells));
+                                },
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
                     ),
-          ),
           // Add Credit Details Button
           Padding(
             padding: const EdgeInsets.all(16.0),

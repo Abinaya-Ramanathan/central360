@@ -4,6 +4,7 @@ import '../models/sector.dart';
 import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/fixed_header_table.dart';
 import 'add_employee_dialog.dart';
 import 'edit_employee_dialog.dart';
 import 'home_screen.dart';
@@ -40,6 +41,18 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   
   // Horizontal ScrollController for draggable scrollbar
   final ScrollController _horizontalScrollController = ScrollController();
+
+  static const double _headerHeight = 48;
+  static const double _colSector = 100;
+  static const double _colName = 120;
+  static const double _colContact = 100;
+  static const double _colAddress = 150;
+  static const double _colBank = 150;
+  static const double _colRole = 80;
+  static const double _colSalary = 100;
+  static const double _colDate = 100;
+  static const double _colAction = 120;
+  static const double _colSpacing = 16;
 
   @override
   void initState() {
@@ -119,6 +132,150 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
 
   double _getTotalMonthlySalary(List<Employee> employees) {
     return employees.fold(0.0, (sum, emp) => sum + emp.monthlySalary);
+  }
+
+  double _employeeTableWidth(bool showSector) {
+    double w = _colName + _colContact + _colAddress + _colBank + _colRole + _colSalary * 3 + _colDate + _colAction;
+    if (showSector) w += _colSector;
+    final n = showSector ? 10 : 9;
+    return w + (n - 1) * _colSpacing;
+  }
+
+  Widget _buildEmptyEmployeesState() {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.people_outline, size: 64, color: Colors.blue.shade300),
+              const SizedBox(height: 16),
+              Text(
+                widget.selectedSector == null ? 'No employees added yet' : 'No employees in selected sector',
+                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmployeeTable(List<Employee> filteredEmployees) {
+    const bold = TextStyle(fontWeight: FontWeight.bold);
+    final showSector = widget.selectedSector == null;
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: FixedHeaderTable(
+          horizontalScrollController: _horizontalScrollController,
+          totalWidth: _employeeTableWidth(showSector),
+          headerHeight: _headerHeight,
+          headerBuilder: (context) {
+            final List<Widget> headerChildren = [];
+            void addCol(double w, Widget c) {
+              if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _colSpacing));
+              headerChildren.add(SizedBox(width: w, child: c));
+            }
+            if (showSector) {
+              addCol(_colSector, InkWell(
+                onTap: () {
+                  setState(() {
+                    _sortAscending = !_sortAscending;
+                    filteredEmployees.sort((a, b) {
+                      final aName = _getSectorName(a.sector).toLowerCase();
+                      final bName = _getSectorName(b.sector).toLowerCase();
+                      return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                    });
+                  });
+                },
+                child: const Text('Sector', style: bold),
+              ));
+            }
+            addCol(_colName, const Text('Name', style: bold));
+            addCol(_colContact, const Text('Contact', style: bold));
+            addCol(_colAddress, const Text('Address', style: bold));
+            addCol(_colBank, const Text('Bank Details', style: bold));
+            addCol(_colRole, const Text('Role', style: bold));
+            addCol(_colSalary, const Text('Daily Salary', style: bold));
+            addCol(_colSalary, const Text('Weekly Salary', style: bold));
+            addCol(_colSalary, const Text('Monthly Salary', style: bold));
+            addCol(_colDate, const Text('Joining Date', style: bold));
+            addCol(_colAction, const Text('Action', style: bold));
+            return Material(color: Colors.blue.shade100, child: Row(children: headerChildren));
+          },
+          rowCount: filteredEmployees.length + 1,
+          rowBuilder: (context, index) {
+            final List<Widget> rowChildren = [];
+            void addCell(double w, Widget c) {
+              if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _colSpacing));
+              rowChildren.add(SizedBox(width: w, child: c));
+            }
+            if (index == filteredEmployees.length) {
+              if (showSector) addCell(_colSector, const Text('Total', style: bold));
+              addCell(_colName, Text('Count: ${_getTotalEmployeeCount(filteredEmployees)}', style: bold));
+              addCell(_colContact, const SizedBox.shrink());
+              addCell(_colAddress, const SizedBox.shrink());
+              addCell(_colBank, const SizedBox.shrink());
+              addCell(_colRole, const SizedBox.shrink());
+              addCell(_colSalary, Text('₹${_getTotalDailySalary(filteredEmployees).toStringAsFixed(2)}', style: bold));
+              addCell(_colSalary, Text('₹${_getTotalWeeklySalary(filteredEmployees).toStringAsFixed(2)}', style: bold));
+              addCell(_colSalary, Text('₹${_getTotalMonthlySalary(filteredEmployees).toStringAsFixed(2)}', style: bold));
+              addCell(_colDate, const SizedBox.shrink());
+              addCell(_colAction, const SizedBox.shrink());
+              return Material(color: Colors.blue.shade50, child: Row(children: rowChildren));
+            }
+            final employee = filteredEmployees[index];
+            if (showSector) addCell(_colSector, Text(_getSectorName(employee.sector)));
+            addCell(_colName, Text(employee.name));
+            addCell(_colContact, Text(employee.contact));
+            addCell(_colAddress, SizedBox(width: _colAddress, child: Text(employee.address, overflow: TextOverflow.ellipsis)));
+            addCell(_colBank, SizedBox(width: _colBank, child: Text(employee.bankDetails, overflow: TextOverflow.ellipsis)));
+            addCell(_colRole, Text(employee.role));
+            addCell(_colSalary, Text(employee.dailySalary > 0 ? '₹${employee.dailySalary.toStringAsFixed(2)}/day' : '-'));
+            addCell(_colSalary, Text(employee.weeklySalary > 0 ? '₹${employee.weeklySalary.toStringAsFixed(2)}/week' : '-'));
+            addCell(_colSalary, Text(employee.monthlySalary > 0 ? '₹${employee.monthlySalary.toStringAsFixed(2)}/mo' : '-'));
+            addCell(_colDate, Text(
+              employee.joiningDate != null
+                  ? '${employee.joiningDate!.year}-${employee.joiningDate!.month.toString().padLeft(2, '0')}-${employee.joiningDate!.day.toString().padLeft(2, '0')}'
+                  : employee.joiningYear != null ? employee.joiningYear.toString() : 'N/A',
+            ));
+            addCell(_colAction, Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(icon: const Icon(Icons.visibility, color: Colors.green), tooltip: 'View', onPressed: () => _viewEmployee(employee)),
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  tooltip: 'Edit',
+                  onPressed: () async {
+                    final result = await showDialog<Employee>(context: context, builder: (context) => EditEmployeeDialog(employee: employee));
+                    if (result != null) {
+                      try {
+                        final updated = await ApiService.updateEmployee(result);
+                        setState(() {
+                          final i = _employees.indexWhere((e) => e.id == employee.id);
+                          if (i != -1) _employees[i] = updated;
+                          _filterEmployees();
+                        });
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating employee: $e')));
+                      }
+                    }
+                  },
+                ),
+                if (widget.isMainAdmin)
+                  IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Delete', onPressed: () => _deleteEmployee(employee)),
+              ],
+            ));
+            return Row(children: rowChildren);
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _loadEmployees() async {
@@ -497,236 +654,10 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : filteredEmployees.isEmpty
-                  ? SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: SizedBox(
-                        height: MediaQuery.of(context).size.height * 0.6,
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.people_outline,
-                                size: 64,
-                                color: Colors.blue.shade300,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                widget.selectedSector == null
-                                    ? 'No employees added yet'
-                                    : 'No employees in selected sector',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  : Scrollbar(
-                      thumbVisibility: true,
-                      interactive: true,
-                      controller: _horizontalScrollController,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        scrollDirection: Axis.horizontal,
-                        controller: _horizontalScrollController,
-                        child: SingleChildScrollView(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: DataTable(
-                              headingRowColor: WidgetStateProperty.all(
-                                Colors.blue.shade100,
-                              ),
-                              sortColumnIndex: widget.selectedSector == null ? 0 : null,
-                              sortAscending: _sortAscending,
-                              columns: [
-                                if (widget.selectedSector == null)
-                                  DataColumn(
-                                    label: const Text('Sector'),
-                                    onSort: (columnIndex, ascending) {
-                                      setState(() {
-                                        _sortAscending = ascending;
-                                        filteredEmployees.sort((a, b) {
-                                          final aName = _getSectorName(a.sector).toLowerCase();
-                                          final bName = _getSectorName(b.sector).toLowerCase();
-                                          return ascending
-                                              ? aName.compareTo(bName)
-                                              : bName.compareTo(aName);
-                                        });
-                                      });
-                                    },
-                                  ),
-                                const DataColumn(label: Text('Name')),
-                                const DataColumn(label: Text('Contact')),
-                                const DataColumn(label: Text('Address')),
-                                const DataColumn(label: Text('Bank Details')),
-                                const DataColumn(label: Text('Role')),
-                                const DataColumn(label: Text('Daily Salary')),
-                                const DataColumn(label: Text('Weekly Salary')),
-                                const DataColumn(label: Text('Monthly Salary')),
-                                const DataColumn(label: Text('Joining Date')),
-                                const DataColumn(label: Text('Action')),
-                              ],
-                              rows: [
-                                ...filteredEmployees.map((employee) {
-                                  return DataRow(
-                                    cells: [
-                                      if (widget.selectedSector == null)
-                                        DataCell(Text(_getSectorName(employee.sector))),
-                                      DataCell(Text(employee.name)),
-                                      DataCell(Text(employee.contact)),
-                                      DataCell(
-                                        SizedBox(
-                                          width: 150,
-                                          child: Text(
-                                            employee.address,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        SizedBox(
-                                          width: 150,
-                                          child: Text(
-                                            employee.bankDetails,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(Text(employee.role)),
-                                      DataCell(Text(
-                                        employee.dailySalary > 0
-                                            ? '₹${employee.dailySalary.toStringAsFixed(2)}/day'
-                                            : '-',
-                                      )),
-                                      DataCell(Text(
-                                        employee.weeklySalary > 0
-                                            ? '₹${employee.weeklySalary.toStringAsFixed(2)}/week'
-                                            : '-',
-                                      )),
-                                      DataCell(Text(
-                                        employee.monthlySalary > 0
-                                            ? '₹${employee.monthlySalary.toStringAsFixed(2)}/mo'
-                                            : '-',
-                                      )),
-                                      DataCell(Text(
-                                        employee.joiningDate != null
-                                            ? '${employee.joiningDate!.year}-${employee.joiningDate!.month.toString().padLeft(2, '0')}-${employee.joiningDate!.day.toString().padLeft(2, '0')}'
-                                            : employee.joiningYear != null
-                                                ? employee.joiningYear.toString()
-                                                : 'N/A',
-                                      )),
-                                      DataCell(
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(Icons.visibility, color: Colors.green),
-                                              tooltip: 'View',
-                                              onPressed: () => _viewEmployee(employee),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.edit, color: Colors.blue),
-                                              tooltip: 'Edit',
-                                              onPressed: () async {
-                                                final result = await showDialog<Employee>(
-                                                  context: context,
-                                                  builder: (context) => EditEmployeeDialog(
-                                                    employee: employee,
-                                                  ),
-                                                );
-                                                if (result != null) {
-                                                  try {
-                                                    final updated = await ApiService.updateEmployee(result);
-                                                    setState(() {
-                                                      final index = _employees.indexWhere(
-                                                        (e) => e.id == employee.id,
-                                                      );
-                                                      if (index != -1) {
-                                                        _employees[index] = updated;
-                                                      }
-                                                      _filterEmployees(); // Refresh filtered list
-                                                    });
-                                                  } catch (e) {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      SnackBar(content: Text('Error updating employee: $e')),
-                                                    );
-                                                  }
-                                                }
-                                              },
-                                            ),
-                                            if (widget.isMainAdmin)
-                                              IconButton(
-                                                icon: const Icon(Icons.delete, color: Colors.red),
-                                                tooltip: 'Delete',
-                                                onPressed: () => _deleteEmployee(employee),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                }),
-                                // Summary Row
-                                DataRow(
-                                  color: WidgetStateProperty.all(Colors.blue.shade50),
-                                  cells: [
-                                    if (widget.selectedSector == null)
-                                      const DataCell(
-                                        Text(
-                                          'Total',
-                                          style: TextStyle(fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    DataCell(
-                                      Text(
-                                        'Count: ${_getTotalEmployeeCount(filteredEmployees)}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    const DataCell(SizedBox.shrink()),
-                                    const DataCell(SizedBox.shrink()),
-                                    const DataCell(SizedBox.shrink()),
-                                    const DataCell(SizedBox.shrink()),
-                                    DataCell(
-                                      Text(
-                                        '₹${_getTotalDailySalary(filteredEmployees).toStringAsFixed(2)}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Text(
-                                        '₹${_getTotalWeeklySalary(filteredEmployees).toStringAsFixed(2)}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Text(
-                                        '₹${_getTotalMonthlySalary(filteredEmployees).toStringAsFixed(2)}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    const DataCell(SizedBox.shrink()),
-                                    const DataCell(SizedBox.shrink()),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  ? _buildEmptyEmployeesState()
+                  : _buildEmployeeTable(filteredEmployees),
               ),
             ),
-          ),
           ],
         ),
       ),

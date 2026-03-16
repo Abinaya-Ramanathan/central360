@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../widgets/fixed_header_table.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/sector_service.dart';
@@ -18,7 +19,7 @@ class StockManagementScreen extends StatefulWidget {
   final String? selectedSector;
   /// When set, show consolidated data for main + subsectors with sector name column.
   final List<String>? includedSectorCodes;
-  /// Initial tab: 0 = Production, 1 = Daily Stock, 2 = Overall Stock.
+  /// Initial tab: 0 = Production, 1 = Daily Stock, 2 = Overall Stock, 3 = Item Price.
   final int? initialTabIndex;
 
   const StockManagementScreen({
@@ -78,11 +79,29 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   final ScrollController _stockHorizontalScrollController = ScrollController();
   final ScrollController _overallStockHorizontalScrollController = ScrollController();
 
+  // Item Price tab
+  List<Map<String, dynamic>> _itemPrices = [];
+  String _itemPriceSearchQuery = '';
+  bool _isEditModeItemPrice = false;
+  final Map<int, TextEditingController> _itemPriceQuantityControllers = {};
+  final Map<int, String?> _itemPriceUnitValues = {}; // Unit dropdown selection (allowed: gram, kg, Litre, pieces, Boxes, null)
+  final Map<int, TextEditingController> _itemPriceNewPriceControllers = {};
+  final Map<int, TextEditingController> _itemPriceOldPriceControllers = {};
+  final ScrollController _itemPriceHorizontalScrollController = ScrollController();
+
+  static const List<String> _itemPriceUnitOptions = ['gram', 'kg', 'Litre', 'pieces', 'Boxes'];
+  static String? _normalizeItemPriceUnit(String? v) {
+    if (v == null || v.trim().isEmpty) return null;
+    final s = v.trim();
+    if (s == 'piece') return 'pieces';
+    return _itemPriceUnitOptions.contains(s) ? s : null;
+  }
+
   @override
   void initState() {
     super.initState();
     final initialIndex = widget.initialTabIndex ?? 0;
-    _tabController = TabController(length: 3, vsync: this, initialIndex: initialIndex.clamp(0, 2));
+    _tabController = TabController(length: 4, vsync: this, initialIndex: initialIndex.clamp(0, 3));
     _selectedDate = DateTime.now();
     final usernameLower = widget.username.toLowerCase();
     _isAdmin = usernameLower == 'admin' || usernameLower == 'abinaya' || usernameLower == 'srisurya';
@@ -139,6 +158,18 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     for (var controller in _overallNewStockBoxesControllers.values) {
       controller.dispose();
     }
+    for (var controller in _itemPriceQuantityControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _itemPriceNewPriceControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _itemPriceOldPriceControllers.values) {
+      controller.dispose();
+    }
+    _itemPriceHorizontalScrollController.dispose();
+    _stockHorizontalScrollController.dispose();
+    _overallStockHorizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -172,6 +203,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         });
         _loadDailyStock();
         _loadOverallStock();
+        _loadItemPrices();
       }
     } catch (e) {
       if (mounted) {
@@ -426,6 +458,78 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     }
   }
 
+  Future<void> _loadItemPrices() async {
+    try {
+      final sectorParam = (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty)
+          ? null
+          : widget.selectedSector;
+      var list = await ApiService.getItemPrices(sector: sectorParam);
+      if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
+        list = list.where((r) => widget.includedSectorCodes!.contains(r['sector_code']?.toString())).toList();
+      }
+      if (mounted) {
+        for (var c in _itemPriceQuantityControllers.values) c.dispose();
+        for (var c in _itemPriceNewPriceControllers.values) c.dispose();
+        for (var c in _itemPriceOldPriceControllers.values) c.dispose();
+        _itemPriceQuantityControllers.clear();
+        _itemPriceUnitValues.clear();
+        _itemPriceNewPriceControllers.clear();
+        _itemPriceOldPriceControllers.clear();
+        setState(() {
+          _itemPrices = list;
+          for (var r in _itemPrices) {
+            final id = r['item_name_id'] as int? ?? (r['id'] as int? ?? 0);
+            if (id <= 0) continue;
+            _itemPriceQuantityControllers[id] = TextEditingController(text: r['quantity']?.toString() ?? '');
+            _itemPriceUnitValues[id] = _normalizeItemPriceUnit(r['unit']?.toString());
+            _itemPriceNewPriceControllers[id] = TextEditingController(text: r['new_price']?.toString() ?? '');
+            _itemPriceOldPriceControllers[id] = TextEditingController(text: r['old_price']?.toString() ?? '');
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading item prices: $e')));
+      }
+    }
+  }
+
+  Future<void> _saveItemPrices() async {
+    setState(() => _isLoading = true);
+    try {
+      for (var r in _itemPrices) {
+        final itemNameId = r['item_name_id'] as int? ?? (r['id'] as int?);
+        if (itemNameId == null) continue;
+        final q = _itemPriceQuantityControllers[itemNameId]?.text;
+        final u = _itemPriceUnitValues[itemNameId];
+        final newP = _itemPriceNewPriceControllers[itemNameId]?.text;
+        final oldP = _itemPriceOldPriceControllers[itemNameId]?.text;
+        double? newPriceVal;
+        double? oldPriceVal;
+        if (newP != null && newP.isNotEmpty) newPriceVal = double.tryParse(newP);
+        if (oldP != null && oldP.isNotEmpty) oldPriceVal = double.tryParse(oldP);
+        await ApiService.updateItemPrice(
+          itemNameId: itemNameId,
+          id: r['id'] is int ? r['id'] as int : null,
+          quantity: q,
+          unit: u,
+          newPrice: newPriceVal,
+          oldPrice: oldPriceVal,
+        );
+      }
+      if (mounted) {
+        setState(() => _isEditModeItemPrice = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item prices saved')));
+        _loadItemPrices();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -616,6 +720,29 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     return false;
   }
 
+  /// Shows Set/Remove Minimum Stock menu. On Windows: right-click. On Android/touch: long-press the row (Sector or Item Name cell).
+  Future<void> _showOverallStockContextMenu(BuildContext context, Offset position, Map<String, dynamic> record) async {
+    final id = record['id'] as int?;
+    if (id == null) return;
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + 1, position.dy + 1),
+      items: [
+        const PopupMenuItem<String>(value: 'set', child: Text('Set Minimum Stock')),
+        const PopupMenuItem<String>(value: 'remove', child: Text('Remove Minimum Stock')),
+      ],
+    );
+    if (result == null || !mounted) return;
+    try {
+      await ApiService.setOverallStockMinimum(id, result == 'set');
+      if (mounted) _loadOverallStock();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
   Future<void> _generateStatement() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -726,6 +853,244 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           widget.includedSectorCodes!.isNotEmpty &&
           widget.includedSectorCodes!.every((c) => _cafeSectorCodes.contains(c)));
 
+  // Daily Stock fixed header table column widths
+  static const double _dailyColSector = 100;
+  static const double _dailyColSiNo = 50;
+  static const double _dailyColItemName = 150;
+  static const double _dailyColVehicleType = 100;
+  static const double _dailyColPartNumber = 100;
+  static const double _dailyColQty = 90;
+  static const double _dailyColUnit = 80;
+  static const double _dailyColReason = 180;
+  static const double _dailySpacing = 12;
+  static const double _dailyHeaderHeight = 56;
+
+  Widget _buildDailyStockFixedTable(List<Map<String, dynamic>> data, bool showSectorColumn, bool showVehicleColumns) {
+    final baseWidth = (showSectorColumn ? _dailyColSector + _dailySpacing : 0) +
+        _dailyColSiNo + _dailySpacing + _dailyColItemName + _dailySpacing +
+        (showVehicleColumns ? _dailyColVehicleType + _dailySpacing + _dailyColPartNumber + _dailySpacing : 0) +
+        _dailyColQty + _dailySpacing + _dailyColUnit + _dailySpacing +
+        (_isCafeDailyStock ? (_dailyColQty + _dailySpacing + _dailyColUnit + _dailySpacing + _dailyColQty + _dailySpacing + _dailyColUnit + _dailySpacing) : 0) +
+        _dailyColReason;
+    final totalWidth = baseWidth;
+    final sectorSort = () {
+      setState(() {
+        _sortAscendingDaily = !_sortAscendingDaily;
+        data.sort((a, b) {
+          final aName = (a['sector_name']?.toString() ?? a['sector_code']?.toString() ?? '').toLowerCase();
+          final bName = (b['sector_name']?.toString() ?? b['sector_code']?.toString() ?? '').toLowerCase();
+          return _sortAscendingDaily ? aName.compareTo(bName) : bName.compareTo(aName);
+        });
+      });
+    };
+    final headerCells = <Widget>[
+      if (showSectorColumn) ...[
+        InkWell(onTap: sectorSort, child: SizedBox(width: _dailyColSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
+        SizedBox(width: _dailySpacing),
+      ],
+      SizedBox(width: _dailyColSiNo, child: const Text('SI.NO', style: TextStyle(fontWeight: FontWeight.bold))),
+      SizedBox(width: _dailySpacing),
+      SizedBox(width: _dailyColItemName, child: const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+      SizedBox(width: _dailySpacing),
+      if (showVehicleColumns) ...[
+        SizedBox(width: _dailyColVehicleType, child: const Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
+        SizedBox(width: _dailySpacing),
+        SizedBox(width: _dailyColPartNumber, child: const Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
+        SizedBox(width: _dailySpacing),
+      ],
+      SizedBox(width: _dailyColQty, child: Text(_isCafeDailyStock ? 'Canteen' : 'Quantity Taken', style: const TextStyle(fontWeight: FontWeight.bold))),
+      SizedBox(width: _dailySpacing),
+      SizedBox(width: _dailyColUnit, child: const Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+      SizedBox(width: _dailySpacing),
+      if (_isCafeDailyStock) ...[
+        SizedBox(width: _dailyColQty, child: const Text('Main branch', style: TextStyle(fontWeight: FontWeight.bold))),
+        SizedBox(width: _dailySpacing),
+        SizedBox(width: _dailyColUnit, child: const Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+        SizedBox(width: _dailySpacing),
+        SizedBox(width: _dailyColQty, child: const Text('Thanthondrimalai branch', style: TextStyle(fontWeight: FontWeight.bold))),
+        SizedBox(width: _dailySpacing),
+        SizedBox(width: _dailyColUnit, child: const Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+        SizedBox(width: _dailySpacing),
+      ],
+      SizedBox(width: _dailyColReason, child: const Text('Reason', style: TextStyle(fontWeight: FontWeight.bold))),
+    ];
+    return FixedHeaderTable(
+      horizontalScrollController: _stockHorizontalScrollController,
+      totalWidth: totalWidth,
+      headerHeight: _dailyHeaderHeight,
+      headerBuilder: (context) => Row(children: headerCells),
+      rowCount: data.length,
+      rowBuilder: (context, index) {
+        final entry = data.asMap().entries.elementAt(index);
+        final siNo = entry.key + 1;
+        final record = entry.value;
+        final id = record['id'] as int;
+        final itemId = record['item_id'] as int;
+        final key = '${itemId}_$id';
+        final quantityController = _dailyQuantityControllers[key];
+        final reasonController = _dailyReasonControllers[key];
+        final itemSectorCode = record['sector_code']?.toString();
+        final showVehicleForThisItem = _shouldShowVehicleFieldsForItem(itemSectorCode);
+        final rowCells = <Widget>[
+          if (showSectorColumn) ...[
+            SizedBox(width: _dailyColSector, child: Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')),
+            SizedBox(width: _dailySpacing),
+          ],
+          SizedBox(width: _dailyColSiNo, child: Text('$siNo')),
+          SizedBox(width: _dailySpacing),
+          SizedBox(width: _dailyColItemName, child: Text(record['item_name']?.toString() ?? 'N/A')),
+          SizedBox(width: _dailySpacing),
+          if (showVehicleColumns) ...[
+            SizedBox(width: _dailyColVehicleType, child: Text(showVehicleForThisItem ? (record['vehicle_type']?.toString() ?? '') : '')),
+            SizedBox(width: _dailySpacing),
+            SizedBox(width: _dailyColPartNumber, child: Text(showVehicleForThisItem ? (record['part_number']?.toString() ?? '') : '')),
+            SizedBox(width: _dailySpacing),
+          ],
+          SizedBox(
+            width: _dailyColQty,
+            child: _isEditModeDaily
+                ? SizedBox(
+                    width: 90,
+                    child: TextField(
+                      controller: quantityController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                      decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                    ),
+                  )
+                : Text(record['quantity_taken']?.toString() ?? '0'),
+          ),
+          SizedBox(width: _dailySpacing),
+          SizedBox(
+            width: _dailyColUnit,
+            child: _isEditModeDaily
+                ? ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
+                    child: DropdownButtonFormField<String>(
+                      value: _dailyQuantityUnits[key],
+                      isDense: true,
+                      isExpanded: true,
+                      decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4)),
+                      style: const TextStyle(fontSize: 11, color: Colors.black),
+                      dropdownColor: Colors.white,
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
+                        DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
+                        DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
+                        DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
+                        DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
+                        DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 11, color: Colors.black))),
+                      ],
+                      onChanged: (value) => setState(() => _dailyQuantityUnits[key] = value),
+                    ),
+                  )
+                : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
+          ),
+          SizedBox(width: _dailySpacing),
+        ];
+        if (_isCafeDailyStock) {
+          rowCells.addAll([
+            SizedBox(
+              width: _dailyColQty,
+              child: _isEditModeDaily
+                  ? SizedBox(
+                      width: 90,
+                      child: TextField(
+                        controller: _dailyQuantityMainBranchControllers[key],
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                        decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                      ),
+                    )
+                  : Text(record['quantity_taken_main_branch']?.toString() ?? '0'),
+            ),
+            SizedBox(width: _dailySpacing),
+            SizedBox(
+              width: _dailyColUnit,
+              child: _isEditModeDaily
+                  ? ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
+                      child: DropdownButtonFormField<String>(
+                        value: _dailyUnitMainBranch[key],
+                        isDense: true,
+                        isExpanded: true,
+                        decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4)),
+                        style: const TextStyle(fontSize: 11, color: Colors.black),
+                        dropdownColor: Colors.white,
+                        items: const [
+                          DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 11, color: Colors.black))),
+                        ],
+                        onChanged: (value) => setState(() => _dailyUnitMainBranch[key] = value),
+                      ),
+                  )
+                  : Text(record['unit_main_branch']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
+            ),
+            SizedBox(width: _dailySpacing),
+            SizedBox(
+              width: _dailyColQty,
+              child: _isEditModeDaily
+                  ? SizedBox(
+                      width: 90,
+                      child: TextField(
+                        controller: _dailyQuantityThanthondrimalaiControllers[key],
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                        decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                      ),
+                    )
+                  : Text(record['quantity_taken_thanthondrimalai']?.toString() ?? '0'),
+            ),
+            SizedBox(width: _dailySpacing),
+            SizedBox(
+              width: _dailyColUnit,
+              child: _isEditModeDaily
+                  ? ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
+                      child: DropdownButtonFormField<String>(
+                        value: _dailyUnitThanthondrimalai[key],
+                        isDense: true,
+                        isExpanded: true,
+                        decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4)),
+                        style: const TextStyle(fontSize: 11, color: Colors.black),
+                        dropdownColor: Colors.white,
+                        items: const [
+                          DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
+                          DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 11, color: Colors.black))),
+                        ],
+                        onChanged: (value) => setState(() => _dailyUnitThanthondrimalai[key] = value),
+                      ),
+                  )
+                  : Text(record['unit_thanthondrimalai']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
+            ),
+            SizedBox(width: _dailySpacing),
+          ]);
+        }
+        rowCells.add(SizedBox(
+          width: _dailyColReason,
+          child: _isEditModeDaily
+              ? SizedBox(
+                  width: 180,
+                  child: TextField(
+                    controller: reasonController,
+                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                  ),
+                )
+              : Text(record['reason']?.toString() ?? ''),
+        ));
+        return Row(children: rowCells);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredDailyStock = _filterStock(_dailyStock);
@@ -747,6 +1112,13 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     });
     // Show sector column when consolidated (includedSectorCodes) or All Sectors
     final showSectorColumn = widget.selectedSector == null || widget.includedSectorCodes != null;
+    if (showSectorColumn) {
+      filteredOverallStock.sort((a, b) {
+        final aName = (a['sector_name']?.toString() ?? a['sector_code']?.toString() ?? '').toLowerCase();
+        final bName = (b['sector_name']?.toString() ?? b['sector_code']?.toString() ?? '').toLowerCase();
+        return _sortAscendingOverall ? aName.compareTo(bName) : bName.compareTo(aName);
+      });
+    }
     // Show vehicle columns for SSEW sector or for admin when All Sectors is selected or when consolidated view includes SSEW
     final showVehicleColumns = (widget.selectedSector == 'SSEW') ||
                                (widget.selectedSector == null && _isAdmin) ||
@@ -862,6 +1234,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             Tab(text: 'Production'),
             Tab(text: 'Daily Stock'),
             Tab(text: 'Overall Stock'),
+            Tab(text: 'Item Price'),
           ],
         ),
       ),
@@ -944,20 +1317,36 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                         ],
                       )
                     else
-                      ElevatedButton.icon(
-                        onPressed: _isLoading ? null : () {
-                          final state = _productionTabKey.currentState;
-                          if (state != null) {
-                            (state as dynamic).showEditDialog();
-                          }
-                        },
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Edit', style: TextStyle(fontSize: 16)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange.shade700,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _isLoading ? null : () {
+                              final state = _productionTabKey.currentState;
+                              if (state != null) {
+                                (state as dynamic).showEditDialog();
+                              }
+                            },
+                            icon: const Icon(Icons.edit),
+                            label: const Text('Edit', style: TextStyle(fontSize: 16)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange.shade700,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: _isLoading ? null : _generateStatement,
+                            icon: const Icon(Icons.description),
+                            label: const Text('Statement', style: TextStyle(fontSize: 16)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.brown.shade700,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -1054,18 +1443,33 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                         ],
                       )
                     else
-                      ElevatedButton.icon(
-                        onPressed: _isLoading ? null : () {
-                          setState(() {
-                            _isEditModeDaily = true;
-                          });
-                        },
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Edit'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber.shade700,
-                          foregroundColor: Colors.white,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _isLoading ? null : () {
+                              setState(() {
+                                _isEditModeDaily = true;
+                              });
+                            },
+                            icon: const Icon(Icons.edit),
+                            label: const Text('Edit'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber.shade700,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: _isLoading ? null : _generateStatement,
+                            icon: const Icon(Icons.description),
+                            label: const Text('Statement'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.brown.shade700,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -1076,255 +1480,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                     ? const Center(child: CircularProgressIndicator())
                     : filteredDailyStock.isEmpty
                         ? const Center(child: Text('No daily stock records found'))
-                        : SingleChildScrollView(
-                            scrollDirection: Axis.vertical,
-                            child: Scrollbar(
-                              thumbVisibility: true,
-                              interactive: true,
-                              controller: _stockHorizontalScrollController,
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                controller: _stockHorizontalScrollController,
-                                child: DataTable(
-                                columnSpacing: 12,
-                                sortColumnIndex: showSectorColumn ? 0 : null,
-                                sortAscending: _sortAscendingDaily,
-                              columns: [
-                                if (showSectorColumn)
-                                  DataColumn(
-                                    label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    onSort: (columnIndex, ascending) {
-                                      setState(() {
-                                        _sortAscendingDaily = ascending;
-                                        filteredDailyStock.sort((a, b) {
-                                          final aName = (a['sector_name']?.toString() ?? a['sector_code']?.toString() ?? '').toLowerCase();
-                                          final bName = (b['sector_name']?.toString() ?? b['sector_code']?.toString() ?? '').toLowerCase();
-                                          return ascending
-                                              ? aName.compareTo(bName)
-                                              : bName.compareTo(aName);
-                                        });
-                                      });
-                                    },
-                                  ),
-                                const DataColumn(label: Text('SI.NO', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                if (showVehicleColumns) ...[
-                                  const DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
-                                ],
-                                DataColumn(
-                                  label: Text(
-                                    _isCafeDailyStock ? 'Canteen' : 'Quantity Taken',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-                                if (_isCafeDailyStock) ...[
-                                  const DataColumn(label: Text('Main branch', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Thanthondrimalai branch', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-                                ],
-                                const DataColumn(label: Text('Reason', style: TextStyle(fontWeight: FontWeight.bold))),
-                              ],
-                              rows: filteredDailyStock.asMap().entries.map((entry) {
-                                final siNo = entry.key + 1;
-                                final record = entry.value;
-                                final id = record['id'] as int;
-                                final itemId = record['item_id'] as int;
-                                final key = '${itemId}_$id';
-                                final quantityController = _dailyQuantityControllers[key];
-                                final reasonController = _dailyReasonControllers[key];
-                                final itemSectorCode = record['sector_code']?.toString();
-                                final showVehicleForThisItem = _shouldShowVehicleFieldsForItem(itemSectorCode);
-                                
-                                return DataRow(
-                                  cells: [
-                                    if (showSectorColumn)
-                                      DataCell(Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')),
-                                    DataCell(Text('$siNo')),
-                                    DataCell(Text(record['item_name']?.toString() ?? 'N/A')),
-                                    if (showVehicleColumns) ...[
-                                      DataCell(Text(showVehicleForThisItem ? (record['vehicle_type']?.toString() ?? '') : '')),
-                                      DataCell(Text(showVehicleForThisItem ? (record['part_number']?.toString() ?? '') : '')),
-                                    ],
-                                    DataCell(
-                                      _isEditModeDaily
-                                          ? SizedBox(
-                                              width: 90,
-                                              child: TextField(
-                                                controller: quantityController,
-                                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                inputFormatters: [
-                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                ],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                ),
-                                              ),
-                                            )
-                                          : Text(record['quantity_taken']?.toString() ?? '0'),
-                                    ),
-                                    DataCell(
-                                      _isEditModeDaily
-                                          ? ConstrainedBox(
-                                              constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
-                                              child: DropdownButtonFormField<String>(
-                                                initialValue: _dailyQuantityUnits[key],
-                                                isDense: true,
-                                                isExpanded: true,
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                  contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                                ),
-                                                style: const TextStyle(fontSize: 11, color: Colors.black),
-                                                dropdownColor: Colors.white,
-                                                items: const [
-                                                  DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                  DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                  DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                  DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                  DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                  DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                ],
-                                                onChanged: (value) {
-                                                  setState(() {
-                                                    _dailyQuantityUnits[key] = value;
-                                                  });
-                                                },
-                                              ),
-                                            )
-                                          : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
-                                    ),
-                                    if (_isCafeDailyStock) ...[
-                                      DataCell(
-                                        _isEditModeDaily
-                                            ? SizedBox(
-                                                width: 90,
-                                                child: TextField(
-                                                  controller: _dailyQuantityMainBranchControllers[key],
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                  ],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                  ),
-                                                ),
-                                              )
-                                            : Text(record['quantity_taken_main_branch']?.toString() ?? '0'),
-                                      ),
-                                      DataCell(
-                                        _isEditModeDaily
-                                            ? ConstrainedBox(
-                                                constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
-                                                child: DropdownButtonFormField<String>(
-                                                  initialValue: _dailyUnitMainBranch[key],
-                                                  isDense: true,
-                                                  isExpanded: true,
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                                  ),
-                                                  style: const TextStyle(fontSize: 11, color: Colors.black),
-                                                  dropdownColor: Colors.white,
-                                                  items: const [
-                                                    DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                  ],
-                                                  onChanged: (value) {
-                                                    setState(() {
-                                                      _dailyUnitMainBranch[key] = value;
-                                                    });
-                                                  },
-                                                ),
-                                              )
-                                            : Text(record['unit_main_branch']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
-                                      ),
-                                      DataCell(
-                                        _isEditModeDaily
-                                            ? SizedBox(
-                                                width: 90,
-                                                child: TextField(
-                                                  controller: _dailyQuantityThanthondrimalaiControllers[key],
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                  ],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                  ),
-                                                ),
-                                              )
-                                            : Text(record['quantity_taken_thanthondrimalai']?.toString() ?? '0'),
-                                      ),
-                                      DataCell(
-                                        _isEditModeDaily
-                                            ? ConstrainedBox(
-                                                constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
-                                                child: DropdownButtonFormField<String>(
-                                                  initialValue: _dailyUnitThanthondrimalai[key],
-                                                  isDense: true,
-                                                  isExpanded: true,
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                                  ),
-                                                  style: const TextStyle(fontSize: 11, color: Colors.black),
-                                                  dropdownColor: Colors.white,
-                                                  items: const [
-                                                    DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                    DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                                  ],
-                                                  onChanged: (value) {
-                                                    setState(() {
-                                                      _dailyUnitThanthondrimalai[key] = value;
-                                                    });
-                                                  },
-                                                ),
-                                              )
-                                            : Text(record['unit_thanthondrimalai']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
-                                      ),
-                                    ],
-                                    DataCell(
-                                      _isEditModeDaily
-                                          ? SizedBox(
-                                              width: 180,
-                                              child: TextField(
-                                                controller: reasonController,
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                ),
-                                              ),
-                                            )
-                                          : Text(record['reason']?.toString() ?? ''),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ),
+                        : _buildDailyStockFixedTable(filteredDailyStock, showSectorColumn, showVehicleColumns),
               ),
             ],
           ),
@@ -1411,352 +1567,423 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                   ],
                 ),
               ),
-              // Overall Stock Table
+              // Overall Stock Table (sticky header: header row fixed, only data rows scroll)
               Expanded(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : filteredOverallStock.isEmpty
                         ? const Center(child: Text('No overall stock records found'))
-                        : SingleChildScrollView(
-                            scrollDirection: Axis.vertical,
-                            child: Scrollbar(
-                              thumbVisibility: true,
-                              interactive: true,
-                              controller: _overallStockHorizontalScrollController,
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                controller: _overallStockHorizontalScrollController,
-                                child: DataTable(
-                              columnSpacing: 12,
-                              sortColumnIndex: showSectorColumn ? 0 : null,
-                              sortAscending: _sortAscendingOverall,
-                              columns: [
-                                if (showSectorColumn)
-                                  DataColumn(
-                                    label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    onSort: (columnIndex, ascending) {
-                                      setState(() {
-                                        _sortAscendingOverall = ascending;
-                                        filteredOverallStock.sort((a, b) {
-                                          final aName = (a['sector_name']?.toString() ?? a['sector_code']?.toString() ?? '').toLowerCase();
-                                          final bName = (b['sector_name']?.toString() ?? b['sector_code']?.toString() ?? '').toLowerCase();
-                                          return ascending
-                                              ? aName.compareTo(bName)
-                                              : bName.compareTo(aName);
-                                        });
-                                      });
-                                    },
-                                  ),
-                                const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                if (showVehicleColumns) ...[
-                                  const DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
-                                ],
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('Remaining Stock\nin gram', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('Remaining Stock\nin kg', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('Remaining Stock\nin litre', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('Remaining Stock\nin pieces', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('Remaining Stock\nin Boxes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('New Stock\nin gram', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('New Stock\nin kg', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('New Stock\nin litre', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('New Stock\nin pieces', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('New Stock\nin Boxes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ),
-                                ),
-                              ],
-                              rows: filteredOverallStock.map((record) {
-                                final id = record['id'] as int;
-                                final itemId = record['item_id'] as int;
-                                final key = '${itemId}_$id';
-                                
-                                final itemSectorCode = record['sector_code']?.toString();
-                                final showVehicleForThisItem = _shouldShowVehicleFieldsForItem(itemSectorCode);
-                                
-                                return DataRow(
-                                  cells: [
-                                    if (showSectorColumn)
-                                      DataCell(Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')),
-                                    DataCell(Text(record['item_name']?.toString() ?? 'N/A')),
-                                    if (showVehicleColumns) ...[
-                                      DataCell(Text(showVehicleForThisItem ? (record['vehicle_type']?.toString() ?? '') : '')),
-                                      DataCell(Text(showVehicleForThisItem ? (record['part_number']?.toString() ?? '') : '')),
-                                    ],
-                                    // Remaining Stock in gram (read-only, auto-calculated)
-                                    DataCell(
-                                      Container(
-                                        color: Colors.blue.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: Text(
-                                          record['remaining_stock_gram']?.toString() ?? '0',
-                                          style: const TextStyle(fontWeight: FontWeight.w500),
-                                        ),
-                                      ),
-                                    ),
-                                    // Remaining Stock in kg (read-only, auto-calculated)
-                                    DataCell(
-                                      Container(
-                                        color: Colors.blue.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: Text(
-                                          record['remaining_stock_kg']?.toString() ?? '0',
-                                          style: const TextStyle(fontWeight: FontWeight.w500),
-                                        ),
-                                      ),
-                                    ),
-                                    // Remaining Stock in litre (read-only, auto-calculated)
-                                    DataCell(
-                                      Container(
-                                        color: Colors.blue.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: Text(
-                                          record['remaining_stock_litre']?.toString() ?? '0',
-                                          style: const TextStyle(fontWeight: FontWeight.w500),
-                                        ),
-                                      ),
-                                    ),
-                                    // Remaining Stock in pieces (read-only, auto-calculated)
-                                    DataCell(
-                                      Container(
-                                        color: Colors.blue.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: Text(
-                                          record['remaining_stock_pieces']?.toString() ?? '0',
-                                          style: const TextStyle(fontWeight: FontWeight.w500),
-                                        ),
-                                      ),
-                                    ),
-                                    // Remaining Stock in Boxes (read-only, auto-calculated)
-                                    DataCell(
-                                      Container(
-                                        color: Colors.blue.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: Text(
-                                          record['remaining_stock_boxes']?.toString() ?? '0',
-                                          style: const TextStyle(fontWeight: FontWeight.w500),
-                                        ),
-                                      ),
-                                    ),
-                                    // New Stock in gram
-                                    DataCell(
-                                      Container(
-                                        color: Colors.green.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: _isEditModeOverall
-                                          ? SizedBox(
-                                                width: 90,
-                                              child: TextField(
-                                                  controller: _overallNewStockGramControllers[key],
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                  ],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                ),
-                                              ),
-                                            )
-                                            : Text(record['new_stock_gram']?.toString() ?? '0'),
-                                      ),
-                                    ),
-                                    // New Stock in kg
-                                    DataCell(
-                                      Container(
-                                        color: Colors.green.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: _isEditModeOverall
-                                            ? SizedBox(
-                                                width: 90,
-                                                child: TextField(
-                                                  controller: _overallNewStockKgControllers[key],
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                  ],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                  ),
-                                                ),
-                                              )
-                                            : Text(record['new_stock_kg']?.toString() ?? '0'),
-                                      ),
-                                    ),
-                                    // New Stock in litre
-                                    DataCell(
-                                      Container(
-                                        color: Colors.green.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: _isEditModeOverall
-                                            ? SizedBox(
-                                                width: 90,
-                                                child: TextField(
-                                                  controller: _overallNewStockLitreControllers[key],
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                  ],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                  ),
-                                                ),
-                                              )
-                                            : Text(record['new_stock_litre']?.toString() ?? '0'),
-                                      ),
-                                    ),
-                                    // New Stock in pieces
-                                    DataCell(
-                                      Container(
-                                        color: Colors.green.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: _isEditModeOverall
-                                            ? SizedBox(
-                                                width: 90,
-                                                child: TextField(
-                                                  controller: _overallNewStockPiecesControllers[key],
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                  ],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                  ),
-                                                ),
-                                              )
-                                            : Text(record['new_stock_pieces']?.toString() ?? '0'),
-                                      ),
-                                    ),
-                                    // New Stock in Boxes
-                                    DataCell(
-                                      Container(
-                                        color: Colors.green.shade50,
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                        child: _isEditModeOverall
-                                            ? SizedBox(
-                                                width: 90,
-                                                child: TextField(
-                                                  controller: _overallNewStockBoxesControllers[key],
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                  ],
-                                                  decoration: const InputDecoration(
-                                                    border: OutlineInputBorder(),
-                                                    isDense: true,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                  ),
-                                                ),
-                                              )
-                                            : Text(record['new_stock_boxes']?.toString() ?? '0'),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                                ),
-                              ),
-                            ),
+                        : _buildOverallStockTableWithStickyHeader(filteredOverallStock, showSectorColumn, showVehicleColumns),
+              ),
+            ],
+          ),
+          // Item Price Tab
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: Colors.grey.shade100,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search item name...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          filled: true,
+                          fillColor: Colors.white,
                         ),
+                        onChanged: (value) {
+                          setState(() => _itemPriceSearchQuery = value);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    if (_isEditModeItemPrice)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : () {
+                              setState(() => _isEditModeItemPrice = false);
+                            },
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : _saveItemPrices,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Save'),
+                          ),
+                        ],
+                      )
+                    else
+                      ElevatedButton.icon(
+                        onPressed: _isLoading ? null : () {
+                          setState(() => _isEditModeItemPrice = true);
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber.shade700,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _buildItemPriceTable(),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  // Overall Stock sticky table column widths
+  static const double _overallColSector = 100;
+  static const double _overallColItemName = 130;
+  static const double _overallColVehicle = 85;
+  static const double _overallColPart = 85;
+  static const double _overallColUnit = 88;
+  static const double _overallHeaderHeight = 72;
+  static const double _overallRowHeight = 48;
+
+  static const double _itemPriceColSector = 100;
+  static const double _itemPriceColName = 160;
+  static const double _itemPriceColQty = 90;
+  static const double _itemPriceColUnit = 70;
+  static const double _itemPriceColNew = 100;
+  static const double _itemPriceColOld = 100;
+  static const double _itemPriceHeaderHeight = 56;
+  static const double _itemPriceRowHeight = 52;
+
+  Widget _buildOverallStockTableWithStickyHeader(
+    List<Map<String, dynamic>> filteredOverallStock,
+    bool showSectorColumn,
+    bool showVehicleColumns,
+  ) {
+    double totalWidth = _overallColItemName + _overallColUnit * 10;
+    if (showSectorColumn) totalWidth += _overallColSector;
+    if (showVehicleColumns) totalWidth += _overallColVehicle + _overallColPart;
+
+    return FixedHeaderTable(
+      horizontalScrollController: _overallStockHorizontalScrollController,
+      totalWidth: totalWidth,
+      headerHeight: _overallHeaderHeight,
+      headerBuilder: (context) {
+        final cells = <Widget>[
+          if (showSectorColumn)
+            SizedBox(
+              width: _overallColSector,
+              child: InkWell(
+                onTap: () {
+                  setState(() => _sortAscendingOverall = !_sortAscendingOverall);
+                },
+                child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          SizedBox(width: _overallColItemName, child: const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          if (showVehicleColumns) ...[
+            SizedBox(width: _overallColVehicle, child: const Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _overallColPart, child: const Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
+          ],
+          _headerCell('Remaining Stock\nin gram', Colors.blue, _overallColUnit),
+          _headerCell('Remaining Stock\nin kg', Colors.blue, _overallColUnit),
+          _headerCell('Remaining Stock\nin litre', Colors.blue, _overallColUnit),
+          _headerCell('Remaining Stock\nin pieces', Colors.blue, _overallColUnit),
+          _headerCell('Remaining Stock\nin Boxes', Colors.blue, _overallColUnit),
+          _headerCell('New Stock\nin gram', Colors.green, _overallColUnit),
+          _headerCell('New Stock\nin kg', Colors.green, _overallColUnit),
+          _headerCell('New Stock\nin litre', Colors.green, _overallColUnit),
+          _headerCell('New Stock\nin pieces', Colors.green, _overallColUnit),
+          _headerCell('New Stock\nin Boxes', Colors.green, _overallColUnit),
+        ];
+        return SizedBox(
+          height: _overallHeaderHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: cells,
+          ),
+        );
+      },
+      rowCount: filteredOverallStock.length,
+      rowBuilder: (context, index) {
+        final record = filteredOverallStock[index];
+        final id = record['id'] as int;
+        final itemId = record['item_id'] as int;
+        final key = '${itemId}_$id';
+        final isMinimumStock = record['is_minimum_stock'] == true;
+        final rowColor = isMinimumStock ? Colors.red.shade100 : Colors.blue.shade50;
+        final itemSectorCode = record['sector_code']?.toString();
+        final showVehicleForThisItem = _shouldShowVehicleFieldsForItem(itemSectorCode);
+
+        final cells = <Widget>[
+          if (showSectorColumn)
+            SizedBox(
+              width: _overallColSector,
+              child: GestureDetector(
+                onSecondaryTapDown: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
+                onLongPressStart: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
+                child: Container(
+                  color: rowColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  alignment: Alignment.centerLeft,
+                  child: Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? ''),
+                ),
+              ),
+            ),
+          SizedBox(
+            width: _overallColItemName,
+            child: GestureDetector(
+              onSecondaryTapDown: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
+              onLongPressStart: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
+              child: Container(
+                color: rowColor,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                alignment: Alignment.centerLeft,
+                child: Text(record['item_name']?.toString() ?? 'N/A'),
+              ),
+            ),
+          ),
+          if (showVehicleColumns) ...[
+            SizedBox(
+              width: _overallColVehicle,
+              child: Container(
+                color: rowColor,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Text(showVehicleForThisItem ? (record['vehicle_type']?.toString() ?? '') : ''),
+              ),
+            ),
+            SizedBox(
+              width: _overallColPart,
+              child: Container(
+                color: rowColor,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Text(showVehicleForThisItem ? (record['part_number']?.toString() ?? '') : ''),
+              ),
+            ),
+          ],
+          _overallCell(record['remaining_stock_gram']?.toString() ?? '0', Colors.blue.shade50, rowColor, null),
+          _overallCell(record['remaining_stock_kg']?.toString() ?? '0', Colors.blue.shade50, rowColor, null),
+          _overallCell(record['remaining_stock_litre']?.toString() ?? '0', Colors.blue.shade50, rowColor, null),
+          _overallCell(record['remaining_stock_pieces']?.toString() ?? '0', Colors.blue.shade50, rowColor, null),
+          _overallCell(record['remaining_stock_boxes']?.toString() ?? '0', Colors.blue.shade50, rowColor, null),
+          _overallCell(record['new_stock_gram']?.toString() ?? '0', Colors.green.shade50, rowColor, _overallNewStockGramControllers[key]),
+          _overallCell(record['new_stock_kg']?.toString() ?? '0', Colors.green.shade50, rowColor, _overallNewStockKgControllers[key]),
+          _overallCell(record['new_stock_litre']?.toString() ?? '0', Colors.green.shade50, rowColor, _overallNewStockLitreControllers[key]),
+          _overallCell(record['new_stock_pieces']?.toString() ?? '0', Colors.green.shade50, rowColor, _overallNewStockPiecesControllers[key]),
+          _overallCell(record['new_stock_boxes']?.toString() ?? '0', Colors.green.shade50, rowColor, _overallNewStockBoxesControllers[key]),
+        ];
+        return SizedBox(
+          height: _overallRowHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: cells,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _headerCell(String text, MaterialColor color, double width) {
+    return SizedBox(
+      width: width,
+      height: _overallHeaderHeight,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.shade100,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.visible,
+        ),
+      ),
+    );
+  }
+
+  Widget _overallCell(String text, Color bgColor, Color rowColor, TextEditingController? controller) {
+    return SizedBox(
+      width: _overallColUnit,
+      child: Container(
+        color: rowColor,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Container(
+          color: bgColor,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: _isEditModeOverall && controller != null
+              ? TextField(
+                  controller: controller,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ],
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  ),
+                )
+              : Text(text, style: const TextStyle(fontWeight: FontWeight.w500)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemPriceTable() {
+    final showSectorColumn = widget.selectedSector == null || widget.includedSectorCodes != null;
+    final query = _itemPriceSearchQuery.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? _itemPrices
+        : _itemPrices.where((r) => (r['item_name']?.toString() ?? '').toLowerCase().contains(query)).toList();
+    if (_itemPrices.isEmpty && !_isLoading) {
+      return const Center(child: Text('No item prices. Add item names from New Entry.'));
+    }
+    if (filtered.isEmpty) {
+      return const Center(child: Text('No matching items'));
+    }
+    final totalWidth = showSectorColumn
+        ? (_itemPriceColSector + _itemPriceColName + _itemPriceColQty + _itemPriceColUnit + _itemPriceColNew + _itemPriceColOld)
+        : (_itemPriceColName + _itemPriceColQty + _itemPriceColUnit + _itemPriceColNew + _itemPriceColOld);
+    return FixedHeaderTable(
+      horizontalScrollController: _itemPriceHorizontalScrollController,
+      totalWidth: totalWidth,
+      headerHeight: _itemPriceHeaderHeight,
+      headerBuilder: (context) {
+        final cells = <Widget>[
+          if (showSectorColumn)
+            SizedBox(width: _itemPriceColSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _itemPriceColName, child: const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _itemPriceColQty, child: const Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _itemPriceColUnit, child: const Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _itemPriceColNew, child: const Text('New Price', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _itemPriceColOld, child: const Text('Old Price', style: TextStyle(fontWeight: FontWeight.bold))),
+        ];
+        return SizedBox(
+          height: _itemPriceHeaderHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: cells,
+          ),
+        );
+      },
+      rowCount: filtered.length,
+      rowBuilder: (context, index) {
+        final r = filtered[index];
+        final itemNameId = r['item_name_id'] as int? ?? (r['id'] as int? ?? 0);
+        final qCtrl = _itemPriceQuantityControllers[itemNameId];
+        final unitValue = _itemPriceUnitValues[itemNameId];
+        final newCtrl = _itemPriceNewPriceControllers[itemNameId];
+        final oldCtrl = _itemPriceOldPriceControllers[itemNameId];
+        final cells = <Widget>[
+          if (showSectorColumn)
+            SizedBox(
+              width: _itemPriceColSector,
+              child: Text(_getSectorName(r['sector_code']?.toString())),
+            ),
+          SizedBox(
+            width: _itemPriceColName,
+            child: Text(r['item_name']?.toString() ?? ''),
+          ),
+          SizedBox(
+            width: _itemPriceColQty,
+            child: _isEditModeItemPrice && qCtrl != null
+                ? TextField(
+                    controller: qCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                  )
+                : Text(r['quantity']?.toString() ?? ''),
+          ),
+          SizedBox(
+            width: _itemPriceColUnit,
+            child: _isEditModeItemPrice
+                ? DropdownButtonFormField<String>(
+                    value: unitValue != null && _itemPriceUnitOptions.contains(unitValue) ? unitValue : null,
+                    isDense: true,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.black),
+                    dropdownColor: Colors.white,
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 12, color: Colors.black))),
+                      DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 12, color: Colors.black))),
+                      DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 12, color: Colors.black))),
+                      DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 12, color: Colors.black))),
+                      DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 12, color: Colors.black))),
+                      DropdownMenuItem(value: 'Boxes', child: Text('Boxes', style: TextStyle(fontSize: 12, color: Colors.black))),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _itemPriceUnitValues[itemNameId] = value;
+                      });
+                    },
+                  )
+                : Text(r['unit']?.toString() ?? '-'),
+          ),
+          SizedBox(
+            width: _itemPriceColNew,
+            child: _isEditModeItemPrice && newCtrl != null
+                ? TextField(
+                    controller: newCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    ],
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                  )
+                : Text(r['new_price']?.toString() ?? ''),
+          ),
+          SizedBox(
+            width: _itemPriceColOld,
+            child: _isEditModeItemPrice && oldCtrl != null
+                ? TextField(
+                    controller: oldCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    ],
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                  )
+                : Text(r['old_price']?.toString() ?? ''),
+          ),
+        ];
+        return SizedBox(
+          height: _itemPriceRowHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: cells,
+          ),
+        );
+      },
     );
   }
 }

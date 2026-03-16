@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/fixed_header_table.dart';
 import '../models/mahal_booking.dart';
 import '../models/catering_details.dart';
 import '../models/expense_details.dart';
@@ -61,6 +62,11 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
   // Custom mahal details
   final List<String> _customMahalDetails = [];
 
+  final ScrollController _eventHorizontalScrollController = ScrollController();
+  final ScrollController _cateringHorizontalScrollController = ScrollController();
+  final ScrollController _expenseHorizontalScrollController = ScrollController();
+  final ScrollController _vesselHorizontalScrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +84,10 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
     _clientNameSearchController.dispose();
     _orderStatusSearchController.dispose();
     _vesselMahalDetailSearchController.dispose();
+    _eventHorizontalScrollController.dispose();
+    _cateringHorizontalScrollController.dispose();
+    _expenseHorizontalScrollController.dispose();
+    _vesselHorizontalScrollController.dispose();
     for (var controllers in _vesselControllers.values) {
       for (var controller in controllers.values) {
         if (controller is TextEditingController) {
@@ -597,180 +607,149 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
         Expanded(
           child: filteredEvents.isEmpty
               ? Center(child: Text('No event details found', style: TextStyle(color: Colors.grey.shade600)))
-              : Scrollbar(
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                        dataTextStyle: const TextStyle(color: Colors.black87),
-                        columns: [
-                        const DataColumn(label: Text('Booking ID')),
-                        const DataColumn(label: Text('Mahal Detail')),
-                        DataColumn(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Event Date'),
-                              IconButton(
-                                icon: Icon(_sortByDateDesc ? Icons.arrow_downward : Icons.arrow_upward, size: 16),
-                                tooltip: _sortByDateDesc ? 'Sort: Newest First' : 'Sort: Oldest First',
-                                onPressed: () {
-                                  setState(() {
-                                    _sortByDateDesc = !_sortByDateDesc;
-                                  });
-                                },
-                              ),
-                            ],
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final sortedEvents = List<MahalBooking>.from(filteredEvents)..sort((a, b) {
+                      final comparison = a.eventDate.compareTo(b.eventDate);
+                      return _sortByDateDesc ? -comparison : comparison;
+                    });
+                    const double sp = 12;
+                    const double wId = 100, wMahal = 120, wDate = 110, wTiming = 90, wEventName = 110, wClient = 120, wPh1 = 100, wPh2 = 100, wAddr = 150, wFood = 90, wStatus = 90, wDetails = 200, wSettlement = 150, wAction = 160;
+                    const int colCount = 14;
+                    final totalWidth = wId + wMahal + wDate + wTiming + wEventName + wClient + wPh1 + wPh2 + wAddr + wFood + wStatus + wDetails + wSettlement + wAction + (colCount - 1) * sp;
+                    return FixedHeaderTable(
+                      horizontalScrollController: _eventHorizontalScrollController,
+                      totalWidth: totalWidth,
+                      headerHeight: 48,
+                      headerBuilder: (ctx) => Row(
+                        children: [
+                          SizedBox(width: wId, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wMahal, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Mahal Detail', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          InkWell(
+                            onTap: () => setState(() => _sortByDateDesc = !_sortByDateDesc),
+                            child: SizedBox(width: wDate, height: 48, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Event Date', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_sortByDateDesc ? Icons.arrow_downward : Icons.arrow_upward, size: 16)])),
                           ),
-                        ),
-                        const DataColumn(label: Text('Event Timing')),
-                        const DataColumn(label: Text('Event Name')),
-                        const DataColumn(label: Text('Client Name')),
-                        const DataColumn(label: Text('Client Phone 1')),
-                        const DataColumn(label: Text('Client Phone 2')),
-                        const DataColumn(label: Text('Client Address')),
-                        const DataColumn(label: Text('Food Service')),
-                        const DataColumn(label: Text('Settlement Status')),
-                        const DataColumn(label: Text('Details')),
-                        const DataColumn(label: Text('Final Settlement Amount')),
-                        const DataColumn(label: Text('Action')),
-                      ],
-                      rows: [
-                        ...(filteredEvents..sort((a, b) {
-                          final comparison = a.eventDate.compareTo(b.eventDate);
-                          return _sortByDateDesc ? -comparison : comparison;
-                        })).map((event) {
-                        final isSelected = event.bookingId == _selectedBookingId;
-                        return DataRow(
-                          color: isSelected ? WidgetStateProperty.all(Colors.yellow.shade100) : null,
-                          cells: [
-                            DataCell(
-                              InkWell(
-                                onTap: () => _onBookingIdSelected(event.bookingId!),
-                                child: Text(event.bookingId ?? 'N/A', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
-                              ),
+                          SizedBox(width: sp),
+                          SizedBox(width: wTiming, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Event Timing', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wEventName, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Event Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wClient, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Client Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wPh1, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Client Phone 1', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wPh2, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Client Phone 2', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wAddr, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Client Address', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wFood, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Food Service', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wStatus, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Settlement Status', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wDetails, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Details', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wSettlement, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Final Settlement Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                        ],
+                      ),
+                      rowCount: sortedEvents.length + 1,
+                      rowBuilder: (ctx, index) {
+                        if (index == sortedEvents.length) {
+                          return Container(
+                            color: Colors.blue.shade50,
+                            child: Row(
+                              children: [
+                                SizedBox(width: wId, child: Text('Total (${filteredEvents.where((e) => e.bookingId != null).length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                                SizedBox(width: sp),
+                                SizedBox(width: wMahal), SizedBox(width: sp),
+                                SizedBox(width: wDate), SizedBox(width: sp),
+                                SizedBox(width: wTiming), SizedBox(width: sp),
+                                SizedBox(width: wEventName), SizedBox(width: sp),
+                                SizedBox(width: wClient), SizedBox(width: sp),
+                                SizedBox(width: wPh1), SizedBox(width: sp),
+                                SizedBox(width: wPh2), SizedBox(width: sp),
+                                SizedBox(width: wAddr), SizedBox(width: sp),
+                                SizedBox(width: wFood), SizedBox(width: sp),
+                                SizedBox(width: wStatus), SizedBox(width: sp),
+                                SizedBox(width: wDetails), SizedBox(width: sp),
+                                SizedBox(width: wSettlement, child: Text('₹${filteredEvents.fold<double>(0.0, (sum, event) => sum + (event.finalSettlementAmount ?? 0.0)).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green))),
+                                SizedBox(width: sp),
+                                SizedBox(width: wAction),
+                              ],
                             ),
-                            DataCell(Text(event.mahalDetail, style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(FormatUtils.formatDateDisplay(event.eventDate), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.eventTiming ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.eventName ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.clientName, style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.clientPhone1 ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.clientPhone2 ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-                            DataCell(SizedBox(width: 150, child: Text(event.clientAddress ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87)))),
-                            DataCell(Text(event.foodService ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(event.orderStatus?.toUpperCase() ?? 'OPEN', style: const TextStyle(color: Colors.black87))),
-                            // Details - read-only
-                            DataCell(
-                              SizedBox(
-                                width: 200,
-                                child: Text(
-                                  event.details ?? '',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.black87),
-                                ),
-                              ),
-                            ),
-                            // Final Settlement Amount - editable
-                            DataCell(
-                              event.bookingId != null && 
-                              _editModeEvent[event.bookingId] == true &&
-                              _finalSettlementControllers.containsKey(event.bookingId) &&
-                              _finalSettlementControllers[event.bookingId] != null
-                                  ? SizedBox(
-                                      width: 150,
-                                      child: TextFormField(
-                                        controller: _finalSettlementControllers[event.bookingId]!,
-                                        decoration: const InputDecoration(
-                                          border: OutlineInputBorder(),
-                                          isDense: true,
-                                          prefixText: '₹',
-                                        ),
-                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      ),
-                                    )
-                                  : Text(
-                                      event.finalSettlementAmount != null
-                                          ? '₹${event.finalSettlementAmount?.toStringAsFixed(2) ?? '0.00'}'
-                                          : 'N/A',
-                                      style: const TextStyle(color: Colors.black87),
-                                    ),
-                            ),
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewEvent(event)),
-                                  IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), onPressed: () => _editEvent(event)),
-                                  if (event.bookingId != null)
-                                    if (_editModeEvent[event.bookingId] == true)
-                                      ...[
-                                        IconButton(
-                                          icon: const Icon(Icons.save, color: Colors.green, size: 20),
-                                          tooltip: 'Save',
-                                          onPressed: () => _saveFinalSettlementAmount(event),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
-                                          tooltip: 'Cancel',
-                                          onPressed: () => _cancelEditFinalSettlementAmount(event.bookingId!),
-                                        ),
-                                      ]
-                                    else
-                                      IconButton(
-                                        icon: const Icon(Icons.edit_note, color: Colors.orange, size: 20),
-                                        tooltip: 'Edit Final Settlement',
-                                        onPressed: () => _toggleEditFinalSettlementAmount(event),
-                                      ),
-                                  if (widget.isMainAdmin && event.bookingId != null)
-                                    IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () => _deleteEvent(event.bookingId!)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      }),
-                        // Total Row
-                        DataRow(
-                          color: WidgetStateProperty.all(Colors.blue.shade50),
-                          cells: [
-                            DataCell(
-                              Text(
-                                'Total (${filteredEvents.where((e) => e.bookingId != null).length})',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                            ),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            DataCell(
-                              Text(
-                                '₹${filteredEvents.fold<double>(0.0, (sum, event) => sum + (event.finalSettlementAmount ?? 0.0)).toStringAsFixed(2)}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
-                              ),
-                            ),
-                            const DataCell(Text('')),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                          );
+                        }
+                        final event = sortedEvents[index];
+                        return _buildEventDataRow(event);
+                      },
+                    );
+                  },
                 ),
-              ),
         ),
       ],
     );
+  }
+
+  Widget _buildEventDataRow(MahalBooking event) {
+    const double sp = 12;
+    const double wId = 100, wMahal = 120, wDate = 110, wTiming = 90, wEventName = 110, wClient = 120, wPh1 = 100, wPh2 = 100, wAddr = 150, wFood = 90, wStatus = 90, wDetails = 200, wSettlement = 150, wAction = 160;
+    final isSelected = event.bookingId == _selectedBookingId;
+    final isEditSettlement = event.bookingId != null && _editModeEvent[event.bookingId] == true && _finalSettlementControllers.containsKey(event.bookingId) && _finalSettlementControllers[event.bookingId] != null;
+    final cells = <Widget>[
+      SizedBox(width: wId, child: InkWell(onTap: () => _onBookingIdSelected(event.bookingId!), child: Text(event.bookingId ?? 'N/A', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)))),
+      SizedBox(width: sp),
+      SizedBox(width: wMahal, child: Text(event.mahalDetail, style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wDate, child: Text(FormatUtils.formatDateDisplay(event.eventDate), style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wTiming, child: Text(event.eventTiming ?? 'N/A', style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wEventName, child: Text(event.eventName ?? 'N/A', style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wClient, child: Text(event.clientName, style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wPh1, child: Text(event.clientPhone1 ?? 'N/A', style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wPh2, child: Text(event.clientPhone2 ?? 'N/A', style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wAddr, child: Text(event.clientAddress ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wFood, child: Text(event.foodService ?? 'N/A', style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wStatus, child: Text(event.orderStatus?.toUpperCase() ?? 'OPEN', style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wDetails, child: Text(event.details ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wSettlement, child: isEditSettlement ? TextFormField(controller: _finalSettlementControllers[event.bookingId]!, decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, prefixText: '₹'), keyboardType: const TextInputType.numberWithOptions(decimal: true)) : Text(event.finalSettlementAmount != null ? '₹${event.finalSettlementAmount?.toStringAsFixed(2) ?? '0.00'}' : 'N/A', style: const TextStyle(color: Colors.black87))),
+      SizedBox(width: sp),
+      SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: _buildEventActionButtons(event))),
+    ];
+    return Container(
+      color: isSelected ? Colors.yellow.shade100 : null,
+      child: Row(children: cells),
+    );
+  }
+
+  List<Widget> _buildEventActionButtons(MahalBooking event) {
+    final list = <Widget>[
+      IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewEvent(event)),
+      IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), onPressed: () => _editEvent(event)),
+    ];
+    if (event.bookingId != null) {
+      if (_editModeEvent[event.bookingId] == true) {
+        list.add(IconButton(icon: const Icon(Icons.save, color: Colors.green, size: 20), tooltip: 'Save', onPressed: () => _saveFinalSettlementAmount(event)));
+        list.add(IconButton(icon: const Icon(Icons.cancel, color: Colors.grey, size: 20), tooltip: 'Cancel', onPressed: () => _cancelEditFinalSettlementAmount(event.bookingId!)));
+      } else {
+        list.add(IconButton(icon: const Icon(Icons.edit_note, color: Colors.orange, size: 20), tooltip: 'Edit Final Settlement', onPressed: () => _toggleEditFinalSettlementAmount(event)));
+      }
+    }
+    if (widget.isMainAdmin && event.bookingId != null) {
+      list.add(IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () => _deleteEvent(event.bookingId!)));
+    }
+    return list;
   }
 
   Widget _buildCateringDetailsTab() {
@@ -783,51 +762,68 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
         Expanded(
           child: filteredCatering.isEmpty
               ? Center(child: Text('No catering details found', style: TextStyle(color: Colors.grey.shade600)))
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    child: DataTable(
-                      headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                      dataTextStyle: const TextStyle(color: Colors.black87),
-                      columns: const [
-                        DataColumn(label: Text('Booking ID')),
-                        DataColumn(label: Text('Delivery Location')),
-                        DataColumn(label: Text('Morning Food Count')),
-                        DataColumn(label: Text('Morning Food Menu')),
-                        DataColumn(label: Text('Afternoon Food Count')),
-                        DataColumn(label: Text('Afternoon Food Menu')),
-                        DataColumn(label: Text('Evening Food Count')),
-                        DataColumn(label: Text('Evening Food Menu')),
-                        DataColumn(label: Text('Action')),
-                      ],
-                      rows: filteredCatering.map((catering) {
-                        return DataRow(
-                          cells: [
-                            DataCell(Text(catering.bookingId, style: const TextStyle(color: Colors.black87))),
-                            DataCell(SizedBox(width: 150, child: Text(catering.deliveryLocation ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87)))),
-                            DataCell(Text(catering.morningFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
-                            DataCell(SizedBox(width: 200, child: Text(catering.morningFoodMenu ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87)))),
-                            DataCell(Text(catering.afternoonFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
-                            DataCell(SizedBox(width: 200, child: Text(catering.afternoonFoodMenu ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87)))),
-                            DataCell(Text(catering.eveningFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
-                            DataCell(SizedBox(width: 200, child: Text(catering.eveningFoodMenu ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87)))),
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewCatering(catering)),
-                                  IconButton(icon: const Icon(Icons.download, color: Colors.blue, size: 20), tooltip: 'Download PDF', onPressed: () => _downloadCateringPDF(catering)),
-                                  IconButton(icon: const Icon(Icons.edit, color: Colors.orange, size: 20), tooltip: 'Edit', onPressed: () => _editCatering(catering)),
-                                  if (widget.isMainAdmin)
-                                    IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteCatering(catering.bookingId)),
-                                ],
-                              ),
-                            ),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    const double sp = 12;
+                    const double wId = 100, wLoc = 150, wCount = 100, wMenu = 200, wAction = 160;
+                    final totalWidth = wId + wLoc + wCount + wMenu * 3 + wCount * 2 + wAction + 8 * sp;
+                    return FixedHeaderTable(
+                      horizontalScrollController: _cateringHorizontalScrollController,
+                      totalWidth: totalWidth,
+                      headerHeight: 48,
+                      headerBuilder: (ctx) => Row(
+                        children: [
+                          SizedBox(width: wId, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wLoc, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Delivery Location', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wCount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Morning Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wMenu, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Morning Food Menu', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wCount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Afternoon Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wMenu, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Afternoon Food Menu', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wCount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Evening Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wMenu, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Evening Food Menu', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                        ],
+                      ),
+                      rowCount: filteredCatering.length,
+                      rowBuilder: (ctx, index) {
+                        final catering = filteredCatering[index];
+                        return Row(
+                          children: [
+                            SizedBox(width: wId, child: Text(catering.bookingId, style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wLoc, child: Text(catering.deliveryLocation ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wCount, child: Text(catering.morningFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wMenu, child: Text(catering.morningFoodMenu ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wCount, child: Text(catering.afternoonFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wMenu, child: Text(catering.afternoonFoodMenu ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wCount, child: Text(catering.eveningFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wMenu, child: Text(catering.eveningFoodMenu ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewCatering(catering)),
+                              IconButton(icon: const Icon(Icons.download, color: Colors.blue, size: 20), tooltip: 'Download PDF', onPressed: () => _downloadCateringPDF(catering)),
+                              IconButton(icon: const Icon(Icons.edit, color: Colors.orange, size: 20), tooltip: 'Edit', onPressed: () => _editCatering(catering)),
+                              if (widget.isMainAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteCatering(catering.bookingId)),
+                            ])),
                           ],
                         );
-                      }).toList(),
-                    ),
-                  ),
+                      },
+                    );
+                  },
                 ),
         ),
       ],
@@ -844,71 +840,73 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
         Expanded(
           child: filteredExpense.isEmpty
               ? Center(child: Text('No expense details found', style: TextStyle(color: Colors.grey.shade600)))
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    child: DataTable(
-                      headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                      dataTextStyle: const TextStyle(color: Colors.black87),
-                      columns: const [
-                        DataColumn(label: Text('Booking ID')),
-                        DataColumn(label: Text('Master Salary')),
-                        DataColumn(label: Text('Cooking Helper Salary')),
-                        DataColumn(label: Text('External Catering Salary')),
-                        DataColumn(label: Text('Current Bill')),
-                        DataColumn(label: Text('Cleaning Bill')),
-                        DataColumn(label: Text('Grocery Bill')),
-                        DataColumn(label: Text('Vegetable Bill')),
-                        DataColumn(label: Text('Cylinder Amount')),
-                        DataColumn(label: Text('Morning Food Expense')),
-                        DataColumn(label: Text('Afternoon Food Expense')),
-                        DataColumn(label: Text('Evening Food Expense')),
-                        DataColumn(label: Text('Vehicle Expense')),
-                        DataColumn(label: Text('Packing Items Charge')),
-                        DataColumn(label: Text('Details')),
-                        DataColumn(label: Text('Total Expense')),
-                        DataColumn(label: Text('Action')),
-                      ],
-                      rows: filteredExpense.map((expense) {
-                        return DataRow(
-                          cells: [
-                            DataCell(Text(expense.bookingId, style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.masterSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.cookingHelperSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.externalCateringSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.currentBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.cleaningBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.groceryBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.vegetableBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.cylinderAmount.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.morningFoodExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.afternoonFoodExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.eveningFoodExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.vehicleExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(Text(expense.packingItemsCharge.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            DataCell(SizedBox(width: 200, child: Text(expense.details ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87)))),
-                            DataCell(
-                              Text(
-                                _calculateTotalExpense(expense).toStringAsFixed(2),
-                                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewExpense(expense)),
-                                  IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), onPressed: () => _editExpense(expense)),
-                                  if (widget.isMainAdmin)
-                                    IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () => _deleteExpense(expense.bookingId)),
-                                ],
-                              ),
-                            ),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    const double sp = 10;
+                    const double wId = 100, wNum = 90, wDetails = 200, wAction = 120;
+                    const int colCount = 18;
+                    final totalWidth = wId + wNum * 14 + wDetails + wNum + wAction + (colCount - 1) * sp;
+                    final labels = ['Booking ID', 'Master Salary', 'Cooking Helper Salary', 'External Catering Salary', 'Current Bill', 'Cleaning Bill', 'Grocery Bill', 'Vegetable Bill', 'Cylinder Amount', 'Morning Food Expense', 'Afternoon Food Expense', 'Evening Food Expense', 'Vehicle Expense', 'Packing Items Charge', 'Details', 'Total Expense', 'Action'];
+                    final widths = [wId, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wDetails, wNum, wAction];
+                    return FixedHeaderTable(
+                      horizontalScrollController: _expenseHorizontalScrollController,
+                      totalWidth: totalWidth,
+                      headerHeight: 48,
+                      headerBuilder: (ctx) => Row(
+                        children: [
+                          for (var i = 0; i < labels.length; i++) ...[
+                            if (i > 0) SizedBox(width: sp),
+                            SizedBox(width: widths[i], height: 48, child: Align(alignment: Alignment.centerLeft, child: Text(labels[i], style: const TextStyle(fontWeight: FontWeight.bold)))),
+                          ],
+                        ],
+                      ),
+                      rowCount: filteredExpense.length,
+                      rowBuilder: (ctx, index) {
+                        final expense = filteredExpense[index];
+                        return Row(
+                          children: [
+                            SizedBox(width: wId, child: Text(expense.bookingId, style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.masterSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.cookingHelperSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.externalCateringSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.currentBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.cleaningBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.groceryBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.vegetableBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.cylinderAmount.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.morningFoodExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.afternoonFoodExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.eveningFoodExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.vehicleExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(expense.packingItemsCharge.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wDetails, child: Text(expense.details ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wNum, child: Text(_calculateTotalExpense(expense).toStringAsFixed(2), style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold))),
+                            SizedBox(width: sp),
+                            SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewExpense(expense)),
+                              IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), onPressed: () => _editExpense(expense)),
+                              if (widget.isMainAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), onPressed: () => _deleteExpense(expense.bookingId)),
+                            ])),
                           ],
                         );
-                      }).toList(),
-                    ),
-                  ),
+                      },
+                    );
+                  },
                 ),
         ),
       ],
@@ -1279,124 +1277,77 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                   ),
                 )
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    child: DataTable(
-                      headingTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                      dataTextStyle: const TextStyle(color: Colors.black87),
-                      columns: const [
-                        DataColumn(label: Text('Mahal Detail')),
-                        DataColumn(label: Text('Item Name')),
-                        DataColumn(label: Text('Count')),
-                        DataColumn(label: Text('Action')),
-                      ],
-                      rows: filteredVessels.map((vessel) {
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    const double sp = 12;
+                    const double wMahal = 180, wItem = 200, wCount = 100, wAction = 120;
+                    final totalWidth = wMahal + wItem + wCount + wAction + 3 * sp;
+                    return FixedHeaderTable(
+                      horizontalScrollController: _vesselHorizontalScrollController,
+                      totalWidth: totalWidth,
+                      headerHeight: 48,
+                      headerBuilder: (ctx) => Row(
+                        children: [
+                          SizedBox(width: wMahal, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Mahal Detail', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wItem, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wCount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Count', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: sp),
+                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                        ],
+                      ),
+                      rowCount: filteredVessels.length,
+                      rowBuilder: (ctx, index) {
+                        final vessel = filteredVessels[index];
                         final id = vessel['id'] as int;
                         final isEditing = _editModeVessels[id] == true;
                         final controllers = _vesselControllers[id] ?? {};
-                        
-                        return DataRow(
-                          cells: [
-                            // Mahal Detail
-                            DataCell(
-                              isEditing
-                                  ? DropdownButtonFormField<String>(
-                                      initialValue: controllers['mahal_detail'] as String? ?? vessel['mahal_detail'] as String,
-                                      decoration: const InputDecoration(
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                      ),
-                                      items: [
-                                        const DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
-                                        const DropdownMenuItem(value: 'Thirukampuliyur Minihall', child: Text('Thirukampuliyur Minihall')),
-                                        const DropdownMenuItem(value: 'Thirukampuliyur Big Hall', child: Text('Thirukampuliyur Big Hall')),
-                                        ..._customMahalDetails.map((detail) => DropdownMenuItem(value: detail, child: Text(detail))),
-                                      ],
-                                      onChanged: (value) {
-                                        if (value != null) {
-                                          setState(() {
-                                            if (!_vesselControllers.containsKey(id)) {
-                                              _vesselControllers[id] = {};
-                                            }
-                                            _vesselControllers[id]!['mahal_detail'] = value;
-                                          });
-                                        }
-                                      },
-                                    )
-                                  : Text(vessel['mahal_detail'] as String),
-                            ),
-                            // Item Name
-                            DataCell(
-                              isEditing
-                                  ? SizedBox(
-                                      width: 200,
-                                      child: TextFormField(
-                                        controller: controllers['item_name'] as TextEditingController?,
-                                        decoration: const InputDecoration(
-                                          border: OutlineInputBorder(),
-                                          isDense: true,
-                                        ),
-                                      ),
-                                    )
-                                  : Text(vessel['item_name'] as String),
-                            ),
-                            // Count
-                            DataCell(
-                              isEditing
-                                  ? SizedBox(
-                                      width: 100,
-                                      child: TextFormField(
-                                        controller: controllers['count'] as TextEditingController?,
-                                        decoration: const InputDecoration(
-                                          border: OutlineInputBorder(),
-                                          isDense: true,
-                                        ),
-                                        keyboardType: TextInputType.number,
-                                      ),
-                                    )
-                                  : Text(vessel['count'].toString()),
-                            ),
-                            // Action
-                            DataCell(
-                              isEditing
-                                  ? Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.save, color: Colors.green, size: 20),
-                                          tooltip: 'Save',
-                                          onPressed: () => _saveVessel(id),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
-                                          tooltip: 'Cancel',
-                                          onPressed: () => _cancelEditVessel(id),
-                                        ),
-                                      ],
-                                    )
-                                  : Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                          tooltip: 'Edit',
-                                          onPressed: () => _toggleEditVessel(id),
-                                        ),
-                                        if (AuthService.isMainAdmin)
-                                          IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                            tooltip: 'Delete',
-                                            onPressed: () => _deleteVessel(id),
-                                          ),
-                                      ],
-                                    ),
-                            ),
+                        return Row(
+                          children: [
+                            SizedBox(width: wMahal, child: isEditing
+                                ? DropdownButtonFormField<String>(
+                                    value: controllers['mahal_detail'] as String? ?? vessel['mahal_detail'] as String,
+                                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                    items: [
+                                      const DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
+                                      const DropdownMenuItem(value: 'Thirukampuliyur Minihall', child: Text('Thirukampuliyur Minihall')),
+                                      const DropdownMenuItem(value: 'Thirukampuliyur Big Hall', child: Text('Thirukampuliyur Big Hall')),
+                                      ..._customMahalDetails.map((detail) => DropdownMenuItem(value: detail, child: Text(detail))),
+                                    ],
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        setState(() {
+                                          if (!_vesselControllers.containsKey(id)) _vesselControllers[id] = {};
+                                          _vesselControllers[id]!['mahal_detail'] = value;
+                                        });
+                                      }
+                                    },
+                                  )
+                                : Text(vessel['mahal_detail'] as String)),
+                            SizedBox(width: sp),
+                            SizedBox(width: wItem, child: isEditing
+                                ? TextFormField(controller: controllers['item_name'] as TextEditingController?, decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))
+                                : Text(vessel['item_name'] as String)),
+                            SizedBox(width: sp),
+                            SizedBox(width: wCount, child: isEditing
+                                ? TextFormField(controller: controllers['count'] as TextEditingController?, decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number)
+                                : Text(vessel['count'].toString())),
+                            SizedBox(width: sp),
+                            SizedBox(width: wAction, child: isEditing
+                                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                                    IconButton(icon: const Icon(Icons.save, color: Colors.green, size: 20), tooltip: 'Save', onPressed: () => _saveVessel(id)),
+                                    IconButton(icon: const Icon(Icons.cancel, color: Colors.grey, size: 20), tooltip: 'Cancel', onPressed: () => _cancelEditVessel(id)),
+                                  ])
+                                : Row(mainAxisSize: MainAxisSize.min, children: [
+                                    IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), tooltip: 'Edit', onPressed: () => _toggleEditVessel(id)),
+                                    if (AuthService.isMainAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteVessel(id)),
+                                  ])),
                           ],
                         );
-                      }).toList(),
-                    ),
-                  ),
+                      },
+                    );
+                  },
                 ),
         ),
       ],

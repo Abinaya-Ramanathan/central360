@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../models/sector.dart';
+import '../widgets/fixed_header_table.dart';
 import 'edit_stock_item_dialog.dart';
 
 class ManageStockItemsDialog extends StatefulWidget {
@@ -25,11 +26,18 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
   bool _isLoading = false;
   bool _sortAscending = true; // Sort direction for Sector column
   String? _searchSectorCode; // Selected sector for search filter
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -135,6 +143,89 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
     }
   }
 
+  static const double _headerHeight = 48;
+  static const double _colItemName = 180;
+  static const double _colSector = 120;
+  static const double _colVehicleType = 120;
+  static const double _colPartNumber = 120;
+  static const double _colAction = 120;
+  static const double _colSpacing = 20;
+  static const double _totalWidth = _colItemName + _colSector + _colVehicleType + _colPartNumber + _colAction + _colSpacing * 4;
+
+  Widget _buildStockItemsFixedTable() {
+    return FixedHeaderTable(
+      horizontalScrollController: _horizontalScrollController,
+      totalWidth: _totalWidth,
+      headerHeight: _headerHeight,
+      headerBuilder: (context) => Row(
+        children: [
+          SizedBox(width: _colItemName, child: const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _sortAscending = !_sortAscending;
+                _filteredStockItems = List.from(_filteredStockItems)
+                  ..sort((a, b) {
+                    final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                    final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                    return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                  });
+              });
+            },
+            child: SizedBox(width: _colSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+          ),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colVehicleType, child: const Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colPartNumber, child: const Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colAction, child: const Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+        ],
+      ),
+      rowCount: _filteredStockItems.length,
+      rowBuilder: (context, index) {
+        final item = _filteredStockItems[index];
+        final sectorCode = item['sector_code']?.toString();
+        final showVehicleFields = sectorCode == 'SSEW';
+        return Row(
+          children: [
+            SizedBox(width: _colItemName, child: Text(item['item_name']?.toString() ?? 'N/A')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colSector, child: Text(_getSectorName(sectorCode))),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colVehicleType, child: Text(showVehicleFields ? (item['vehicle_type']?.toString() ?? '') : '')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colPartNumber, child: Text(showVehicleFields ? (item['part_number']?.toString() ?? '') : '')),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colAction,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                    tooltip: 'Edit',
+                    onPressed: () => _editStockItem(item),
+                  ),
+                  if (widget.isMainAdmin)
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                      tooltip: 'Delete',
+                      onPressed: () => _deleteStockItem(
+                        item['id'] as int,
+                        item['item_name']?.toString() ?? 'Stock Item',
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -234,76 +325,7 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
                             style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
                         )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: Scrollbar(
-                            thumbVisibility: true,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: DataTable(
-                                columnSpacing: 20,
-                              sortColumnIndex: 1,
-                              sortAscending: _sortAscending,
-                              columns: [
-                                const DataColumn(label: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(
-                                  label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  onSort: (columnIndex, ascending) {
-                                    setState(() {
-                                      _sortAscending = ascending;
-                                      _stockItems.sort((a, b) {
-                                        final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                                        final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                                        return ascending
-                                            ? aName.compareTo(bName)
-                                            : bName.compareTo(aName);
-                                      });
-                                    });
-                                  },
-                                ),
-                                // Show vehicle type and part number columns
-                                const DataColumn(label: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
-                              ],
-                              rows: _filteredStockItems.map((item) {
-                                final sectorCode = item['sector_code']?.toString();
-                                final showVehicleFields = sectorCode == 'SSEW';
-                                
-                                return DataRow(
-                                  cells: [
-                                    DataCell(Text(item['item_name']?.toString() ?? 'N/A')),
-                                    DataCell(Text(_getSectorName(sectorCode))),
-                                    DataCell(Text(showVehicleFields ? (item['vehicle_type']?.toString() ?? '') : '')),
-                                    DataCell(Text(showVehicleFields ? (item['part_number']?.toString() ?? '') : '')),
-                                    DataCell(
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                            tooltip: 'Edit',
-                                            onPressed: () => _editStockItem(item),
-                                          ),
-                                          if (widget.isMainAdmin)
-                                            IconButton(
-                                              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                              tooltip: 'Delete',
-                                              onPressed: () => _deleteStockItem(
-                                                item['id'] as int,
-                                                item['item_name']?.toString() ?? 'Stock Item',
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ),
+                      : _buildStockItemsFixedTable(),
             ),
           ],
         ),

@@ -5,6 +5,7 @@ import '../services/sector_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
 import '../utils/pdf_generator.dart';
+import '../widgets/fixed_header_table.dart';
 
 class ExpenseTabContent extends StatefulWidget {
   final String? selectedSector;
@@ -169,157 +170,145 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
     return total;
   }
 
+  static const double _expenseSp = 20;
+  static const double _expenseWSector = 150, _expenseWAmount = 120;
+
   Widget _buildAllSectorsSummaryTable() {
-    if (_sectorExpenseSummary.isEmpty) {
-      return DataTable(
-        columnSpacing: 20,
-        columns: const [
-          DataColumn(label: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+    const totalWidth = _expenseWSector + _expenseSp + _expenseWAmount;
+    final sortedSectors = _sectorExpenseSummary.isEmpty ? <String>[] : (_sectorExpenseSummary.keys.toList()..sort());
+    final rowCount = _sectorExpenseSummary.isEmpty ? 1 : sortedSectors.length + 1;
+    return FixedHeaderTable(
+      horizontalScrollController: _horizontalScrollController,
+      totalWidth: totalWidth.toDouble(),
+      headerHeight: 48,
+      headerBuilder: (ctx) => Row(
+        children: [
+          SizedBox(width: _expenseWSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _expenseSp),
+          SizedBox(width: _expenseWAmount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
-        rows: const [
-          DataRow(
-            cells: [
-              DataCell(Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
-              DataCell(SizedBox.shrink()),
-            ],
-          ),
-        ],
-      );
-    }
-
-    final sortedSectors = _sectorExpenseSummary.keys.toList()..sort();
-
-    return DataTable(
-      columnSpacing: 20,
-      columns: const [
-        DataColumn(label: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
-        DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
-      ],
-      rows: [
-        ...sortedSectors.map((sectorCode) {
-          return DataRow(
-            cells: [
-              DataCell(Text(_getSectorName(sectorCode))),
-              DataCell(Text('₹${_sectorExpenseSummary[sectorCode]!.toStringAsFixed(2)}')),
+      ),
+      rowCount: rowCount,
+      rowBuilder: (ctx, index) {
+        if (_sectorExpenseSummary.isEmpty) {
+          return Row(
+            children: [
+              SizedBox(width: _expenseWSector, child: const Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
+              SizedBox(width: _expenseSp),
+              SizedBox(width: _expenseWAmount),
             ],
           );
-        }),
-        DataRow(
-          color: WidgetStateProperty.all(Colors.purple.shade50),
-          cells: [
-            const DataCell(
-              Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        }
+        if (index == sortedSectors.length) {
+          return Container(
+            color: Colors.purple.shade50,
+            child: Row(
+              children: [
+                SizedBox(width: _expenseWSector, child: const Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                SizedBox(width: _expenseSp),
+                SizedBox(width: _expenseWAmount, child: Text(_calculateTotalExpenseForAllSectors().toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple))),
+              ],
             ),
-                  DataCell(
-                    Text(
-                      _calculateTotalExpenseForAllSectors().toStringAsFixed(2),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple),
-                    ),
-                  ),
+          );
+        }
+        final sectorCode = sortedSectors[index];
+        return Row(
+          children: [
+            SizedBox(width: _expenseWSector, child: Text(_getSectorName(sectorCode))),
+            SizedBox(width: _expenseSp),
+            SizedBox(width: _expenseWAmount, child: Text('₹${_sectorExpenseSummary[sectorCode]!.toStringAsFixed(2)}')),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
+  static const double _singleWSector = 120, _singleWItem = 200, _singleWAmount = 100, _singleWReason = 200, _singleWActions = 140;
+
   Widget _buildSingleSectorTable() {
     final showSectorColumn = widget.isAdmin && widget.selectedSector == null;
-    
-    return DataTable(
-      columnSpacing: 20,
-      sortColumnIndex: showSectorColumn ? 0 : null,
-      sortAscending: _sortAscending,
-      columns: [
-        if (showSectorColumn)
-          DataColumn(
-            label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-            onSort: (columnIndex, ascending) {
-              setState(() {
-                _sortAscending = ascending;
-                _expenseData.sort((a, b) {
-                  final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                  final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                  return ascending
-                      ? aName.compareTo(bName)
-                      : bName.compareTo(aName);
-                });
+    final totalWidth = showSectorColumn
+        ? (_singleWSector + _expenseSp + _singleWItem + _expenseSp + _singleWAmount + _expenseSp + _singleWReason + _expenseSp + _singleWActions)
+        : (_singleWItem + _expenseSp + _singleWAmount + _expenseSp + _singleWReason + _expenseSp + _singleWActions);
+    final rowCount = _expenseData.isEmpty ? 1 : _expenseData.length + 1;
+    return FixedHeaderTable(
+      horizontalScrollController: _horizontalScrollController,
+      totalWidth: totalWidth.toDouble(),
+      headerHeight: 48,
+      headerBuilder: (ctx) => Row(
+        children: [
+          if (showSectorColumn) ...[
+            SizedBox(width: _singleWSector, height: 48, child: InkWell(onTap: () => setState(() {
+              _sortAscending = !_sortAscending;
+              _expenseData.sort((a, b) {
+                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
               });
-            },
-          ),
-        const DataColumn(label: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold))),
-        const DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
-        const DataColumn(label: Text('Reason for Purchase', style: TextStyle(fontWeight: FontWeight.bold))),
-        const DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-      ],
-      rows: _expenseData.isEmpty
-          ? [
-              DataRow(
-                cells: [
-                  if (showSectorColumn)
-                    const DataCell(SizedBox.shrink()),
-                  const DataCell(Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
-                  const DataCell(SizedBox.shrink()),
-                  const DataCell(SizedBox.shrink()),
-                  const DataCell(SizedBox.shrink()),
-                ],
-              ),
-            ]
-          : [
-              ..._expenseData.map((record) {
-                final showSectorColumn = widget.isAdmin && widget.selectedSector == null;
-                return DataRow(
-                  cells: [
-                    if (showSectorColumn)
-                      DataCell(Text(_getSectorName(record['sector_code']?.toString()))),
-                    DataCell(Text(record['item_details']?.toString() ?? '')),
-                    DataCell(Text(_parseDecimalFromDynamic(record['amount']).toStringAsFixed(2))),
-                    DataCell(Text(record['reason_for_purchase']?.toString() ?? '')),
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.visibility, color: Colors.green, size: 20),
-                            tooltip: 'View',
-                            onPressed: () => _viewExpenseData(record),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                            tooltip: 'Edit',
-                            onPressed: () => _editExpenseData(record),
-                          ),
-                          if (widget.isAdmin)
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                              tooltip: 'Delete',
-                              onPressed: () => _deleteExpenseData(record['id']),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }),
-              DataRow(
-                color: WidgetStateProperty.all(Colors.purple.shade50),
-                cells: [
-                  if (widget.isAdmin && widget.selectedSector == null)
-                    const DataCell(SizedBox.shrink()),
-                  const DataCell(
-                    Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-            DataCell(
-              Text(
-                _calculateTotalExpense().toStringAsFixed(2),
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple),
-              ),
-            ),
-                  const DataCell(SizedBox.shrink()),
-                  const DataCell(SizedBox.shrink()),
-                ],
-              ),
+            }), child: Align(alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_sortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])))),
+            SizedBox(width: _expenseSp),
+          ],
+          SizedBox(width: _singleWItem, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _expenseSp),
+          SizedBox(width: _singleWAmount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _expenseSp),
+          SizedBox(width: _singleWReason, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Reason for Purchase', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _expenseSp),
+          SizedBox(width: _singleWActions, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold)))),
+        ],
+      ),
+      rowCount: rowCount,
+      rowBuilder: (ctx, index) {
+        if (_expenseData.isEmpty) {
+          return Row(
+            children: [
+              if (showSectorColumn) ...[SizedBox(width: _singleWSector), SizedBox(width: _expenseSp)],
+              SizedBox(width: _singleWItem, child: const Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
+              SizedBox(width: _expenseSp),
+              SizedBox(width: _singleWAmount),
+              SizedBox(width: _expenseSp),
+              SizedBox(width: _singleWReason),
+              SizedBox(width: _expenseSp),
+              SizedBox(width: _singleWActions),
             ],
+          );
+        }
+        if (index == _expenseData.length) {
+          return Container(
+            color: Colors.purple.shade50,
+            child: Row(
+              children: [
+                if (showSectorColumn) ...[SizedBox(width: _singleWSector), SizedBox(width: _expenseSp)],
+                SizedBox(width: _singleWItem, child: const Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                SizedBox(width: _expenseSp),
+                SizedBox(width: _singleWAmount, child: Text(_calculateTotalExpense().toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple))),
+                SizedBox(width: _expenseSp),
+                SizedBox(width: _singleWReason),
+                SizedBox(width: _expenseSp),
+                SizedBox(width: _singleWActions),
+              ],
+            ),
+          );
+        }
+        final record = _expenseData[index];
+        final actionButtons = <Widget>[
+          IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewExpenseData(record)),
+          IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), tooltip: 'Edit', onPressed: () => _editExpenseData(record)),
+          if (widget.isAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteExpenseData(record['id'])),
+        ];
+        return Row(
+          children: [
+            if (showSectorColumn) ...[SizedBox(width: _singleWSector, child: Text(_getSectorName(record['sector_code']?.toString()))), SizedBox(width: _expenseSp)],
+            SizedBox(width: _singleWItem, child: Text(record['item_details']?.toString() ?? '')),
+            SizedBox(width: _expenseSp),
+            SizedBox(width: _singleWAmount, child: Text(_parseDecimalFromDynamic(record['amount']).toStringAsFixed(2))),
+            SizedBox(width: _expenseSp),
+            SizedBox(width: _singleWReason, child: Text(record['reason_for_purchase']?.toString() ?? '')),
+            SizedBox(width: _expenseSp),
+            SizedBox(width: _singleWActions, child: Row(mainAxisSize: MainAxisSize.min, children: actionButtons)),
+          ],
+        );
+      },
     );
   }
 
@@ -853,20 +842,9 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : Scrollbar(
-                  thumbVisibility: true,
-                  interactive: true,
-                  controller: _horizontalScrollController,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    controller: _horizontalScrollController,
-                    child: SingleChildScrollView(
-                      child: widget.selectedSector == null && !widget.isAdmin
-                        ? _buildAllSectorsSummaryTable()
-                        : _buildSingleSectorTable(),
-                  ),
-                ),
-              ),
+              : (widget.selectedSector == null && !widget.isAdmin
+                  ? _buildAllSectorsSummaryTable()
+                  : _buildSingleSectorTable()),
         ),
         if (widget.selectedSector != null || (widget.isAdmin && widget.selectedSector == null))
           Padding(

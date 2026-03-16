@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
+import '../widgets/fixed_header_table.dart';
 
 class DailyMiningActivityTabContent extends StatefulWidget {
   final String? selectedSector;
@@ -26,6 +27,7 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
   bool _isLoading = false;
   bool _isGlobalEditMode = false;
   final Map<int, TextEditingController> _quantityControllers = {};
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void initState() {
@@ -38,11 +40,19 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
 
   @override
   void dispose() {
+    _horizontalScrollController.dispose();
     for (var controller in _quantityControllers.values) {
       controller.dispose();
     }
     super.dispose();
   }
+
+  static const double _headerHeight = 48;
+  static const double _colActivityName = 200;
+  static const double _colSector = 150;
+  static const double _colQuantity = 120;
+  static const double _colSpacing = 20;
+  static const double _totalWidth = _colActivityName + _colSector + _colQuantity + _colSpacing * 2;
 
   Future<void> _loadSectors() async {
     try {
@@ -279,62 +289,60 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.vertical,
-                      child: Scrollbar(
-                        thumbVisibility: true,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                          child: Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: DataTable(
-                              columnSpacing: 20,
-                              columns: const [
-                                DataColumn(label: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
-                              ],
-                              rows: _miningActivities.map((activity) {
-                                final activityId = activity['id'] as int;
-                                final existingEntry = _dailyEntries.firstWhere(
-                                  (entry) => entry['activity_id'] == activityId,
-                                  orElse: () => {},
-                                );
-
-                                return DataRow(
-                                  cells: [
-                                    DataCell(Text(activity['activity_name']?.toString() ?? 'N/A')),
-                                    DataCell(Text(_getSectorName(activity['sector_code']?.toString()))),
-                                    DataCell(
-                                      _isGlobalEditMode && _quantityControllers.containsKey(activityId)
-                                          ? SizedBox(
-                                              width: 120,
-                                              child: TextFormField(
-                                                controller: _quantityControllers[activityId],
-                                                decoration: const InputDecoration(
-                                                  border: OutlineInputBorder(),
-                                                  isDense: true,
-                                                ),
-                                                keyboardType: TextInputType.number,
-                                              ),
-                                            )
-                                          : Text(existingEntry['quantity']?.toString() ?? '0'),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
+                  : Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: FixedHeaderTable(
+                          horizontalScrollController: _horizontalScrollController,
+                          totalWidth: _totalWidth,
+                          headerHeight: _headerHeight,
+                          headerBuilder: (context) => Row(
+                            children: [
+                              SizedBox(width: _colActivityName, child: const Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                              SizedBox(width: _colSpacing),
+                              SizedBox(width: _colSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                              SizedBox(width: _colSpacing),
+                              SizedBox(width: _colQuantity, child: const Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
+                            ],
                           ),
+                          rowCount: _miningActivities.length,
+                          rowBuilder: (context, index) {
+                            final activity = _miningActivities[index];
+                            final activityId = activity['id'] as int;
+                            final existingEntry = _dailyEntries.firstWhere(
+                              (entry) => entry['activity_id'] == activityId,
+                              orElse: () => {},
+                            );
+                            return Row(
+                              children: [
+                                SizedBox(width: _colActivityName, child: Text(activity['activity_name']?.toString() ?? 'N/A')),
+                                SizedBox(width: _colSpacing),
+                                SizedBox(width: _colSector, child: Text(_getSectorName(activity['sector_code']?.toString()))),
+                                SizedBox(width: _colSpacing),
+                                SizedBox(
+                                  width: _colQuantity,
+                                  child: _isGlobalEditMode && _quantityControllers.containsKey(activityId)
+                                      ? TextFormField(
+                                          controller: _quantityControllers[activityId],
+                                          decoration: const InputDecoration(
+                                            border: OutlineInputBorder(),
+                                            isDense: true,
+                                          ),
+                                          keyboardType: TextInputType.number,
+                                        )
+                                      : Text(existingEntry['quantity']?.toString() ?? '0'),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ),
                   ),
-        ),
       ],
     );
   }

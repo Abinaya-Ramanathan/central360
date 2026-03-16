@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../models/sector.dart';
+import '../widgets/fixed_header_table.dart';
 import 'edit_mining_activity_dialog.dart';
 
 class ManageMiningActivitiesDialog extends StatefulWidget {
@@ -25,11 +26,18 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
   bool _isLoading = false;
   bool _sortAscending = true; // Sort direction for Sector column
   String? _searchSectorCode; // Selected sector for search filter
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -73,6 +81,89 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
       orElse: () => Sector(code: sectorCode, name: sectorCode),
     );
     return sector.name;
+  }
+
+  static const double _headerHeight = 48;
+  static const double _colActivityName = 180;
+  static const double _colSector = 120;
+  static const double _colDescription = 200;
+  static const double _colAction = 120;
+  static const double _colSpacing = 20;
+  static const double _totalWidth = _colActivityName + _colSector + _colDescription + _colAction + _colSpacing * 3;
+
+  Widget _buildMiningActivitiesFixedTable() {
+    return FixedHeaderTable(
+      horizontalScrollController: _horizontalScrollController,
+      totalWidth: _totalWidth,
+      headerHeight: _headerHeight,
+      headerBuilder: (context) => Row(
+        children: [
+          SizedBox(width: _colActivityName, child: const Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _sortAscending = !_sortAscending;
+                _filteredMiningActivities = List.from(_filteredMiningActivities)
+                  ..sort((a, b) {
+                    final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                    final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                    return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                  });
+              });
+            },
+            child: SizedBox(width: _colSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+          ),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colDescription, child: const Text('Description', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSpacing),
+          SizedBox(width: _colAction, child: const Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+        ],
+      ),
+      rowCount: _filteredMiningActivities.length,
+      rowBuilder: (context, index) {
+        final activity = _filteredMiningActivities[index];
+        return Row(
+          children: [
+            SizedBox(width: _colActivityName, child: Text(activity['activity_name']?.toString() ?? 'N/A')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colSector, child: Text(_getSectorName(activity['sector_code']?.toString()))),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colDescription,
+              child: Text(
+                activity['description']?.toString() ?? '',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colAction,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                    tooltip: 'Edit',
+                    onPressed: () => _editMiningActivity(activity),
+                  ),
+                  if (widget.isMainAdmin)
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                      tooltip: 'Delete',
+                      onPressed: () => _deleteMiningActivity(
+                        activity['id'] as int,
+                        activity['activity_name']?.toString() ?? 'Mining Activity',
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _deleteMiningActivity(int activityId, String activityName) async {
@@ -233,79 +324,7 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
                             style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
                         )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: Scrollbar(
-                            thumbVisibility: true,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: DataTable(
-                                columnSpacing: 20,
-                              sortColumnIndex: 1,
-                              sortAscending: _sortAscending,
-                              columns: [
-                                const DataColumn(label: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(
-                                  label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  onSort: (columnIndex, ascending) {
-                                    setState(() {
-                                      _sortAscending = ascending;
-                                      _miningActivities.sort((a, b) {
-                                        final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                                        final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                                        return ascending
-                                            ? aName.compareTo(bName)
-                                            : bName.compareTo(aName);
-                                      });
-                                    });
-                                  },
-                                ),
-                                const DataColumn(label: Text('Description', style: TextStyle(fontWeight: FontWeight.bold))),
-                                const DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
-                              ],
-                              rows: _filteredMiningActivities.map((activity) {
-                                return DataRow(
-                                  cells: [
-                                    DataCell(Text(activity['activity_name']?.toString() ?? 'N/A')),
-                                    DataCell(Text(_getSectorName(activity['sector_code']?.toString()))),
-                                    DataCell(
-                                      SizedBox(
-                                        width: 200,
-                                        child: Text(
-                                          activity['description']?.toString() ?? '',
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                            tooltip: 'Edit',
-                                            onPressed: () => _editMiningActivity(activity),
-                                          ),
-                                          if (widget.isMainAdmin)
-                                            IconButton(
-                                              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                              tooltip: 'Delete',
-                                              onPressed: () => _deleteMiningActivity(
-                                                activity['id'] as int,
-                                                activity['activity_name']?.toString() ?? 'Mining Activity',
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ),
+                      : _buildMiningActivitiesFixedTable(),
             ),
           ],
         ),

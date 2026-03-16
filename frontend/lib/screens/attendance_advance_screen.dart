@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
+import '../widgets/fixed_header_table.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -46,6 +47,9 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   Map<int, String?> _rentVehicleStatusControllers = {}; // Map of vehicle_id to status
   bool _isEditMode = false; // Edit mode for both employee and rent vehicle attendance
   Future<bool> Function()? _saveEmployeeAttendance;
+  final ScrollController _rentVehicleHorizontalScrollController = ScrollController();
+  final ScrollController _advanceSearchHorizontalScrollController = ScrollController();
+  final ScrollController _advanceTableHorizontalScrollController = ScrollController();
 
   bool get _showMiningActivityTab {
     // Show tab if All sector (null) or SSBM (not when showing SSC main+subs via includedSectorCodes)
@@ -81,6 +85,9 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   void dispose() {
     _tabController.dispose();
     _advanceSearchController.dispose();
+    _rentVehicleHorizontalScrollController.dispose();
+    _advanceSearchHorizontalScrollController.dispose();
+    _advanceTableHorizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -680,90 +687,16 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                               style: TextStyle(fontSize: 16, color: Colors.grey),
                             ),
                           )
-                        : Scrollbar(
-                            thumbVisibility: true,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: SingleChildScrollView(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Card(
-                                    elevation: 4,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(
-                                      Colors.teal.shade100,
-                                    ),
-                                    columns: const [
-                                      DataColumn(
-                                        label: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ),
-                                      DataColumn(
-                                        label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ),
-                                    ],
-                                    rows: _rentVehicles.map((vehicle) {
-                                      final vehicleId = vehicle['id'] as int;
-                                      final currentStatus = _rentVehicleStatusControllers[vehicleId];
-                                      return DataRow(
-                                        cells: [
-                                          DataCell(Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
-                                          DataCell(
-                                            _isEditMode
-                                                ? DropdownButton<String>(
-                                                    value: currentStatus,
-                                                    hint: const Text('Select Status'),
-                                                    isExpanded: true,
-                                                    items: const [
-                                                      DropdownMenuItem<String>(
-                                                        value: 'present',
-                                                        child: Text('Present'),
-                                                      ),
-                                                      DropdownMenuItem<String>(
-                                                        value: 'absent',
-                                                        child: Text('Absent'),
-                                                      ),
-                                                      DropdownMenuItem<String>(
-                                                        value: 'halfday',
-                                                        child: Text('Halfday'),
-                                                      ),
-                                                    ],
-                                                    onChanged: (value) {
-                                                      setState(() {
-                                                        _rentVehicleStatusControllers[vehicleId] = value;
-                                                      });
-                                                    },
-                                                  )
-                                                : Text(
-                                                    currentStatus == null
-                                                        ? '-'
-                                                        : currentStatus == 'present'
-                                                            ? 'Present'
-                                                            : currentStatus == 'absent'
-                                                                ? 'Absent'
-                                                                : 'Halfday',
-                                                    style: TextStyle(
-                                                      color: currentStatus == null
-                                                          ? Colors.grey
-                                                          : currentStatus == 'present'
-                                                              ? Colors.green.shade700
-                                                              : currentStatus == 'absent'
-                                                                  ? Colors.red.shade700
-                                                                  : Colors.orange.shade700,
-                                                    ),
-                                                  ),
-                                          ),
-                                        ],
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
+                        : Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              child: _buildRentVehicleTable(),
                             ),
                           ),
-                    ),
               ),
             ],
           ),
@@ -793,8 +726,11 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                     const SizedBox(height: 12),
                     Scrollbar(
                       thumbVisibility: true,
+                      interactive: true,
+                      controller: _advanceSearchHorizontalScrollController,
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
+                        controller: _advanceSearchHorizontalScrollController,
                         child: Row(
                           children: [
                             // Search Bar
@@ -851,148 +787,16 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
                               ),
                             ),
                           )
-                        : Scrollbar(
-                            thumbVisibility: true,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: SingleChildScrollView(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Card(
-                                    elevation: 4,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(
-                                      Colors.green.shade100,
-                                    ),
-                                    sortColumnIndex: ((widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null) ? 0 : null,
-                                    sortAscending: _sortAscendingAdvance,
-                                    columns: [
-                                      if ((widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null)
-                                        DataColumn(
-                                          label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          onSort: (columnIndex, ascending) {
-                                            setState(() {
-                                              _sortAscendingAdvance = ascending;
-                                              _advanceDetails.sort((a, b) {
-                                                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                                                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                                                return ascending
-                                                    ? aName.compareTo(bName)
-                                                    : bName.compareTo(aName);
-                                              });
-                                            });
-                                          },
-                                        ),
-                                      const DataColumn(
-                                        label: Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ),
-                                      const DataColumn(
-                                        label: Text('Outstanding Advance', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ),
-                                      // Only show Bulk Advance column if any employee has bulk_advance > 0
-                                      if (_filteredAdvanceDetails.any((detail) => ((detail['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01))
-                                        const DataColumn(
-                                          label: Text('Bulk Advance', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        ),
-                                    ],
-                                    rows: () {
-                                      // Calculate totals
-                                      double totalOutstandingAdvance = 0.0;
-                                      double totalBulkAdvance = 0.0;
-                                      final showBulkColumn = _filteredAdvanceDetails.any((d) => ((d['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01);
-                                      
-                                      // Generate data rows and calculate totals
-                                      final dataRows = _filteredAdvanceDetails.map((detail) {
-                                        final outstandingAdvance = (detail['outstanding_advance'] as num?)?.toDouble() ?? 0.0;
-                                        final bulkAdvance = (detail['bulk_advance'] as num?)?.toDouble() ?? 0.0;
-                                        
-                                        // Add to totals
-                                        totalOutstandingAdvance += outstandingAdvance;
-                                        totalBulkAdvance += bulkAdvance;
-                                        
-                                        return DataRow(
-                                          cells: [
-                                            if ((widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null)
-                                              DataCell(Text(_getSectorName(detail['sector_code']?.toString()))),
-                                            DataCell(Text(detail['employee_name']?.toString() ?? 'N/A')),
-                                            DataCell(
-                                              Text(
-                                                '₹${outstandingAdvance.toStringAsFixed(2)}',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.red.shade700,
-                                                ),
-                                              ),
-                                            ),
-                                            // Only show Bulk Advance cell if column is shown
-                                            if (showBulkColumn)
-                                              DataCell(
-                                                Text(
-                                                  bulkAdvance > 0.01
-                                                      ? '₹${bulkAdvance.toStringAsFixed(2)}'
-                                                      : '₹0.00',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: bulkAdvance > 0.01 ? Colors.blue.shade700 : Colors.grey,
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        );
-                                      }).toList();
-                                      
-                                      // Create total row
-                                      final totalRow = DataRow(
-                                        color: WidgetStateProperty.all(Colors.blue.shade50),
-                                        cells: [
-                                          if ((widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null)
-                                            const DataCell(Text('')),
-                                          const DataCell(
-                                            Text(
-                                              'TOTAL',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Text(
-                                              '₹${totalOutstandingAdvance.toStringAsFixed(2)}',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                                color: Colors.red.shade700,
-                                              ),
-                                            ),
-                                          ),
-                                          // Only show Bulk Advance total if column is shown
-                                          if (showBulkColumn)
-                                            DataCell(
-                                              Text(
-                                                '₹${totalBulkAdvance.toStringAsFixed(2)}',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 14,
-                                                  color: Colors.blue.shade700,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      );
-                                      
-                                      // Combine data rows and total row
-                                      return [...dataRows, totalRow];
-                                    }(),
-                                  ),
-                                ),
+                        : Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              child: _buildAdvanceDetailsTable(),
                             ),
                           ),
-                    ),
               ),
             ],
           ),
@@ -1012,6 +816,144 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
           ),
         ],
       ),
+    );
+  }
+
+  static const double _rentVehicleHeaderHeight = 48;
+  static const double _rentVehicleColName = 150;
+  static const double _rentVehicleColStatus = 120;
+  static const double _rentVehicleSpacing = 20;
+  static const double _rentVehicleTotalWidth = _rentVehicleColName + _rentVehicleSpacing + _rentVehicleColStatus;
+
+  Widget _buildRentVehicleTable() {
+    return FixedHeaderTable(
+      horizontalScrollController: _rentVehicleHorizontalScrollController,
+      totalWidth: _rentVehicleTotalWidth,
+      headerHeight: _rentVehicleHeaderHeight,
+      headerBuilder: (context) => Material(
+        color: Colors.teal.shade100,
+        child: Row(
+          children: [
+            SizedBox(width: _rentVehicleColName, child: const Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _rentVehicleSpacing),
+            SizedBox(width: _rentVehicleColStatus, child: const Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
+          ],
+        ),
+      ),
+      rowCount: _rentVehicles.length,
+      rowBuilder: (context, index) {
+        final vehicle = _rentVehicles[index];
+        final vehicleId = vehicle['id'] as int;
+        final currentStatus = _rentVehicleStatusControllers[vehicleId];
+        return Row(
+          children: [
+            SizedBox(width: _rentVehicleColName, child: Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
+            SizedBox(width: _rentVehicleSpacing),
+            SizedBox(
+              width: _rentVehicleColStatus,
+              child: _isEditMode
+                  ? DropdownButton<String>(
+                      value: currentStatus,
+                      hint: const Text('Select Status'),
+                      isExpanded: true,
+                      items: const [
+                        DropdownMenuItem<String>(value: 'present', child: Text('Present')),
+                        DropdownMenuItem<String>(value: 'absent', child: Text('Absent')),
+                        DropdownMenuItem<String>(value: 'halfday', child: Text('Halfday')),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _rentVehicleStatusControllers[vehicleId] = value);
+                      },
+                    )
+                  : Text(
+                      currentStatus == null ? '-' : currentStatus == 'present' ? 'Present' : currentStatus == 'absent' ? 'Absent' : 'Halfday',
+                      style: TextStyle(
+                        color: currentStatus == null ? Colors.grey : currentStatus == 'present' ? Colors.green.shade700 : currentStatus == 'absent' ? Colors.red.shade700 : Colors.orange.shade700,
+                      ),
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  static const double _advanceHeaderHeight = 48;
+  static const double _advanceColSector = 100;
+  static const double _advanceColName = 150;
+  static const double _advanceColAmount = 120;
+  static const double _advanceSpacing = 20;
+
+  Widget _buildAdvanceDetailsTable() {
+    final showSector = (widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null;
+    final showBulkColumn = _filteredAdvanceDetails.any((d) => ((d['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01);
+    int colCount = 3;
+    if (showSector) colCount++;
+    if (showBulkColumn) colCount++;
+    double totalWidth = (showSector ? _advanceColSector : 0) + _advanceColName + _advanceColAmount * (showBulkColumn ? 2 : 1) + (colCount - 1) * _advanceSpacing;
+    const bold = TextStyle(fontWeight: FontWeight.bold);
+    final List<Widget> headerChildren = [];
+    void addCol(double w, Widget c) {
+      if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _advanceSpacing));
+      headerChildren.add(SizedBox(width: w, child: c));
+    }
+    if (showSector) {
+      addCol(_advanceColSector, InkWell(
+        onTap: () {
+          setState(() {
+            _sortAscendingAdvance = !_sortAscendingAdvance;
+            _advanceDetails.sort((a, b) {
+              final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+              final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+              return _sortAscendingAdvance ? aName.compareTo(bName) : bName.compareTo(aName);
+            });
+          });
+        },
+        child: const Text('Sector', style: bold),
+      ));
+    }
+    addCol(_advanceColName, const Text('Employee Name', style: bold));
+    addCol(_advanceColAmount, const Text('Outstanding Advance', style: bold));
+    if (showBulkColumn) addCol(_advanceColAmount, const Text('Bulk Advance', style: bold));
+
+    double totalOutstanding = 0.0;
+    double totalBulk = 0.0;
+    for (final d in _filteredAdvanceDetails) {
+      totalOutstanding += (d['outstanding_advance'] as num?)?.toDouble() ?? 0.0;
+      totalBulk += (d['bulk_advance'] as num?)?.toDouble() ?? 0.0;
+    }
+
+    return FixedHeaderTable(
+      horizontalScrollController: _advanceTableHorizontalScrollController,
+      totalWidth: totalWidth,
+      headerHeight: _advanceHeaderHeight,
+      headerBuilder: (context) => Material(
+        color: Colors.green.shade100,
+        child: Row(children: headerChildren),
+      ),
+      rowCount: _filteredAdvanceDetails.length + 1,
+      rowBuilder: (context, index) {
+        final List<Widget> rowChildren = [];
+        void addCell(double w, Widget c) {
+          if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _advanceSpacing));
+          rowChildren.add(SizedBox(width: w, child: c));
+        }
+        if (index == _filteredAdvanceDetails.length) {
+          if (showSector) addCell(_advanceColSector, const Text(''));
+          addCell(_advanceColName, const Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)));
+          addCell(_advanceColAmount, Text('₹${totalOutstanding.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red.shade700)));
+          if (showBulkColumn) addCell(_advanceColAmount, Text('₹${totalBulk.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue.shade700)));
+          return Material(color: Colors.blue.shade50, child: Row(children: rowChildren));
+        }
+        final detail = _filteredAdvanceDetails[index];
+        final outstandingAdvance = (detail['outstanding_advance'] as num?)?.toDouble() ?? 0.0;
+        final bulkAdvance = (detail['bulk_advance'] as num?)?.toDouble() ?? 0.0;
+        if (showSector) addCell(_advanceColSector, Text(_getSectorName(detail['sector_code']?.toString())));
+        addCell(_advanceColName, Text(detail['employee_name']?.toString() ?? 'N/A'));
+        addCell(_advanceColAmount, Text('₹${outstandingAdvance.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade700)));
+        if (showBulkColumn) addCell(_advanceColAmount, Text(bulkAdvance > 0.01 ? '₹${bulkAdvance.toStringAsFixed(2)}' : '₹0.00', style: TextStyle(fontWeight: FontWeight.bold, color: bulkAdvance > 0.01 ? Colors.blue.shade700 : Colors.grey)));
+        return Row(children: rowChildren);
+      },
     );
   }
 }

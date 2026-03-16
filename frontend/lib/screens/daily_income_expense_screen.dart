@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/pdf_generator.dart';
+import '../widgets/fixed_header_table.dart';
 import 'home_screen.dart';
 import 'month_year_picker.dart';
 
@@ -327,158 +328,66 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
       }
     }
 
-    return Scrollbar(
-      thumbVisibility: true,
-      interactive: true,
-      controller: _dailyTabHorizontalScrollController,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        controller: _dailyTabHorizontalScrollController,
-        child: SingleChildScrollView(
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(Colors.blue.shade100),
-            columns: const [
-              DataColumn(label: Text('Item Name')),
-            DataColumn(label: Text('Quantity')),
-            DataColumn(label: Text('Income'), numeric: true),
-            DataColumn(label: Text('Expense'), numeric: true),
-            DataColumn(label: Text('Action')),
-          ],
-          rows: [
-            ..._incomeExpenseData.asMap().entries.map((entry) {
-              final index = entry.key;
-              final item = entry.value;
-              final isEditing = _editModeIncomeExpense[index] ?? false;
-              final controllers = _incomeExpenseControllers[index] ?? {};
-
-              return DataRow(
-                cells: [
-                  DataCell(
-                    isEditing
-                        ? SizedBox(
-                            width: 150,
-                            child: TextField(
-                              controller: controllers['item_name'],
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                            ),
-                          )
-                        : Text(item['item_name']?.toString() ?? ''),
-                  ),
-                  DataCell(
-                    isEditing
-                        ? SizedBox(
-                            width: 100,
-                            child: TextField(
-                              controller: controllers['quantity'],
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                            ),
-                          )
-                        : Text(item['quantity']?.toString() ?? ''),
-                  ),
-                  DataCell(
-                    isEditing
-                        ? SizedBox(
-                            width: 120,
-                            child: TextField(
-                              controller: controllers['income_amount'],
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                              ],
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            '₹${_parseAmount(item['income_amount']).toStringAsFixed(2)}',
-                          ),
-                  ),
-                  DataCell(
-                    isEditing
-                        ? SizedBox(
-                            width: 120,
-                            child: TextField(
-                              controller: controllers['expense_amount'],
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                              ],
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            '₹${_parseAmount(item['expense_amount']).toStringAsFixed(2)}',
-                          ),
-                  ),
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isEditing)
-                          IconButton(
-                            icon: const Icon(Icons.save, color: Colors.green),
-                            tooltip: 'Save',
-                            onPressed: () => _saveIncomeExpenseItem(index),
-                          )
-                        else
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue),
-                            tooltip: 'Edit',
-                            onPressed: () => _editIncomeExpenseItem(index),
-                          ),
-                        if (widget.isMainAdmin)
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            tooltip: 'Delete',
-                            onPressed: () => _deleteIncomeExpenseItem(index),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            }),
-            // Total Row
-            DataRow(
-              color: WidgetStateProperty.all(Colors.grey.shade200),
-              cells: [
-                const DataCell(
-                  Text(
-                    'Total',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const DataCell(SizedBox.shrink()),
-                DataCell(
-                  Text(
-                    '₹${totalIncome.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                DataCell(
-                  Text(
-                    '₹${totalExpense.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const DataCell(SizedBox.shrink()),
-              ],
-            ),
+    const double sp = 20;
+    const double wItem = 150, wQty = 100, wIncome = 120, wExpense = 120, wAction = 160;
+    final totalWidth = wItem + sp + wQty + sp + wIncome + sp + wExpense + sp + wAction;
+    return FixedHeaderTable(
+      horizontalScrollController: _dailyTabHorizontalScrollController,
+      totalWidth: totalWidth,
+      headerHeight: 48,
+      headerBuilder: (ctx) => Container(
+        color: Colors.blue.shade100,
+        child: Row(
+          children: [
+            SizedBox(width: wItem, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Item Name'))),
+            SizedBox(width: sp),
+            SizedBox(width: wQty, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Quantity'))),
+            SizedBox(width: sp),
+            SizedBox(width: wIncome, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Income'))),
+            SizedBox(width: sp),
+            SizedBox(width: wExpense, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Expense'))),
+            SizedBox(width: sp),
+            SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action'))),
           ],
         ),
       ),
-    ),
+      rowCount: _incomeExpenseData.length + 1,
+      rowBuilder: (ctx, index) {
+        if (index == _incomeExpenseData.length) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: Row(
+              children: [
+                SizedBox(width: wItem, child: const Text('Total', style: TextStyle(fontWeight: FontWeight.bold))),
+                SizedBox(width: sp),
+                SizedBox(width: wQty),
+                SizedBox(width: sp),
+                SizedBox(width: wIncome, child: Text('₹${totalIncome.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold))),
+                SizedBox(width: sp),
+                SizedBox(width: wExpense, child: Text('₹${totalExpense.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold))),
+                SizedBox(width: sp),
+                SizedBox(width: wAction),
+              ],
+            ),
+          );
+        }
+        final item = _incomeExpenseData[index];
+        final isEditing = _editModeIncomeExpense[index] ?? false;
+        final controllers = _incomeExpenseControllers[index] ?? {};
+        return Row(
+          children: [
+            SizedBox(width: wItem, child: isEditing ? SizedBox(width: 150, child: TextField(controller: controllers['item_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(item['item_name']?.toString() ?? '')),
+            SizedBox(width: sp),
+            SizedBox(width: wQty, child: isEditing ? SizedBox(width: 100, child: TextField(controller: controllers['quantity'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(item['quantity']?.toString() ?? '')),
+            SizedBox(width: sp),
+            SizedBox(width: wIncome, child: isEditing ? SizedBox(width: 120, child: TextField(controller: controllers['income_amount'], keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text('₹${_parseAmount(item['income_amount']).toStringAsFixed(2)}')),
+            SizedBox(width: sp),
+            SizedBox(width: wExpense, child: isEditing ? SizedBox(width: 120, child: TextField(controller: controllers['expense_amount'], keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text('₹${_parseAmount(item['expense_amount']).toStringAsFixed(2)}')),
+            SizedBox(width: sp),
+            SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: [if (isEditing) IconButton(icon: const Icon(Icons.save, color: Colors.green), tooltip: 'Save', onPressed: () => _saveIncomeExpenseItem(index)) else IconButton(icon: const Icon(Icons.edit, color: Colors.blue), tooltip: 'Edit', onPressed: () => _editIncomeExpenseItem(index)), if (widget.isMainAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Delete', onPressed: () => _deleteIncomeExpenseItem(index))])),
+          ],
+        );
+      },
     );
   }
 
@@ -703,63 +612,52 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
       grandTotalExpense += _parseAmount(item['total_expense']);
     }
 
-    return Scrollbar(
-      thumbVisibility: true,
-      interactive: true,
-      controller: _overallTabHorizontalScrollController,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        controller: _overallTabHorizontalScrollController,
-        child: SingleChildScrollView(
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(Colors.blue.shade100),
-            columns: const [
-              DataColumn(label: Text('Sector Name')),
-            DataColumn(label: Text('Total Income'), numeric: true),
-            DataColumn(label: Text('Total Expense'), numeric: true),
-          ],
-          rows: [
-            ..._overallData.map((item) {
-              return DataRow(
-                cells: [
-                  DataCell(Text(item['sector_name']?.toString() ?? '')),
-                  DataCell(Text(
-                    '₹${_parseAmount(item['total_income']).toStringAsFixed(2)}',
-                  )),
-                  DataCell(Text(
-                    '₹${_parseAmount(item['total_expense']).toStringAsFixed(2)}',
-                  )),
-                ],
-              );
-            }),
-            // Grand Total Row
-            DataRow(
-              color: WidgetStateProperty.all(Colors.grey.shade200),
-              cells: [
-                const DataCell(
-                  Text(
-                    'Grand Total',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                DataCell(
-                  Text(
-                    '₹${grandTotalIncome.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                DataCell(
-                  Text(
-                    '₹${grandTotalExpense.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
+    const double sp = 20;
+    const double wSector = 150, wIncome = 130, wExpense = 130;
+    final totalWidth = wSector + sp + wIncome + sp + wExpense;
+    return FixedHeaderTable(
+      horizontalScrollController: _overallTabHorizontalScrollController,
+      totalWidth: totalWidth,
+      headerHeight: 48,
+      headerBuilder: (ctx) => Container(
+        color: Colors.blue.shade100,
+        child: Row(
+          children: [
+            SizedBox(width: wSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector Name'))),
+            SizedBox(width: sp),
+            SizedBox(width: wIncome, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Total Income'))),
+            SizedBox(width: sp),
+            SizedBox(width: wExpense, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Total Expense'))),
           ],
         ),
       ),
-    ),
+      rowCount: _overallData.length + 1,
+      rowBuilder: (ctx, index) {
+        if (index == _overallData.length) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: Row(
+              children: [
+                SizedBox(width: wSector, child: const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold))),
+                SizedBox(width: sp),
+                SizedBox(width: wIncome, child: Text('₹${grandTotalIncome.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold))),
+                SizedBox(width: sp),
+                SizedBox(width: wExpense, child: Text('₹${grandTotalExpense.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold))),
+              ],
+            ),
+          );
+        }
+        final item = _overallData[index];
+        return Row(
+          children: [
+            SizedBox(width: wSector, child: Text(item['sector_name']?.toString() ?? '')),
+            SizedBox(width: sp),
+            SizedBox(width: wIncome, child: Text('₹${_parseAmount(item['total_income']).toStringAsFixed(2)}')),
+            SizedBox(width: sp),
+            SizedBox(width: wExpense, child: Text('₹${_parseAmount(item['total_expense']).toStringAsFixed(2)}')),
+          ],
+        );
+      },
     );
   }
 

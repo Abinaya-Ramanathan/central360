@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/employee.dart';
 import '../services/api_service.dart';
 import '../utils/format_utils.dart';
+import '../widgets/fixed_header_table.dart';
 
 class PresentDaysCountTabContent extends StatefulWidget {
   final String? selectedSector;
@@ -28,6 +29,10 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
   List<Map<String, dynamic>> _miningActivities = [];
   Map<int, double> _miningActivityTotals = {}; // Map of activity_id to total quantity
   bool _isLoading = false;
+  final ScrollController _horizontalScrollController = ScrollController();
+  final ScrollController _employeesTableScrollController = ScrollController();
+  final ScrollController _rentVehiclesTableScrollController = ScrollController();
+  final ScrollController _miningTableScrollController = ScrollController();
 
   @override
   void initState() {
@@ -42,6 +47,15 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
     if (widget.selectedSector == null || widget.selectedSector == 'SSBM') {
       _loadMiningActivities();
     }
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    _employeesTableScrollController.dispose();
+    _rentVehiclesTableScrollController.dispose();
+    _miningTableScrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -494,166 +508,178 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     )
-                  : Scrollbar(
-                      thumbVisibility: true,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SingleChildScrollView(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Employees Table
-                              if (_employees.isNotEmpty)
-                                Card(
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(Colors.green.shade100),
-                                    columns: const [
-                                      DataColumn(label: Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text('Total OT in hours', style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text('Calculated Salary', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    ],
-                                    rows: _employees.map((employee) {
-                                      final presentDays = _presentDaysCount[employee.id] ?? 0;
-                                      final totalOtHours = _totalOtHours[employee.id] ?? 0.0;
-                                      final calculatedSalary = presentDays * employee.dailySalary;
-                                      return DataRow(
-                                        cells: [
-                                          DataCell(Text(employee.name)),
-                                          DataCell(
-                                            Text(
-                                              presentDays.toString(),
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: presentDays > 0 ? Colors.green.shade700 : Colors.grey,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Text(
-                                              totalOtHours.toStringAsFixed(2),
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: totalOtHours > 0 ? Colors.orange.shade700 : Colors.grey,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Text(
-                                              '₹${calculatedSalary.toStringAsFixed(2)}',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: calculatedSalary > 0 ? Colors.blue.shade700 : Colors.grey,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                              // Rent Vehicles Table
-                              if (_rentVehicles.isNotEmpty) ...[
-                                const SizedBox(height: 16),
-                                Card(
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(Colors.teal.shade100),
-                                    columns: const [
-                                      DataColumn(label: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    ],
-                                    rows: _rentVehicles.map((vehicle) {
-                                      final vehicleId = vehicle['id'] as int;
-                                      final presentDays = _rentVehiclePresentDaysCount[vehicleId] ?? 0.0;
-                                      return DataRow(
-                                        cells: [
-                                          DataCell(Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
-                                          DataCell(
-                                            Text(
-                                              presentDays == presentDays.toInt() 
-                                                  ? presentDays.toInt().toString()
-                                                  : presentDays.toStringAsFixed(1),
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: presentDays > 0 ? Colors.teal.shade700 : Colors.grey,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                              ],
-                              // Daily Mining Activity Table
-                              if (_miningActivities.isNotEmpty) ...[
-                                const SizedBox(height: 16),
-                                Card(
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(12.0),
-                                        child: Text(
-                                          'Daily Mining Activity',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.amber.shade700,
-                                          ),
-                                        ),
+                  : Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_employees.isNotEmpty)
+                            Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: _buildPresentEmployeesTable(),
+                            ),
+                          if (_rentVehicles.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: _buildPresentRentVehiclesTable(),
+                            ),
+                          ],
+                          if (_miningActivities.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Text(
+                                      'Daily Mining Activity',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.amber.shade700,
                                       ),
-                                      DataTable(
-                                        headingRowColor: WidgetStateProperty.all(Colors.amber.shade100),
-                                        columns: const [
-                                          DataColumn(label: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                          DataColumn(label: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
-                                        ],
-                                        rows: _miningActivities.map((activity) {
-                                          final activityId = activity['id'] as int;
-                                          final totalQuantity = _miningActivityTotals[activityId] ?? 0.0;
-                                          return DataRow(
-                                            cells: [
-                                              DataCell(Text(activity['activity_name']?.toString() ?? 'N/A')),
-                                              DataCell(
-                                                Text(
-                                                  totalQuantity.toStringAsFixed(2),
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: totalQuantity > 0 ? Colors.amber.shade700 : Colors.grey,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
+                                  _buildPresentMiningTable(),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-              ),
         ),
       ],
+    );
+  }
+
+  static const double _headerHeight = 48;
+  static const double _colName = 150;
+  static const double _colDays = 120;
+  static const double _colOt = 120;
+  static const double _colSalary = 130;
+  static const double _colSpacing = 20;
+
+  Widget _buildPresentEmployeesTable() {
+    const totalWidth = _colName + _colSpacing + _colDays + _colSpacing + _colOt + _colSpacing + _colSalary;
+    return FixedHeaderTable(
+      horizontalScrollController: _employeesTableScrollController,
+      totalWidth: totalWidth.toDouble(),
+      headerHeight: _headerHeight,
+      headerBuilder: (context) => Material(
+        color: Colors.green.shade100,
+        child: Row(
+          children: [
+            SizedBox(width: _colName, child: const Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colDays, child: const Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colOt, child: const Text('Total OT in hours', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colSalary, child: const Text('Calculated Salary', style: TextStyle(fontWeight: FontWeight.bold))),
+          ],
+        ),
+      ),
+      rowCount: _employees.length,
+      rowBuilder: (context, index) {
+        final employee = _employees[index];
+        final presentDays = _presentDaysCount[employee.id] ?? 0;
+        final totalOtHours = _totalOtHours[employee.id] ?? 0.0;
+        final calculatedSalary = presentDays * employee.dailySalary;
+        return Row(
+          children: [
+            SizedBox(width: _colName, child: Text(employee.name)),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colDays, child: Text(presentDays.toString(), style: TextStyle(fontWeight: FontWeight.bold, color: presentDays > 0 ? Colors.green.shade700 : Colors.grey))),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colOt, child: Text(totalOtHours.toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, color: totalOtHours > 0 ? Colors.orange.shade700 : Colors.grey))),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colSalary, child: Text('₹${calculatedSalary.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: calculatedSalary > 0 ? Colors.blue.shade700 : Colors.grey))),
+          ],
+        );
+      },
+    );
+  }
+
+  static const double _rentColName = 150;
+  static const double _rentColDays = 120;
+  static const double _rentTotalWidth = _rentColName + _colSpacing + _rentColDays;
+
+  Widget _buildPresentRentVehiclesTable() {
+    return FixedHeaderTable(
+      horizontalScrollController: _rentVehiclesTableScrollController,
+      totalWidth: _rentTotalWidth,
+      headerHeight: _headerHeight,
+      headerBuilder: (context) => Material(
+        color: Colors.teal.shade100,
+        child: Row(
+          children: [
+            SizedBox(width: _rentColName, child: const Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _rentColDays, child: const Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
+          ],
+        ),
+      ),
+      rowCount: _rentVehicles.length,
+      rowBuilder: (context, index) {
+        final vehicle = _rentVehicles[index];
+        final vehicleId = vehicle['id'] as int;
+        final presentDays = _rentVehiclePresentDaysCount[vehicleId] ?? 0.0;
+        return Row(
+          children: [
+            SizedBox(width: _rentColName, child: Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _rentColDays, child: Text(presentDays == presentDays.toInt() ? presentDays.toInt().toString() : presentDays.toStringAsFixed(1), style: TextStyle(fontWeight: FontWeight.bold, color: presentDays > 0 ? Colors.teal.shade700 : Colors.grey))),
+          ],
+        );
+      },
+    );
+  }
+
+  static const double _miningColName = 200;
+  static const double _miningColQty = 120;
+  static const double _miningTotalWidth = _miningColName + _colSpacing + _miningColQty;
+
+  Widget _buildPresentMiningTable() {
+    return FixedHeaderTable(
+      horizontalScrollController: _miningTableScrollController,
+      totalWidth: _miningTotalWidth,
+      headerHeight: _headerHeight,
+      headerBuilder: (context) => Material(
+        color: Colors.amber.shade100,
+        child: Row(
+          children: [
+            SizedBox(width: _miningColName, child: const Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _miningColQty, child: const Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
+          ],
+        ),
+      ),
+      rowCount: _miningActivities.length,
+      rowBuilder: (context, index) {
+        final activity = _miningActivities[index];
+        final activityId = activity['id'] as int;
+        final totalQuantity = _miningActivityTotals[activityId] ?? 0.0;
+        return Row(
+          children: [
+            SizedBox(width: _miningColName, child: Text(activity['activity_name']?.toString() ?? 'N/A')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _miningColQty, child: Text(totalQuantity.toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, color: totalQuantity > 0 ? Colors.amber.shade700 : Colors.grey))),
+          ],
+        );
+      },
     );
   }
 }

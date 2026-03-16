@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
+import '../widgets/fixed_header_table.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -34,6 +35,13 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
   bool _isEditMode = false;
   bool _isLoading = false;
   final ScrollController _horizontalScrollController = ScrollController();
+
+  static const double _headerHeight = 48;
+  static const double _colName = 120;
+  static const double _colStatus = 100;
+  static const double _colOt = 100;
+  static const double _colMoney = 120;
+  static const double _colSpacing = 16;
 
   // Attendance data for each employee
   final Map<String, Map<String, dynamic>> _attendanceData = {};
@@ -572,165 +580,155 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                                   ],
                                 ),
                               )
-                            : Scrollbar(
-                                controller: _horizontalScrollController,
-                                thumbVisibility: true,
-                                interactive: true,
-                                child: SingleChildScrollView(
-                                  controller: _horizontalScrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  child: SingleChildScrollView(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: Card(
-                                        elevation: 4,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: DataTable(
-                                  headingRowColor: WidgetStateProperty.all(
-                                    Colors.blue.shade100,
+                            : Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Card(
+                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  columns: const [
-                                    DataColumn(label: Text('Name')),
-                                    DataColumn(label: Text('Status')),
-                                    DataColumn(label: Text('OT in Hours')),
-                                    DataColumn(label: Text('Outstanding Advance')),
-                                    DataColumn(label: Text('Advance Taken')),
-                                    DataColumn(label: Text('Advance Paid')),
-                                  ],
-                                  rows: _employees.map((employee) {
-                                    final data = _attendanceData[employee.id] ?? {
-                                      'status': 'present',
-                                      'ot_hours': 0.0,
-                                      'outstanding_advance': 0.0,
-                                      'advance_taken': 0.0,
-                                      'advance_paid': 0.0,
-                                    };
-                                    return DataRow(
-                                      cells: [
-                                        DataCell(Text(employee.name)),
-                                        DataCell(
-                                          _isEditMode
-                                              ? DropdownButton<String>(
-                                                  value: data['status'],
-                                                  hint: const Text('Select Status'),
-                                                  items: const [
-                                                    DropdownMenuItem(
-                                                      value: 'present',
-                                                      child: Text('Present'),
-                                                    ),
-                                                    DropdownMenuItem(
-                                                      value: 'absent',
-                                                      child: Text('Absent'),
-                                                    ),
-                                                    DropdownMenuItem(
-                                                      value: 'halfday',
-                                                      child: Text('Half Day'),
-                                                    ),
-                                                  ],
-                                                  onChanged: (value) {
-                                                    setState(() {
-                                                      _attendanceData[employee.id]?['status'] = value;
-                                                    });
-                                                  },
-                                                )
-                                              : Text(
-                                                  data['status'] != null
-                                                      ? data['status'].toString().toUpperCase()
-                                                      : 'Not Set',
-                                                  style: TextStyle(
-                                                    color: data['status'] == null ? Colors.grey : null,
-                                                  ),
-                                                ),
-                                        ),
-                                        DataCell(
-                                          _isEditMode
-                                              ? SizedBox(
-                                                  width: 120,
-                                                  child: TextFormField(
-                                                    initialValue: (data['ot_hours'] ?? 0.0).toString(),
-                                                    keyboardType: TextInputType.number,
-                                                    inputFormatters: [
-                                                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                    ],
-                                                    onChanged: (value) {
-                                                      _attendanceData[employee.id]?['ot_hours'] =
-                                                          double.tryParse(value) ?? 0.0;
-                                                    },
-                                                  ),
-                                                )
-                                              : Text(
-                                                  '${(data['ot_hours'] ?? 0.0).toStringAsFixed(2)} hrs',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.orange.shade700,
-                                                  ),
-                                                ),
-                                        ),
-                                        DataCell(
-                                          Text(
-                                            '₹${(data['outstanding_advance'] ?? 0.0).toStringAsFixed(2)}',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.blue.shade700,
-                                            ),
-                                          ),
-                                        ),
-                                        DataCell(
-                                          _isEditMode
-                                              ? SizedBox(
-                                                  width: 120,
-                                                  child: TextFormField(
-                                                    initialValue: (data['advance_taken'] ?? 0.0).toString(),
-                                                    keyboardType: TextInputType.number,
-                                                    inputFormatters: [
-                                                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                    ],
-                                                    onChanged: (value) {
-                                                      _attendanceData[employee.id]?['advance_taken'] =
-                                                          double.tryParse(value) ?? 0.0;
-                                                      _recalculateOutstanding();
-                                                    },
-                                                  ),
-                                                )
-                                              : Text('₹${(data['advance_taken'] ?? 0.0).toStringAsFixed(2)}'),
-                                        ),
-                                        DataCell(
-                                          _isEditMode
-                                              ? SizedBox(
-                                                  width: 120,
-                                                  child: TextFormField(
-                                                    initialValue: (data['advance_paid'] ?? 0.0).toString(),
-                                                    keyboardType: TextInputType.number,
-                                                    inputFormatters: [
-                                                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                                    ],
-                                                    onChanged: (value) {
-                                                      _attendanceData[employee.id]?['advance_paid'] =
-                                                          double.tryParse(value) ?? 0.0;
-                                                      _recalculateOutstanding();
-                                                    },
-                                                  ),
-                                                )
-                                              : Text('₹${(data['advance_paid'] ?? 0.0).toStringAsFixed(2)}'),
-                                        ),
-                                      ],
-                                    );
-                                  }).toList(),
+                                  child: _buildDailyAttendanceTable(),
                                 ),
                               ),
-                            ),
-                          ),
-                        ),
-                      ),
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  double _dailyAttendanceTableWidth() {
+    return _colName + _colStatus + _colOt + _colMoney * 3 + 5 * _colSpacing;
+  }
+
+  Widget _buildDailyAttendanceTable() {
+    final totalWidth = _dailyAttendanceTableWidth();
+    return FixedHeaderTable(
+      horizontalScrollController: _horizontalScrollController,
+      totalWidth: totalWidth,
+      headerHeight: _headerHeight,
+      headerBuilder: (context) => Material(
+        color: Colors.blue.shade100,
+        child: Row(
+          children: [
+            SizedBox(width: _colName, child: const Text('Name')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colStatus, child: const Text('Status')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colOt, child: const Text('OT in Hours')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colMoney, child: const Text('Outstanding Advance')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colMoney, child: const Text('Advance Taken')),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colMoney, child: const Text('Advance Paid')),
+          ],
+        ),
+      ),
+      rowCount: _employees.length,
+      rowBuilder: (context, index) {
+        final employee = _employees[index];
+        final data = _attendanceData[employee.id] ?? {
+          'status': 'present',
+          'ot_hours': 0.0,
+          'outstanding_advance': 0.0,
+          'advance_taken': 0.0,
+          'advance_paid': 0.0,
+        };
+        return Row(
+          children: [
+            SizedBox(width: _colName, child: Text(employee.name)),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colStatus,
+              child: _isEditMode
+                  ? DropdownButton<String>(
+                      value: data['status'],
+                      hint: const Text('Select Status'),
+                      items: const [
+                        DropdownMenuItem(value: 'present', child: Text('Present')),
+                        DropdownMenuItem(value: 'absent', child: Text('Absent')),
+                        DropdownMenuItem(value: 'halfday', child: Text('Half Day')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _attendanceData[employee.id] ??= {};
+                          _attendanceData[employee.id]!['status'] = value;
+                        });
+                      },
+                    )
+                  : Text(
+                      data['status'] != null ? data['status'].toString().toUpperCase() : 'Not Set',
+                      style: TextStyle(color: data['status'] == null ? Colors.grey : null),
+                    ),
+            ),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colOt,
+              child: _isEditMode
+                  ? SizedBox(
+                      width: 120,
+                      child: TextFormField(
+                        initialValue: (data['ot_hours'] ?? 0.0).toString(),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                        onChanged: (value) {
+                          _attendanceData[employee.id] ??= {};
+                          _attendanceData[employee.id]!['ot_hours'] = double.tryParse(value) ?? 0.0;
+                        },
+                      ),
+                    )
+                  : Text(
+                      '${(data['ot_hours'] ?? 0.0).toStringAsFixed(2)} hrs',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade700),
+                    ),
+            ),
+            SizedBox(width: _colSpacing),
+            SizedBox(width: _colMoney, child: Text('₹${(data['outstanding_advance'] ?? 0.0).toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700))),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colMoney,
+              child: _isEditMode
+                  ? SizedBox(
+                      width: 120,
+                      child: TextFormField(
+                        initialValue: (data['advance_taken'] ?? 0.0).toString(),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                        onChanged: (value) {
+                          _attendanceData[employee.id] ??= {};
+                          _attendanceData[employee.id]!['advance_taken'] = double.tryParse(value) ?? 0.0;
+                          _recalculateOutstanding();
+                        },
+                      ),
+                    )
+                  : Text('₹${(data['advance_taken'] ?? 0.0).toStringAsFixed(2)}'),
+            ),
+            SizedBox(width: _colSpacing),
+            SizedBox(
+              width: _colMoney,
+              child: _isEditMode
+                  ? SizedBox(
+                      width: 120,
+                      child: TextFormField(
+                        initialValue: (data['advance_paid'] ?? 0.0).toString(),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                        onChanged: (value) {
+                          _attendanceData[employee.id] ??= {};
+                          _attendanceData[employee.id]!['advance_paid'] = double.tryParse(value) ?? 0.0;
+                          _recalculateOutstanding();
+                        },
+                      ),
+                    )
+                  : Text('₹${(data['advance_paid'] ?? 0.0).toStringAsFixed(2)}'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

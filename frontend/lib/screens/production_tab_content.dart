@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
+import '../widgets/fixed_header_table.dart';
 
 /// Callback (isEditMode) when production enters or exits edit mode.
 typedef OnProductionEditModeChanged = void Function(bool isEditMode);
@@ -55,6 +56,13 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   
   // Horizontal ScrollController for draggable scrollbar
   final ScrollController _horizontalScrollController = ScrollController();
+
+  static const double _headerHeight = 48;
+  static const double _colSector = 120;
+  static const double _colProductName = 150;
+  static const double _colNum = 90;
+  static const double _colUnit = 75;
+  static const double _colSpacing = 20;
 
   @override
   void initState() {
@@ -542,341 +550,170 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                             ],
                           ),
                         )
-                      : Scrollbar(
-                          thumbVisibility: true,
-                          interactive: true,
-                          controller: _horizontalScrollController,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            controller: _horizontalScrollController,
-                            child: SingleChildScrollView(
-                              child: DataTable(
-                              columnSpacing: 20,
-                              sortColumnIndex: showSectorColumn ? 0 : null,
-                              sortAscending: _sortAscending,
-                              columns: [
-                                if (showSectorColumn)
-                                  DataColumn(
-                                    label: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    onSort: (columnIndex, ascending) {
-                                      setState(() {
-                                        _sortAscending = ascending;
-                                        _filteredProductionData.sort((a, b) {
-                                          final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                                          final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                                          return ascending
-                                              ? aName.compareTo(bName)
-                                              : bName.compareTo(aName);
-                                        });
-                                      });
-                                    },
-                                  ),
-                                const DataColumn(label: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(
-                                  label: Text(
-                                    _isCanteenStore ? 'Overall Production' : 'Morning Production',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                if (_isCafeProduction) const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(
-                                  label: Text(
-                                    _isCanteenStore ? 'Sent to Mainbranch' : 'Afternoon Production',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                if (_isCafeProduction) const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(
-                                  label: Text(
-                                    _isCanteenStore ? 'Sent to Thanthondrimalai' : 'Evening Production',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                if (_isCafeProduction) const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-                                if (!_isCanteenStore) ...[
-                                  const DataColumn(label: Text('Overall Production', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  if (_isCafeProduction) const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-                                ],
-                                if (_isCanteenStore) ...[
-                                  const DataColumn(label: Text('Stock in Canteen', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-                                ],
-                                if (!_isCafeProduction) const DataColumn(label: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-                              ],
-                              rows: _filteredProductionData.map((record) {
-                            final productName = record['product_name']?.toString() ?? '';
-                            final sectorCode = record['sector_code']?.toString() ?? widget.selectedSector;
-                            final controllerKey = _isConsolidatedView ? '$productName|$sectorCode' : productName;
-                            final morning = _parseIntFromDynamic(record['morning_production'] ?? 0);
-                            final afternoon = _parseIntFromDynamic(record['afternoon_production'] ?? 0);
-                            final evening = _parseIntFromDynamic(record['evening_production'] ?? 0);
-                            final overall = morning + afternoon + evening;
-                            final stockInCanteen = record['stock_in_canteen'] != null
-                                ? _parseIntFromDynamic(record['stock_in_canteen'])
-                                : 0;
-                            
-                            final List<DataCell> cells = [];
-                            if (showSectorColumn) {
-                              cells.add(DataCell(Text(_getSectorName(record['sector_code']?.toString()))));
-                            }
-                            cells.add(DataCell(Text(record['product_name']?.toString() ?? '')));
-                            // Morning / Overall Production
-                            cells.add(DataCell(
-                              _isEditModeProduction && _morningControllers.containsKey(controllerKey)
-                                  ? SizedBox(
-                                      width: 70,
-                                      child: TextField(
-                                        controller: _morningControllers[controllerKey],
-                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                        ],
-                                        decoration: const InputDecoration(
-                                          border: OutlineInputBorder(),
-                                          isDense: true,
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                        ),
-                                      ),
-                                    )
-                                  : Text('$morning'),
-                            ));
-                            if (_isCafeProduction) {
-                              cells.add(DataCell(
-                                _isEditModeProduction
-                                    ? ConstrainedBox(
-                                        constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
-                                        child: DropdownButtonFormField<String>(
-                                          value: _productionUnits[controllerKey],
-                                          isDense: true,
-                                          isExpanded: true,
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
-                                            isDense: true,
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                          ),
-                                          style: const TextStyle(fontSize: 11, color: Colors.black),
-                                          dropdownColor: Colors.white,
-                                          items: const [
-                                            DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                          ],
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _productionUnits[controllerKey] = value;
-                                            });
-                                          },
-                                        ),
-                                      )
-                                    : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
-                              ));
-                            }
-                            // Afternoon / Sent to Mainbranch
-                            cells.add(DataCell(
-                              _isEditModeProduction && _afternoonControllers.containsKey(controllerKey)
-                                  ? SizedBox(
-                                      width: 70,
-                                      child: TextField(
-                                        controller: _afternoonControllers[controllerKey],
-                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                        ],
-                                        decoration: const InputDecoration(
-                                          border: OutlineInputBorder(),
-                                          isDense: true,
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                        ),
-                                      ),
-                                    )
-                                  : Text('$afternoon'),
-                            ));
-                            if (_isCafeProduction) {
-                              cells.add(DataCell(
-                                _isEditModeProduction
-                                    ? ConstrainedBox(
-                                        constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
-                                        child: DropdownButtonFormField<String>(
-                                          value: _unitAfternoon[controllerKey],
-                                          isDense: true,
-                                          isExpanded: true,
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
-                                            isDense: true,
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                          ),
-                                          style: const TextStyle(fontSize: 11, color: Colors.black),
-                                          dropdownColor: Colors.white,
-                                          items: const [
-                                            DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                          ],
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _unitAfternoon[controllerKey] = value;
-                                            });
-                                          },
-                                        ),
-                                      )
-                                    : Text(record['unit_afternoon']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
-                              ));
-                            }
-                            // Evening / Sent to Thanthondrimalai
-                            cells.add(DataCell(
-                              _isEditModeProduction && _eveningControllers.containsKey(controllerKey)
-                                  ? SizedBox(
-                                      width: 70,
-                                      child: TextField(
-                                        controller: _eveningControllers[controllerKey],
-                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                        ],
-                                        decoration: const InputDecoration(
-                                          border: OutlineInputBorder(),
-                                          isDense: true,
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                        ),
-                                      ),
-                                    )
-                                  : Text('$evening'),
-                            ));
-                            if (_isCafeProduction) {
-                              cells.add(DataCell(
-                                _isEditModeProduction
-                                    ? ConstrainedBox(
-                                        constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
-                                        child: DropdownButtonFormField<String>(
-                                          value: _unitEvening[controllerKey],
-                                          isDense: true,
-                                          isExpanded: true,
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
-                                            isDense: true,
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                          ),
-                                          style: const TextStyle(fontSize: 11, color: Colors.black),
-                                          dropdownColor: Colors.white,
-                                          items: const [
-                                            DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                          ],
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _unitEvening[controllerKey] = value;
-                                            });
-                                          },
-                                        ),
-                                      )
-                                    : Text(record['unit_evening']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
-                              ));
-                            }
-                            if (!_isCanteenStore) {
-                              cells.add(DataCell(
-                                Text('$overall', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              ));
-                            }
-                            if (_isCanteenStore) {
-                              cells.add(DataCell(
-                                _isEditModeProduction && _stockInCanteenControllers.containsKey(controllerKey)
-                                    ? SizedBox(
-                                        width: 70,
-                                        child: TextField(
-                                          controller: _stockInCanteenControllers[controllerKey],
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                          inputFormatters: [
-                                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                          ],
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
-                                            isDense: true,
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                          ),
-                                        ),
-                                      )
-                                    : Text('$stockInCanteen'),
-                              ));
-                              cells.add(DataCell(
-                                _isEditModeProduction
-                                    ? ConstrainedBox(
-                                        constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
-                                        child: DropdownButtonFormField<String>(
-                                          value: _unitStockInCanteen[controllerKey],
-                                          isDense: true,
-                                          isExpanded: true,
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
-                                            isDense: true,
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                          ),
-                                          style: const TextStyle(fontSize: 11, color: Colors.black),
-                                          dropdownColor: Colors.white,
-                                          items: const [
-                                            DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                          ],
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _unitStockInCanteen[controllerKey] = value;
-                                            });
-                                          },
-                                        ),
-                                      )
-                                    : Text(record['unit_stock_in_canteen']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
-                              ));
-                            }
-                            if (!_isCafeProduction) {
-                              cells.add(DataCell(
-                                _isEditModeProduction
-                                    ? ConstrainedBox(
-                                        constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
-                                        child: DropdownButtonFormField<String>(
-                                          value: _productionUnits[controllerKey],
-                                          isDense: true,
-                                          isExpanded: true,
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
-                                            isDense: true,
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                          ),
-                                          style: const TextStyle(fontSize: 11, color: Colors.black),
-                                          dropdownColor: Colors.white,
-                                          items: const [
-                                            DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                            DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
-                                          ],
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _productionUnits[controllerKey] = value;
-                                            });
-                                          },
-                                        ),
-                                      )
-                                    : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
-                              ));
-                            }
-                            return DataRow(cells: cells);
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-                  ),
+                      : _buildProductionTable(showSectorColumn),
         ),
       ],
+    );
+  }
+
+  double _getProductionTableWidth(bool showSectorColumn) {
+    final widths = <double>[];
+    if (showSectorColumn) widths.add(_colSector);
+    widths.addAll([_colProductName, _colNum, _colNum, _colNum]);
+    if (_isCafeProduction) widths.addAll([_colUnit, _colUnit, _colUnit]);
+    if (!_isCanteenStore) {
+      widths.add(_colNum);
+      if (_isCafeProduction) widths.add(_colUnit);
+    }
+    if (_isCanteenStore) widths.addAll([_colNum, _colUnit]);
+    if (!_isCafeProduction) widths.add(_colUnit);
+    if (widths.isEmpty) return 0;
+    return widths.reduce((a, b) => a + b) + (widths.length - 1) * _colSpacing;
+  }
+
+  Widget _buildProductionTable(bool showSectorColumn) {
+    final totalWidth = _getProductionTableWidth(showSectorColumn);
+    const bold = TextStyle(fontWeight: FontWeight.bold);
+    return FixedHeaderTable(
+      horizontalScrollController: _horizontalScrollController,
+      totalWidth: totalWidth,
+      headerHeight: _headerHeight,
+      headerBuilder: (context) {
+        final List<Widget> headerChildren = [];
+        void addCol(double w, Widget c) {
+          if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _colSpacing));
+          headerChildren.add(SizedBox(width: w, child: c));
+        }
+        if (showSectorColumn) {
+          addCol(_colSector, InkWell(
+            onTap: () {
+              setState(() {
+                _sortAscending = !_sortAscending;
+                _filteredProductionData.sort((a, b) {
+                  final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                  final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                  return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                });
+              });
+            },
+            child: const Text('Sector', style: bold),
+          ));
+        }
+        addCol(_colProductName, const Text('Product Name', style: bold));
+        addCol(_colNum, Text(_isCanteenStore ? 'Overall Production' : 'Morning Production', style: bold));
+        if (_isCafeProduction) addCol(_colUnit, const Text('Unit', style: bold));
+        addCol(_colNum, Text(_isCanteenStore ? 'Sent to Mainbranch' : 'Afternoon Production', style: bold));
+        if (_isCafeProduction) addCol(_colUnit, const Text('Unit', style: bold));
+        addCol(_colNum, Text(_isCanteenStore ? 'Sent to Thanthondrimalai' : 'Evening Production', style: bold));
+        if (_isCafeProduction) addCol(_colUnit, const Text('Unit', style: bold));
+        if (!_isCanteenStore) {
+          addCol(_colNum, const Text('Overall Production', style: bold));
+          if (_isCafeProduction) addCol(_colUnit, const Text('Unit', style: bold));
+        }
+        if (_isCanteenStore) {
+          addCol(_colNum, const Text('Stock in Canteen', style: bold));
+          addCol(_colUnit, const Text('Unit', style: bold));
+        }
+        if (!_isCafeProduction) addCol(_colUnit, const Text('Unit', style: bold));
+        return Row(children: headerChildren);
+      },
+      rowCount: _filteredProductionData.length,
+      rowBuilder: (context, index) {
+        final record = _filteredProductionData[index];
+        final productName = record['product_name']?.toString() ?? '';
+        final sectorCode = record['sector_code']?.toString() ?? widget.selectedSector;
+        final controllerKey = _isConsolidatedView ? '$productName|$sectorCode' : productName;
+        final morning = _parseIntFromDynamic(record['morning_production'] ?? 0);
+        final afternoon = _parseIntFromDynamic(record['afternoon_production'] ?? 0);
+        final evening = _parseIntFromDynamic(record['evening_production'] ?? 0);
+        final overall = morning + afternoon + evening;
+        final stockInCanteen = record['stock_in_canteen'] != null
+            ? _parseIntFromDynamic(record['stock_in_canteen'])
+            : 0;
+        final List<Widget> rowChildren = [];
+        void addCell(double w, Widget c) {
+          if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _colSpacing));
+          rowChildren.add(SizedBox(width: w, child: c));
+        }
+        Widget unitDropdown(String? value, ValueChanged<String?> onChanged) {
+          return ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
+            child: DropdownButtonFormField<String>(
+              value: value,
+              isDense: true,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+              ),
+              style: const TextStyle(fontSize: 11, color: Colors.black),
+              dropdownColor: Colors.white,
+              items: const [
+                DropdownMenuItem(value: null, child: Text('-', style: TextStyle(fontSize: 11, color: Colors.black))),
+                DropdownMenuItem(value: 'gram', child: Text('gram', style: TextStyle(fontSize: 11, color: Colors.black))),
+                DropdownMenuItem(value: 'kg', child: Text('kg', style: TextStyle(fontSize: 11, color: Colors.black))),
+                DropdownMenuItem(value: 'Litre', child: Text('Litre', style: TextStyle(fontSize: 11, color: Colors.black))),
+                DropdownMenuItem(value: 'pieces', child: Text('pieces', style: TextStyle(fontSize: 11, color: Colors.black))),
+              ],
+              onChanged: onChanged,
+            ),
+          );
+        }
+        if (showSectorColumn) addCell(_colSector, Text(_getSectorName(record['sector_code']?.toString())));
+        addCell(_colProductName, Text(record['product_name']?.toString() ?? ''));
+        addCell(_colNum, _isEditModeProduction && _morningControllers.containsKey(controllerKey)
+            ? SizedBox(width: 70, child: TextField(
+                controller: _morningControllers[controllerKey],
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+              ))
+            : Text('$morning'));
+        if (_isCafeProduction) addCell(_colUnit, _isEditModeProduction
+            ? unitDropdown(_productionUnits[controllerKey], (v) => setState(() => _productionUnits[controllerKey] = v))
+            : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
+        addCell(_colNum, _isEditModeProduction && _afternoonControllers.containsKey(controllerKey)
+            ? SizedBox(width: 70, child: TextField(
+                controller: _afternoonControllers[controllerKey],
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+              ))
+            : Text('$afternoon'));
+        if (_isCafeProduction) addCell(_colUnit, _isEditModeProduction
+            ? unitDropdown(_unitAfternoon[controllerKey], (v) => setState(() => _unitAfternoon[controllerKey] = v))
+            : Text(record['unit_afternoon']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
+        addCell(_colNum, _isEditModeProduction && _eveningControllers.containsKey(controllerKey)
+            ? SizedBox(width: 70, child: TextField(
+                controller: _eveningControllers[controllerKey],
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+              ))
+            : Text('$evening'));
+        if (_isCafeProduction) addCell(_colUnit, _isEditModeProduction
+            ? unitDropdown(_unitEvening[controllerKey], (v) => setState(() => _unitEvening[controllerKey] = v))
+            : Text(record['unit_evening']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
+        if (!_isCanteenStore) addCell(_colNum, Text('$overall', style: const TextStyle(fontWeight: FontWeight.bold)));
+        if (_isCanteenStore) {
+          addCell(_colNum, _isEditModeProduction && _stockInCanteenControllers.containsKey(controllerKey)
+              ? SizedBox(width: 70, child: TextField(
+                  controller: _stockInCanteenControllers[controllerKey],
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                  decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                ))
+              : Text('$stockInCanteen'));
+          addCell(_colUnit, _isEditModeProduction
+              ? unitDropdown(_unitStockInCanteen[controllerKey], (v) => setState(() => _unitStockInCanteen[controllerKey] = v))
+              : Text(record['unit_stock_in_canteen']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
+        }
+        if (!_isCafeProduction) addCell(_colUnit, _isEditModeProduction
+            ? unitDropdown(_productionUnits[controllerKey], (v) => setState(() => _productionUnits[controllerKey] = v))
+            : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
+        return Row(children: rowChildren);
+      },
     );
   }
 }

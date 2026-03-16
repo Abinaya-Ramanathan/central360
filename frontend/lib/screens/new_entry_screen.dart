@@ -6,6 +6,8 @@ import 'manage_products_dialog.dart';
 import 'manage_sectors_dialog.dart';
 import 'add_stock_item_dialog.dart';
 import 'manage_stock_items_dialog.dart';
+import 'add_item_name_dialog.dart';
+import 'manage_item_names_dialog.dart';
 import 'add_rent_vehicle_dialog.dart';
 import 'manage_rent_vehicles_dialog.dart';
 import 'add_mining_activity_dialog.dart';
@@ -174,6 +176,32 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
                             showDialog(
                               context: context,
                               builder: (context) => ManageStockItemsDialog(
+                                isMainAdmin: widget.isMainAdmin,
+                                selectedSector: _selectedSector,
+                              ),
+                            );
+                          },
+                        ),
+                        _buildAdminButton(
+                          icon: Icons.label,
+                          label: 'Add Item Name',
+                          color: Colors.indigo.shade700,
+                          onPressed: () async {
+                            final result = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => const AddItemNameDialog(),
+                            );
+                            if (result == true) {}
+                          },
+                        ),
+                        _buildAdminButton(
+                          icon: Icons.list_alt,
+                          label: 'Manage Item Name',
+                          color: Colors.deepPurple.shade700,
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => ManageItemNamesDialog(
                                 isMainAdmin: widget.isMainAdmin,
                                 selectedSector: _selectedSector,
                               ),

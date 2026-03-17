@@ -178,7 +178,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
           headerBuilder: (context) {
             final List<Widget> headerChildren = [];
             void addCol(double w, Widget c) {
-              if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _colSpacing));
+              if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
               headerChildren.add(SizedBox(width: w, child: c));
             }
             if (showSector) {
@@ -212,7 +212,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
           rowBuilder: (context, index) {
             final List<Widget> rowChildren = [];
             void addCell(double w, Widget c) {
-              if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _colSpacing));
+              if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: _colSpacing));
               rowChildren.add(SizedBox(width: w, child: c));
             }
             if (index == filteredEmployees.length) {

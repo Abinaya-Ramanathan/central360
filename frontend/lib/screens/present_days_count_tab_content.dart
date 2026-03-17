@@ -580,15 +580,15 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
       headerHeight: _headerHeight,
       headerBuilder: (context) => Material(
         color: Colors.green.shade100,
-        child: Row(
+        child: const Row(
           children: [
-            SizedBox(width: _colName, child: const Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _colName, child: Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _colDays, child: const Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _colDays, child: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _colOt, child: const Text('Total OT in hours', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _colOt, child: Text('Total OT in hours', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _colSalary, child: const Text('Calculated Salary', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _colSalary, child: Text('Calculated Salary', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
       ),
@@ -601,11 +601,11 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         return Row(
           children: [
             SizedBox(width: _colName, child: Text(employee.name)),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colDays, child: Text(presentDays.toString(), style: TextStyle(fontWeight: FontWeight.bold, color: presentDays > 0 ? Colors.green.shade700 : Colors.grey))),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colOt, child: Text(totalOtHours.toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, color: totalOtHours > 0 ? Colors.orange.shade700 : Colors.grey))),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colSalary, child: Text('₹${calculatedSalary.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: calculatedSalary > 0 ? Colors.blue.shade700 : Colors.grey))),
           ],
         );
@@ -624,11 +624,11 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
       headerHeight: _headerHeight,
       headerBuilder: (context) => Material(
         color: Colors.teal.shade100,
-        child: Row(
+        child: const Row(
           children: [
-            SizedBox(width: _rentColName, child: const Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _rentColName, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _rentColDays, child: const Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _rentColDays, child: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
       ),
@@ -640,7 +640,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         return Row(
           children: [
             SizedBox(width: _rentColName, child: Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _rentColDays, child: Text(presentDays == presentDays.toInt() ? presentDays.toInt().toString() : presentDays.toStringAsFixed(1), style: TextStyle(fontWeight: FontWeight.bold, color: presentDays > 0 ? Colors.teal.shade700 : Colors.grey))),
           ],
         );
@@ -659,11 +659,11 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
       headerHeight: _headerHeight,
       headerBuilder: (context) => Material(
         color: Colors.amber.shade100,
-        child: Row(
+        child: const Row(
           children: [
-            SizedBox(width: _miningColName, child: const Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _miningColName, child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _miningColQty, child: const Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _miningColQty, child: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
       ),
@@ -675,7 +675,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         return Row(
           children: [
             SizedBox(width: _miningColName, child: Text(activity['activity_name']?.toString() ?? 'N/A')),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _miningColQty, child: Text(totalQuantity.toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, color: totalQuantity > 0 ? Colors.amber.shade700 : Colors.grey))),
           ],
         );

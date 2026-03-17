@@ -612,19 +612,19 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
       headerHeight: _headerHeight,
       headerBuilder: (context) => Material(
         color: Colors.blue.shade100,
-        child: Row(
+        child: const Row(
           children: [
-            SizedBox(width: _colName, child: const Text('Name')),
+            SizedBox(width: _colName, child: Text('Name')),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _colStatus, child: const Text('Status')),
+            SizedBox(width: _colStatus, child: Text('Status')),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _colOt, child: const Text('OT in Hours')),
+            SizedBox(width: _colOt, child: Text('OT in Hours')),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _colMoney, child: const Text('Outstanding Advance')),
+            SizedBox(width: _colMoney, child: Text('Outstanding Advance')),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _colMoney, child: const Text('Advance Taken')),
+            SizedBox(width: _colMoney, child: Text('Advance Taken')),
             SizedBox(width: _colSpacing),
-            SizedBox(width: _colMoney, child: const Text('Advance Paid')),
+            SizedBox(width: _colMoney, child: Text('Advance Paid')),
           ],
         ),
       ),
@@ -641,7 +641,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
         return Row(
           children: [
             SizedBox(width: _colName, child: Text(employee.name)),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colStatus,
               child: _isEditMode
@@ -665,7 +665,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                       style: TextStyle(color: data['status'] == null ? Colors.grey : null),
                     ),
             ),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colOt,
               child: _isEditMode
@@ -686,9 +686,9 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                       style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade700),
                     ),
             ),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colMoney, child: Text('₹${(data['outstanding_advance'] ?? 0.0).toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700))),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colMoney,
               child: _isEditMode
@@ -707,7 +707,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                     )
                   : Text('₹${(data['advance_taken'] ?? 0.0).toStringAsFixed(2)}'),
             ),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colMoney,
               child: _isEditMode

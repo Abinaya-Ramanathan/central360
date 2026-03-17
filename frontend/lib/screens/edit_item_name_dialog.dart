@@ -181,7 +181,7 @@ class _EditItemNameDialogState extends State<EditItemNameDialog> {
               ],
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedSectorCode,
+                initialValue: _selectedSectorCode,
                 decoration: InputDecoration(
                   labelText: 'Sector *',
                   prefixIcon: const Icon(Icons.business, color: Colors.indigo),

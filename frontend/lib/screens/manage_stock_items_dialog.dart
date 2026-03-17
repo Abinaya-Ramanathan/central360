@@ -159,8 +159,8 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
       headerHeight: _headerHeight,
       headerBuilder: (context) => Row(
         children: [
-          SizedBox(width: _colItemName, child: const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colSpacing),
+          const SizedBox(width: _colItemName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _colSpacing),
           InkWell(
             onTap: () {
               setState(() {
@@ -173,14 +173,14 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
                   });
               });
             },
-            child: SizedBox(width: _colSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+            child: const SizedBox(width: _colSector, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
           ),
-          SizedBox(width: _colSpacing),
-          SizedBox(width: _colVehicleType, child: const Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colSpacing),
-          SizedBox(width: _colPartNumber, child: const Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colSpacing),
-          SizedBox(width: _colAction, child: const Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _colSpacing),
+          const SizedBox(width: _colVehicleType, child: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _colSpacing),
+          const SizedBox(width: _colPartNumber, child: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _colSpacing),
+          const SizedBox(width: _colAction, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
       rowCount: _filteredStockItems.length,
@@ -191,13 +191,13 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
         return Row(
           children: [
             SizedBox(width: _colItemName, child: Text(item['item_name']?.toString() ?? 'N/A')),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colSector, child: Text(_getSectorName(sectorCode))),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colVehicleType, child: Text(showVehicleFields ? (item['vehicle_type']?.toString() ?? '') : '')),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colPartNumber, child: Text(showVehicleFields ? (item['part_number']?.toString() ?? '') : '')),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colAction,
               child: Row(

@@ -248,19 +248,19 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
       horizontalScrollController: _horizontalScrollController,
       totalWidth: totalWidth.toDouble(),
       headerHeight: 48,
-      headerBuilder: (ctx) => Row(
+      headerBuilder: (ctx) => const Row(
         children: [
-          SizedBox(width: _allSectorsWSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _allSectorsWSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold)))),
           SizedBox(width: _allSectorsSp),
-          SizedBox(width: _allSectorsWAmount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _allSectorsWAmount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
       rowCount: rowCount,
       rowBuilder: (ctx, index) {
         if (_sectorExpenseSummary.isEmpty) {
-          return Row(
+          return const Row(
             children: [
-              SizedBox(width: _allSectorsWSector, child: const Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
+              SizedBox(width: _allSectorsWSector, child: Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
               SizedBox(width: _allSectorsSp),
               SizedBox(width: _allSectorsWAmount),
             ],
@@ -271,8 +271,8 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
             color: Colors.purple.shade50,
             child: Row(
               children: [
-                SizedBox(width: _allSectorsWSector, child: const Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-                SizedBox(width: _allSectorsSp),
+                const SizedBox(width: _allSectorsWSector, child: Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                const SizedBox(width: _allSectorsSp),
                 SizedBox(width: _allSectorsWAmount, child: Text('₹${_calculateTotalExpenseForAllSectors().toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple))),
               ],
             ),
@@ -282,7 +282,7 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
         return Row(
           children: [
             SizedBox(width: _allSectorsWSector, child: Text(_getSectorName(sectorCode))),
-            SizedBox(width: _allSectorsSp),
+            const SizedBox(width: _allSectorsSp),
             SizedBox(width: _allSectorsWAmount, child: Text('₹${_sectorExpenseSummary[sectorCode]!.toStringAsFixed(2)}')),
           ],
         );
@@ -301,23 +301,23 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
       horizontalScrollController: _horizontalScrollController,
       totalWidth: totalWidth.toDouble(),
       headerHeight: 48,
-      headerBuilder: (ctx) => Row(
+      headerBuilder: (ctx) => const Row(
         children: [
-          SizedBox(width: _singleSectorWItem, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _singleSectorWItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold)))),
           SizedBox(width: _singleSectorSp),
-          SizedBox(width: _singleSectorWAmount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _singleSectorWAmount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
           SizedBox(width: _singleSectorSp),
-          SizedBox(width: _singleSectorWReason, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Reason for Purchase', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _singleSectorWReason, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Reason for Purchase', style: TextStyle(fontWeight: FontWeight.bold)))),
           SizedBox(width: _singleSectorSp),
-          SizedBox(width: _singleSectorWActions, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _singleSectorWActions, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
       rowCount: rowCount,
       rowBuilder: (ctx, index) {
         if (_expenseData.isEmpty) {
-          return Row(
+          return const Row(
             children: [
-              SizedBox(width: _singleSectorWItem, child: const Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
+              SizedBox(width: _singleSectorWItem, child: Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
               SizedBox(width: _singleSectorSp),
               SizedBox(width: _singleSectorWAmount),
               SizedBox(width: _singleSectorSp),
@@ -332,13 +332,13 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
             color: Colors.purple.shade50,
             child: Row(
               children: [
-                SizedBox(width: _singleSectorWItem, child: const Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-                SizedBox(width: _singleSectorSp),
+                const SizedBox(width: _singleSectorWItem, child: Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                const SizedBox(width: _singleSectorSp),
                 SizedBox(width: _singleSectorWAmount, child: Text('₹${_calculateTotalExpense().toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple))),
-                SizedBox(width: _singleSectorSp),
-                SizedBox(width: _singleSectorWReason),
-                SizedBox(width: _singleSectorSp),
-                SizedBox(width: _singleSectorWActions),
+                const SizedBox(width: _singleSectorSp),
+                const SizedBox(width: _singleSectorWReason),
+                const SizedBox(width: _singleSectorSp),
+                const SizedBox(width: _singleSectorWActions),
               ],
             ),
           );
@@ -347,11 +347,11 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
         return Row(
           children: [
             SizedBox(width: _singleSectorWItem, child: Text(record['item_details']?.toString() ?? '')),
-            SizedBox(width: _singleSectorSp),
+            const SizedBox(width: _singleSectorSp),
             SizedBox(width: _singleSectorWAmount, child: Text('₹${_parseDecimalFromDynamic(record['amount']).toStringAsFixed(2)}')),
-            SizedBox(width: _singleSectorSp),
+            const SizedBox(width: _singleSectorSp),
             SizedBox(width: _singleSectorWReason, child: Text(record['reason_for_purchase']?.toString() ?? '')),
-            SizedBox(width: _singleSectorSp),
+            const SizedBox(width: _singleSectorSp),
             SizedBox(width: _singleSectorWActions, child: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), tooltip: 'Edit', onPressed: () => _editExpenseData(record)), IconButton(icon: const Icon(Icons.delete, color: Colors.red, size: 20), tooltip: 'Delete', onPressed: () => _deleteExpenseData(record['id']))])),
           ],
         );

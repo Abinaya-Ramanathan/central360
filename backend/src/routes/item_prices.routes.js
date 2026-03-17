@@ -7,6 +7,29 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const { sector } = req.query;
+
+    // Ensure all stock items appear as item names (and have a default item_prices row)
+    // 1) Sync stock_items -> item_names
+    await db.query(`
+      INSERT INTO item_names (item_name, sector_code, vehicle_type, part_number)
+      SELECT si.item_name, si.sector_code, si.vehicle_type, si.part_number
+      FROM stock_items si
+      LEFT JOIN item_names iname
+        ON iname.item_name = si.item_name
+       AND iname.sector_code = si.sector_code
+      WHERE iname.id IS NULL
+    `);
+
+    // 2) Ensure every item_name has an item_prices row
+    await db.query(`
+      INSERT INTO item_prices (item_name_id, quantity, unit, new_price, old_price)
+      SELECT iname.id, '0', NULL, 0, 0
+      FROM item_names iname
+      LEFT JOIN item_prices ip
+        ON ip.item_name_id = iname.id
+      WHERE ip.id IS NULL
+    `);
+
     let query = `
       SELECT iname.id as item_name_id, iname.item_name, iname.sector_code,
              ip.id as id, ip.quantity, ip.unit, ip.new_price, ip.old_price

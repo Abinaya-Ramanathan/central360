@@ -173,7 +173,9 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
         final controllerKey = _isConsolidatedView ? '$productName|$sectorCode' : productName;
         if (!_morningControllers.containsKey(controllerKey) ||
             !_afternoonControllers.containsKey(controllerKey) ||
-            !_eveningControllers.containsKey(controllerKey)) continue;
+            !_eveningControllers.containsKey(controllerKey)) {
+          continue;
+        }
         final productionRecord = {
           if (recordId != null) 'id': recordId,
           'product_name': productName,
@@ -284,7 +286,9 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   Future<void> _loadData() async {
     if (widget.selectedDate == null) return;
     if (widget.selectedSector == null && !widget.isAdmin &&
-        (widget.includedSectorCodes == null || widget.includedSectorCodes!.isEmpty)) return;
+        (widget.includedSectorCodes == null || widget.includedSectorCodes!.isEmpty)) {
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -317,7 +321,9 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
 
   Future<void> _loadProducts() async {
     if (widget.selectedSector == null && !widget.isAdmin &&
-        (widget.includedSectorCodes == null || widget.includedSectorCodes!.isEmpty)) return;
+        (widget.includedSectorCodes == null || widget.includedSectorCodes!.isEmpty)) {
+      return;
+    }
     try {
       if (widget.includedSectorCodes != null && widget.includedSectorCodes!.isNotEmpty) {
         _products = [];
@@ -359,7 +365,9 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
   Future<void> _loadProductionData() async {
     if (widget.selectedDate == null) return;
     if (widget.selectedSector == null && !widget.isAdmin &&
-        (widget.includedSectorCodes == null || widget.includedSectorCodes!.isEmpty)) return;
+        (widget.includedSectorCodes == null || widget.includedSectorCodes!.isEmpty)) {
+      return;
+    }
     
     if (_products.isEmpty) {
       await _loadProducts();
@@ -581,7 +589,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
       headerBuilder: (context) {
         final List<Widget> headerChildren = [];
         void addCol(double w, Widget c) {
-          if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _colSpacing));
+          if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
           headerChildren.add(SizedBox(width: w, child: c));
         }
         if (showSectorColumn) {
@@ -632,14 +640,14 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
             : 0;
         final List<Widget> rowChildren = [];
         void addCell(double w, Widget c) {
-          if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _colSpacing));
+          if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: _colSpacing));
           rowChildren.add(SizedBox(width: w, child: c));
         }
         Widget unitDropdown(String? value, ValueChanged<String?> onChanged) {
           return ConstrainedBox(
             constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
             child: DropdownButtonFormField<String>(
-              value: value,
+              initialValue: value,
               isDense: true,
               isExpanded: true,
               decoration: const InputDecoration(
@@ -670,9 +678,11 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                 decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
               ))
             : Text('$morning'));
-        if (_isCafeProduction) addCell(_colUnit, _isEditModeProduction
+        if (_isCafeProduction) {
+          addCell(_colUnit, _isEditModeProduction
             ? unitDropdown(_productionUnits[controllerKey], (v) => setState(() => _productionUnits[controllerKey] = v))
             : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
+        }
         addCell(_colNum, _isEditModeProduction && _afternoonControllers.containsKey(controllerKey)
             ? SizedBox(width: 70, child: TextField(
                 controller: _afternoonControllers[controllerKey],
@@ -681,9 +691,11 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                 decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
               ))
             : Text('$afternoon'));
-        if (_isCafeProduction) addCell(_colUnit, _isEditModeProduction
+        if (_isCafeProduction) {
+          addCell(_colUnit, _isEditModeProduction
             ? unitDropdown(_unitAfternoon[controllerKey], (v) => setState(() => _unitAfternoon[controllerKey] = v))
             : Text(record['unit_afternoon']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
+        }
         addCell(_colNum, _isEditModeProduction && _eveningControllers.containsKey(controllerKey)
             ? SizedBox(width: 70, child: TextField(
                 controller: _eveningControllers[controllerKey],
@@ -692,9 +704,11 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
                 decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
               ))
             : Text('$evening'));
-        if (_isCafeProduction) addCell(_colUnit, _isEditModeProduction
+        if (_isCafeProduction) {
+          addCell(_colUnit, _isEditModeProduction
             ? unitDropdown(_unitEvening[controllerKey], (v) => setState(() => _unitEvening[controllerKey] = v))
             : Text(record['unit_evening']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
+        }
         if (!_isCanteenStore) addCell(_colNum, Text('$overall', style: const TextStyle(fontWeight: FontWeight.bold)));
         if (_isCanteenStore) {
           addCell(_colNum, _isEditModeProduction && _stockInCanteenControllers.containsKey(controllerKey)
@@ -709,9 +723,11 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
               ? unitDropdown(_unitStockInCanteen[controllerKey], (v) => setState(() => _unitStockInCanteen[controllerKey] = v))
               : Text(record['unit_stock_in_canteen']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
         }
-        if (!_isCafeProduction) addCell(_colUnit, _isEditModeProduction
+        if (!_isCafeProduction) {
+          addCell(_colUnit, _isEditModeProduction
             ? unitDropdown(_productionUnits[controllerKey], (v) => setState(() => _productionUnits[controllerKey] = v))
             : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)));
+        }
         return Row(children: rowChildren);
       },
     );

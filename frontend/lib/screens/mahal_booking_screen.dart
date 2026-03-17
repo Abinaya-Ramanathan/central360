@@ -616,43 +616,43 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     const double sp = 12;
                     const double wId = 100, wMahal = 120, wDate = 110, wTiming = 90, wEventName = 110, wClient = 120, wPh1 = 100, wPh2 = 100, wAddr = 150, wFood = 90, wStatus = 90, wDetails = 200, wSettlement = 150, wAction = 160;
                     const int colCount = 14;
-                    final totalWidth = wId + wMahal + wDate + wTiming + wEventName + wClient + wPh1 + wPh2 + wAddr + wFood + wStatus + wDetails + wSettlement + wAction + (colCount - 1) * sp;
+                    const totalWidth = wId + wMahal + wDate + wTiming + wEventName + wClient + wPh1 + wPh2 + wAddr + wFood + wStatus + wDetails + wSettlement + wAction + (colCount - 1) * sp;
                     return FixedHeaderTable(
                       horizontalScrollController: _eventHorizontalScrollController,
                       totalWidth: totalWidth,
                       headerHeight: 48,
                       headerBuilder: (ctx) => Row(
                         children: [
-                          SizedBox(width: wId, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wMahal, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Mahal Detail', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
+                          const SizedBox(width: wId, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wMahal, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Mahal Detail', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
                           InkWell(
                             onTap: () => setState(() => _sortByDateDesc = !_sortByDateDesc),
                             child: SizedBox(width: wDate, height: 48, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Event Date', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_sortByDateDesc ? Icons.arrow_downward : Icons.arrow_upward, size: 16)])),
                           ),
-                          SizedBox(width: sp),
-                          SizedBox(width: wTiming, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Event Timing', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wEventName, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Event Name', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wClient, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Client Name', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wPh1, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Client Phone 1', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wPh2, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Client Phone 2', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wAddr, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Client Address', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wFood, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Food Service', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wStatus, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Settlement Status', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wDetails, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Details', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wSettlement, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Final Settlement Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
-                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wTiming, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Event Timing', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wEventName, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Event Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wClient, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Client Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wPh1, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Client Phone 1', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wPh2, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Client Phone 2', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wAddr, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Client Address', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wFood, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Food Service', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wStatus, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Settlement Status', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wDetails, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Details', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wSettlement, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Final Settlement Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: sp),
+                          const SizedBox(width: wAction, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
                         ],
                       ),
                       rowCount: sortedEvents.length + 1,
@@ -663,21 +663,21 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                             child: Row(
                               children: [
                                 SizedBox(width: wId, child: Text('Total (${filteredEvents.where((e) => e.bookingId != null).length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-                                SizedBox(width: sp),
-                                SizedBox(width: wMahal), SizedBox(width: sp),
-                                SizedBox(width: wDate), SizedBox(width: sp),
-                                SizedBox(width: wTiming), SizedBox(width: sp),
-                                SizedBox(width: wEventName), SizedBox(width: sp),
-                                SizedBox(width: wClient), SizedBox(width: sp),
-                                SizedBox(width: wPh1), SizedBox(width: sp),
-                                SizedBox(width: wPh2), SizedBox(width: sp),
-                                SizedBox(width: wAddr), SizedBox(width: sp),
-                                SizedBox(width: wFood), SizedBox(width: sp),
-                                SizedBox(width: wStatus), SizedBox(width: sp),
-                                SizedBox(width: wDetails), SizedBox(width: sp),
+                                const SizedBox(width: sp),
+                                const SizedBox(width: wMahal), const SizedBox(width: sp),
+                                const SizedBox(width: wDate), const SizedBox(width: sp),
+                                const SizedBox(width: wTiming), const SizedBox(width: sp),
+                                const SizedBox(width: wEventName), const SizedBox(width: sp),
+                                const SizedBox(width: wClient), const SizedBox(width: sp),
+                                const SizedBox(width: wPh1), const SizedBox(width: sp),
+                                const SizedBox(width: wPh2), const SizedBox(width: sp),
+                                const SizedBox(width: wAddr), const SizedBox(width: sp),
+                                const SizedBox(width: wFood), const SizedBox(width: sp),
+                                const SizedBox(width: wStatus), const SizedBox(width: sp),
+                                const SizedBox(width: wDetails), const SizedBox(width: sp),
                                 SizedBox(width: wSettlement, child: Text('₹${filteredEvents.fold<double>(0.0, (sum, event) => sum + (event.finalSettlementAmount ?? 0.0)).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green))),
-                                SizedBox(width: sp),
-                                SizedBox(width: wAction),
+                                const SizedBox(width: sp),
+                                const SizedBox(width: wAction),
                               ],
                             ),
                           );
@@ -700,31 +700,31 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
     final isEditSettlement = event.bookingId != null && _editModeEvent[event.bookingId] == true && _finalSettlementControllers.containsKey(event.bookingId) && _finalSettlementControllers[event.bookingId] != null;
     final cells = <Widget>[
       SizedBox(width: wId, child: InkWell(onTap: () => _onBookingIdSelected(event.bookingId!), child: Text(event.bookingId ?? 'N/A', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wMahal, child: Text(event.mahalDetail, style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wDate, child: Text(FormatUtils.formatDateDisplay(event.eventDate), style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wTiming, child: Text(event.eventTiming ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wEventName, child: Text(event.eventName ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wClient, child: Text(event.clientName, style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wPh1, child: Text(event.clientPhone1 ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wPh2, child: Text(event.clientPhone2 ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wAddr, child: Text(event.clientAddress ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wFood, child: Text(event.foodService ?? 'N/A', style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wStatus, child: Text(event.orderStatus?.toUpperCase() ?? 'OPEN', style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wDetails, child: Text(event.details ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wSettlement, child: isEditSettlement ? TextFormField(controller: _finalSettlementControllers[event.bookingId]!, decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, prefixText: '₹'), keyboardType: const TextInputType.numberWithOptions(decimal: true)) : Text(event.finalSettlementAmount != null ? '₹${event.finalSettlementAmount?.toStringAsFixed(2) ?? '0.00'}' : 'N/A', style: const TextStyle(color: Colors.black87))),
-      SizedBox(width: sp),
+      const SizedBox(width: sp),
       SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: _buildEventActionButtons(event))),
     ];
     return Container(
@@ -766,30 +766,30 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                   builder: (context, constraints) {
                     const double sp = 12;
                     const double wId = 100, wLoc = 150, wCount = 100, wMenu = 200, wAction = 160;
-                    final totalWidth = wId + wLoc + wCount + wMenu * 3 + wCount * 2 + wAction + 8 * sp;
+                    const totalWidth = wId + wLoc + wCount + wMenu * 3 + wCount * 2 + wAction + 8 * sp;
                     return FixedHeaderTable(
                       horizontalScrollController: _cateringHorizontalScrollController,
                       totalWidth: totalWidth,
                       headerHeight: 48,
-                      headerBuilder: (ctx) => Row(
+                      headerBuilder: (ctx) => const Row(
                         children: [
-                          SizedBox(width: wId, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wId, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wLoc, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Delivery Location', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wLoc, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Delivery Location', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wCount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Morning Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wCount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Morning Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wMenu, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Morning Food Menu', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wMenu, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Morning Food Menu', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wCount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Afternoon Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wCount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Afternoon Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wMenu, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Afternoon Food Menu', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wMenu, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Afternoon Food Menu', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wCount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Evening Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wCount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Evening Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wMenu, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Evening Food Menu', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wMenu, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Evening Food Menu', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wAction, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
                         ],
                       ),
                       rowCount: filteredCatering.length,
@@ -798,21 +798,21 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                         return Row(
                           children: [
                             SizedBox(width: wId, child: Text(catering.bookingId, style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wLoc, child: Text(catering.deliveryLocation ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wCount, child: Text(catering.morningFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wMenu, child: Text(catering.morningFoodMenu ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wCount, child: Text(catering.afternoonFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wMenu, child: Text(catering.afternoonFoodMenu ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wCount, child: Text(catering.eveningFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wMenu, child: Text(catering.eveningFoodMenu ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: [
                               IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewCatering(catering)),
                               IconButton(icon: const Icon(Icons.download, color: Colors.blue, size: 20), tooltip: 'Download PDF', onPressed: () => _downloadCateringPDF(catering)),
@@ -845,7 +845,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     const double sp = 10;
                     const double wId = 100, wNum = 90, wDetails = 200, wAction = 120;
                     const int colCount = 18;
-                    final totalWidth = wId + wNum * 14 + wDetails + wNum + wAction + (colCount - 1) * sp;
+                    const totalWidth = wId + wNum * 14 + wDetails + wNum + wAction + (colCount - 1) * sp;
                     final labels = ['Booking ID', 'Master Salary', 'Cooking Helper Salary', 'External Catering Salary', 'Current Bill', 'Cleaning Bill', 'Grocery Bill', 'Vegetable Bill', 'Cylinder Amount', 'Morning Food Expense', 'Afternoon Food Expense', 'Evening Food Expense', 'Vehicle Expense', 'Packing Items Charge', 'Details', 'Total Expense', 'Action'];
                     final widths = [wId, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wDetails, wNum, wAction];
                     return FixedHeaderTable(
@@ -855,7 +855,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                       headerBuilder: (ctx) => Row(
                         children: [
                           for (var i = 0; i < labels.length; i++) ...[
-                            if (i > 0) SizedBox(width: sp),
+                            if (i > 0) const SizedBox(width: sp),
                             SizedBox(width: widths[i], height: 48, child: Align(alignment: Alignment.centerLeft, child: Text(labels[i], style: const TextStyle(fontWeight: FontWeight.bold)))),
                           ],
                         ],
@@ -866,37 +866,37 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                         return Row(
                           children: [
                             SizedBox(width: wId, child: Text(expense.bookingId, style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.masterSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.cookingHelperSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.externalCateringSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.currentBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.cleaningBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.groceryBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.vegetableBill.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.cylinderAmount.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.morningFoodExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.afternoonFoodExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.eveningFoodExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.vehicleExpense.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.packingItemsCharge.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wDetails, child: Text(expense.details ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(_calculateTotalExpense(expense).toStringAsFixed(2), style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold))),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: [
                               IconButton(icon: const Icon(Icons.visibility, color: Colors.green, size: 20), tooltip: 'View', onPressed: () => _viewExpense(expense)),
                               IconButton(icon: const Icon(Icons.edit, color: Colors.blue, size: 20), onPressed: () => _editExpense(expense)),
@@ -1281,20 +1281,20 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                   builder: (context, constraints) {
                     const double sp = 12;
                     const double wMahal = 180, wItem = 200, wCount = 100, wAction = 120;
-                    final totalWidth = wMahal + wItem + wCount + wAction + 3 * sp;
+                    const totalWidth = wMahal + wItem + wCount + wAction + 3 * sp;
                     return FixedHeaderTable(
                       horizontalScrollController: _vesselHorizontalScrollController,
                       totalWidth: totalWidth,
                       headerHeight: 48,
-                      headerBuilder: (ctx) => Row(
+                      headerBuilder: (ctx) => const Row(
                         children: [
-                          SizedBox(width: wMahal, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Mahal Detail', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wMahal, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Mahal Detail', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wItem, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wCount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Count', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wCount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Count', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
-                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          SizedBox(width: wAction, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
                         ],
                       ),
                       rowCount: filteredVessels.length,
@@ -1307,7 +1307,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                           children: [
                             SizedBox(width: wMahal, child: isEditing
                                 ? DropdownButtonFormField<String>(
-                                    value: controllers['mahal_detail'] as String? ?? vessel['mahal_detail'] as String,
+                                    initialValue: controllers['mahal_detail'] as String? ?? vessel['mahal_detail'] as String,
                                     decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
                                     items: [
                                       const DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
@@ -1325,15 +1325,15 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                                     },
                                   )
                                 : Text(vessel['mahal_detail'] as String)),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wItem, child: isEditing
                                 ? TextFormField(controller: controllers['item_name'] as TextEditingController?, decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))
                                 : Text(vessel['item_name'] as String)),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wCount, child: isEditing
                                 ? TextFormField(controller: controllers['count'] as TextEditingController?, decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number)
                                 : Text(vessel['count'].toString())),
-                            SizedBox(width: sp),
+                            const SizedBox(width: sp),
                             SizedBox(width: wAction, child: isEditing
                                 ? Row(mainAxisSize: MainAxisSize.min, children: [
                                     IconButton(icon: const Icon(Icons.save, color: Colors.green, size: 20), tooltip: 'Save', onPressed: () => _saveVessel(id)),

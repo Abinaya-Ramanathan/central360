@@ -300,13 +300,13 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                           horizontalScrollController: _horizontalScrollController,
                           totalWidth: _totalWidth,
                           headerHeight: _headerHeight,
-                          headerBuilder: (context) => Row(
+                          headerBuilder: (context) => const Row(
                             children: [
-                              SizedBox(width: _colActivityName, child: const Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                              SizedBox(width: _colActivityName, child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
                               SizedBox(width: _colSpacing),
-                              SizedBox(width: _colSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+                              SizedBox(width: _colSector, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
                               SizedBox(width: _colSpacing),
-                              SizedBox(width: _colQuantity, child: const Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
+                              SizedBox(width: _colQuantity, child: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
                             ],
                           ),
                           rowCount: _miningActivities.length,
@@ -320,9 +320,9 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                             return Row(
                               children: [
                                 SizedBox(width: _colActivityName, child: Text(activity['activity_name']?.toString() ?? 'N/A')),
-                                SizedBox(width: _colSpacing),
+                                const SizedBox(width: _colSpacing),
                                 SizedBox(width: _colSector, child: Text(_getSectorName(activity['sector_code']?.toString()))),
-                                SizedBox(width: _colSpacing),
+                                const SizedBox(width: _colSpacing),
                                 SizedBox(
                                   width: _colQuantity,
                                   child: _isGlobalEditMode && _quantityControllers.containsKey(activityId)

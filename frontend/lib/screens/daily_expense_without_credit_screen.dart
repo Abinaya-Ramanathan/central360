@@ -3,7 +3,6 @@ import 'expense_tab_content.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import '../models/sector.dart';
-import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';

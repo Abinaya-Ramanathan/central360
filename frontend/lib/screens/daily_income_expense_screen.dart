@@ -330,24 +330,24 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
 
     const double sp = 20;
     const double wItem = 150, wQty = 100, wIncome = 120, wExpense = 120, wAction = 160;
-    final totalWidth = wItem + sp + wQty + sp + wIncome + sp + wExpense + sp + wAction;
+    const totalWidth = wItem + sp + wQty + sp + wIncome + sp + wExpense + sp + wAction;
     return FixedHeaderTable(
       horizontalScrollController: _dailyTabHorizontalScrollController,
       totalWidth: totalWidth,
       headerHeight: 48,
       headerBuilder: (ctx) => Container(
         color: Colors.blue.shade100,
-        child: Row(
+        child: const Row(
           children: [
-            SizedBox(width: wItem, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Item Name'))),
+            SizedBox(width: wItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Name'))),
             SizedBox(width: sp),
-            SizedBox(width: wQty, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Quantity'))),
+            SizedBox(width: wQty, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Quantity'))),
             SizedBox(width: sp),
-            SizedBox(width: wIncome, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Income'))),
+            SizedBox(width: wIncome, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Income'))),
             SizedBox(width: sp),
-            SizedBox(width: wExpense, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Expense'))),
+            SizedBox(width: wExpense, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Expense'))),
             SizedBox(width: sp),
-            SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action'))),
+            SizedBox(width: wAction, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Action'))),
           ],
         ),
       ),
@@ -358,15 +358,15 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
             color: Colors.grey.shade200,
             child: Row(
               children: [
-                SizedBox(width: wItem, child: const Text('Total', style: TextStyle(fontWeight: FontWeight.bold))),
-                SizedBox(width: sp),
-                SizedBox(width: wQty),
-                SizedBox(width: sp),
+                const SizedBox(width: wItem, child: Text('Total', style: TextStyle(fontWeight: FontWeight.bold))),
+                const SizedBox(width: sp),
+                const SizedBox(width: wQty),
+                const SizedBox(width: sp),
                 SizedBox(width: wIncome, child: Text('₹${totalIncome.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold))),
-                SizedBox(width: sp),
+                const SizedBox(width: sp),
                 SizedBox(width: wExpense, child: Text('₹${totalExpense.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold))),
-                SizedBox(width: sp),
-                SizedBox(width: wAction),
+                const SizedBox(width: sp),
+                const SizedBox(width: wAction),
               ],
             ),
           );
@@ -377,13 +377,13 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
         return Row(
           children: [
             SizedBox(width: wItem, child: isEditing ? SizedBox(width: 150, child: TextField(controller: controllers['item_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(item['item_name']?.toString() ?? '')),
-            SizedBox(width: sp),
+            const SizedBox(width: sp),
             SizedBox(width: wQty, child: isEditing ? SizedBox(width: 100, child: TextField(controller: controllers['quantity'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(item['quantity']?.toString() ?? '')),
-            SizedBox(width: sp),
+            const SizedBox(width: sp),
             SizedBox(width: wIncome, child: isEditing ? SizedBox(width: 120, child: TextField(controller: controllers['income_amount'], keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text('₹${_parseAmount(item['income_amount']).toStringAsFixed(2)}')),
-            SizedBox(width: sp),
+            const SizedBox(width: sp),
             SizedBox(width: wExpense, child: isEditing ? SizedBox(width: 120, child: TextField(controller: controllers['expense_amount'], keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text('₹${_parseAmount(item['expense_amount']).toStringAsFixed(2)}')),
-            SizedBox(width: sp),
+            const SizedBox(width: sp),
             SizedBox(width: wAction, child: Row(mainAxisSize: MainAxisSize.min, children: [if (isEditing) IconButton(icon: const Icon(Icons.save, color: Colors.green), tooltip: 'Save', onPressed: () => _saveIncomeExpenseItem(index)) else IconButton(icon: const Icon(Icons.edit, color: Colors.blue), tooltip: 'Edit', onPressed: () => _editIncomeExpenseItem(index)), if (widget.isMainAdmin) IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Delete', onPressed: () => _deleteIncomeExpenseItem(index))])),
           ],
         );
@@ -614,20 +614,20 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
 
     const double sp = 20;
     const double wSector = 150, wIncome = 130, wExpense = 130;
-    final totalWidth = wSector + sp + wIncome + sp + wExpense;
+    const totalWidth = wSector + sp + wIncome + sp + wExpense;
     return FixedHeaderTable(
       horizontalScrollController: _overallTabHorizontalScrollController,
       totalWidth: totalWidth,
       headerHeight: 48,
       headerBuilder: (ctx) => Container(
         color: Colors.blue.shade100,
-        child: Row(
+        child: const Row(
           children: [
-            SizedBox(width: wSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector Name'))),
+            SizedBox(width: wSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector Name'))),
             SizedBox(width: sp),
-            SizedBox(width: wIncome, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Total Income'))),
+            SizedBox(width: wIncome, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Total Income'))),
             SizedBox(width: sp),
-            SizedBox(width: wExpense, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Total Expense'))),
+            SizedBox(width: wExpense, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Total Expense'))),
           ],
         ),
       ),
@@ -638,10 +638,10 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
             color: Colors.grey.shade200,
             child: Row(
               children: [
-                SizedBox(width: wSector, child: const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold))),
-                SizedBox(width: sp),
+                const SizedBox(width: wSector, child: Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold))),
+                const SizedBox(width: sp),
                 SizedBox(width: wIncome, child: Text('₹${grandTotalIncome.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold))),
-                SizedBox(width: sp),
+                const SizedBox(width: sp),
                 SizedBox(width: wExpense, child: Text('₹${grandTotalExpense.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold))),
               ],
             ),
@@ -651,9 +651,9 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
         return Row(
           children: [
             SizedBox(width: wSector, child: Text(item['sector_name']?.toString() ?? '')),
-            SizedBox(width: sp),
+            const SizedBox(width: sp),
             SizedBox(width: wIncome, child: Text('₹${_parseAmount(item['total_income']).toStringAsFixed(2)}')),
-            SizedBox(width: sp),
+            const SizedBox(width: sp),
             SizedBox(width: wExpense, child: Text('₹${_parseAmount(item['total_expense']).toStringAsFixed(2)}')),
           ],
         );

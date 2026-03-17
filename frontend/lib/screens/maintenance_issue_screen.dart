@@ -488,7 +488,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
     final issues = _issues.where((issue) => issue.id != null).toList();
     final List<Widget> headerChildren = [];
     void addCol(double w, Widget c) {
-      if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _colSpacing));
+      if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
       headerChildren.add(SizedBox(width: w, child: c));
     }
     if (showSector) {
@@ -525,7 +525,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
         final isEditMode = _editMode[issueId] == true;
         final List<Widget> rowChildren = [];
         void addCell(double w, Widget c) {
-          if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _colSpacing));
+          if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: _colSpacing));
           rowChildren.add(SizedBox(width: w, child: c));
         }
         if (showSector) {

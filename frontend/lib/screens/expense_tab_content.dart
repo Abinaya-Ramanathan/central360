@@ -181,19 +181,19 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
       horizontalScrollController: _horizontalScrollController,
       totalWidth: totalWidth.toDouble(),
       headerHeight: 48,
-      headerBuilder: (ctx) => Row(
+      headerBuilder: (ctx) => const Row(
         children: [
-          SizedBox(width: _expenseWSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _expenseWSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold)))),
           SizedBox(width: _expenseSp),
-          SizedBox(width: _expenseWAmount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
+          SizedBox(width: _expenseWAmount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
       rowCount: rowCount,
       rowBuilder: (ctx, index) {
         if (_sectorExpenseSummary.isEmpty) {
-          return Row(
+          return const Row(
             children: [
-              SizedBox(width: _expenseWSector, child: const Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
+              SizedBox(width: _expenseWSector, child: Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
               SizedBox(width: _expenseSp),
               SizedBox(width: _expenseWAmount),
             ],
@@ -204,8 +204,8 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
             color: Colors.purple.shade50,
             child: Row(
               children: [
-                SizedBox(width: _expenseWSector, child: const Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-                SizedBox(width: _expenseSp),
+                const SizedBox(width: _expenseWSector, child: Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                const SizedBox(width: _expenseSp),
                 SizedBox(width: _expenseWAmount, child: Text(_calculateTotalExpenseForAllSectors().toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple))),
               ],
             ),
@@ -215,7 +215,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
         return Row(
           children: [
             SizedBox(width: _expenseWSector, child: Text(_getSectorName(sectorCode))),
-            SizedBox(width: _expenseSp),
+            const SizedBox(width: _expenseSp),
             SizedBox(width: _expenseWAmount, child: Text('₹${_sectorExpenseSummary[sectorCode]!.toStringAsFixed(2)}')),
           ],
         );
@@ -246,15 +246,15 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
                 return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
               });
             }), child: Align(alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_sortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])))),
-            SizedBox(width: _expenseSp),
+            const SizedBox(width: _expenseSp),
           ],
-          SizedBox(width: _singleWItem, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold)))),
-          SizedBox(width: _expenseSp),
-          SizedBox(width: _singleWAmount, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
-          SizedBox(width: _expenseSp),
-          SizedBox(width: _singleWReason, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Reason for Purchase', style: TextStyle(fontWeight: FontWeight.bold)))),
-          SizedBox(width: _expenseSp),
-          SizedBox(width: _singleWActions, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold)))),
+          const SizedBox(width: _singleWItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold)))),
+          const SizedBox(width: _expenseSp),
+          const SizedBox(width: _singleWAmount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
+          const SizedBox(width: _expenseSp),
+          const SizedBox(width: _singleWReason, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Reason for Purchase', style: TextStyle(fontWeight: FontWeight.bold)))),
+          const SizedBox(width: _expenseSp),
+          const SizedBox(width: _singleWActions, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
       rowCount: rowCount,
@@ -262,14 +262,14 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
         if (_expenseData.isEmpty) {
           return Row(
             children: [
-              if (showSectorColumn) ...[SizedBox(width: _singleWSector), SizedBox(width: _expenseSp)],
-              SizedBox(width: _singleWItem, child: const Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
-              SizedBox(width: _expenseSp),
-              SizedBox(width: _singleWAmount),
-              SizedBox(width: _expenseSp),
-              SizedBox(width: _singleWReason),
-              SizedBox(width: _expenseSp),
-              SizedBox(width: _singleWActions),
+              if (showSectorColumn) ...[const SizedBox(width: _singleWSector), const SizedBox(width: _expenseSp)],
+              const SizedBox(width: _singleWItem, child: Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
+              const SizedBox(width: _expenseSp),
+              const SizedBox(width: _singleWAmount),
+              const SizedBox(width: _expenseSp),
+              const SizedBox(width: _singleWReason),
+              const SizedBox(width: _expenseSp),
+              const SizedBox(width: _singleWActions),
             ],
           );
         }
@@ -278,14 +278,14 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
             color: Colors.purple.shade50,
             child: Row(
               children: [
-                if (showSectorColumn) ...[SizedBox(width: _singleWSector), SizedBox(width: _expenseSp)],
-                SizedBox(width: _singleWItem, child: const Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-                SizedBox(width: _expenseSp),
+                if (showSectorColumn) ...[const SizedBox(width: _singleWSector), const SizedBox(width: _expenseSp)],
+                const SizedBox(width: _singleWItem, child: Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                const SizedBox(width: _expenseSp),
                 SizedBox(width: _singleWAmount, child: Text(_calculateTotalExpense().toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple))),
-                SizedBox(width: _expenseSp),
-                SizedBox(width: _singleWReason),
-                SizedBox(width: _expenseSp),
-                SizedBox(width: _singleWActions),
+                const SizedBox(width: _expenseSp),
+                const SizedBox(width: _singleWReason),
+                const SizedBox(width: _expenseSp),
+                const SizedBox(width: _singleWActions),
               ],
             ),
           );
@@ -298,13 +298,13 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
         ];
         return Row(
           children: [
-            if (showSectorColumn) ...[SizedBox(width: _singleWSector, child: Text(_getSectorName(record['sector_code']?.toString()))), SizedBox(width: _expenseSp)],
+            if (showSectorColumn) ...[SizedBox(width: _singleWSector, child: Text(_getSectorName(record['sector_code']?.toString()))), const SizedBox(width: _expenseSp)],
             SizedBox(width: _singleWItem, child: Text(record['item_details']?.toString() ?? '')),
-            SizedBox(width: _expenseSp),
+            const SizedBox(width: _expenseSp),
             SizedBox(width: _singleWAmount, child: Text(_parseDecimalFromDynamic(record['amount']).toStringAsFixed(2))),
-            SizedBox(width: _expenseSp),
+            const SizedBox(width: _expenseSp),
             SizedBox(width: _singleWReason, child: Text(record['reason_for_purchase']?.toString() ?? '')),
-            SizedBox(width: _expenseSp),
+            const SizedBox(width: _expenseSp),
             SizedBox(width: _singleWActions, child: Row(mainAxisSize: MainAxisSize.min, children: actionButtons)),
           ],
         );

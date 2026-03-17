@@ -898,9 +898,9 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'issue_description': issueDescription,
-        'date_created': dateCreated != null ? FormatUtils.formatDateForApi(dateCreated!) : null,
+        'date_created': dateCreated != null ? FormatUtils.formatDateForApi(dateCreated) : null,
         'status': status ?? 'Not resolved',
-        'date_resolved': dateResolved != null ? FormatUtils.formatDateForApi(dateResolved!) : null,
+        'date_resolved': dateResolved != null ? FormatUtils.formatDateForApi(dateResolved) : null,
         'sector_code': sectorCode,
       }),
     );

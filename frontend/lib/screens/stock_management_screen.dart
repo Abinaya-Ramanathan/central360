@@ -468,9 +468,15 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         list = list.where((r) => widget.includedSectorCodes!.contains(r['sector_code']?.toString())).toList();
       }
       if (mounted) {
-        for (var c in _itemPriceQuantityControllers.values) c.dispose();
-        for (var c in _itemPriceNewPriceControllers.values) c.dispose();
-        for (var c in _itemPriceOldPriceControllers.values) c.dispose();
+        for (var c in _itemPriceQuantityControllers.values) {
+          c.dispose();
+        }
+        for (var c in _itemPriceNewPriceControllers.values) {
+          c.dispose();
+        }
+        for (var c in _itemPriceOldPriceControllers.values) {
+          c.dispose();
+        }
         _itemPriceQuantityControllers.clear();
         _itemPriceUnitValues.clear();
         _itemPriceNewPriceControllers.clear();
@@ -873,7 +879,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         (_isCafeDailyStock ? (_dailyColQty + _dailySpacing + _dailyColUnit + _dailySpacing + _dailyColQty + _dailySpacing + _dailyColUnit + _dailySpacing) : 0) +
         _dailyColReason;
     final totalWidth = baseWidth;
-    final sectorSort = () {
+    void sectorSort() {
       setState(() {
         _sortAscendingDaily = !_sortAscendingDaily;
         data.sort((a, b) {
@@ -882,37 +888,37 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           return _sortAscendingDaily ? aName.compareTo(bName) : bName.compareTo(aName);
         });
       });
-    };
+    }
     final headerCells = <Widget>[
       if (showSectorColumn) ...[
-        InkWell(onTap: sectorSort, child: SizedBox(width: _dailyColSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
-        SizedBox(width: _dailySpacing),
+        InkWell(onTap: sectorSort, child: const SizedBox(width: _dailyColSector, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
+        const SizedBox(width: _dailySpacing),
       ],
-      SizedBox(width: _dailyColSiNo, child: const Text('SI.NO', style: TextStyle(fontWeight: FontWeight.bold))),
-      SizedBox(width: _dailySpacing),
-      SizedBox(width: _dailyColItemName, child: const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-      SizedBox(width: _dailySpacing),
+      const SizedBox(width: _dailyColSiNo, child: Text('SI.NO', style: TextStyle(fontWeight: FontWeight.bold))),
+      const SizedBox(width: _dailySpacing),
+      const SizedBox(width: _dailyColItemName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+      const SizedBox(width: _dailySpacing),
       if (showVehicleColumns) ...[
-        SizedBox(width: _dailyColVehicleType, child: const Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
-        SizedBox(width: _dailySpacing),
-        SizedBox(width: _dailyColPartNumber, child: const Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
-        SizedBox(width: _dailySpacing),
+        const SizedBox(width: _dailyColVehicleType, child: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
+        const SizedBox(width: _dailySpacing),
+        const SizedBox(width: _dailyColPartNumber, child: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
+        const SizedBox(width: _dailySpacing),
       ],
       SizedBox(width: _dailyColQty, child: Text(_isCafeDailyStock ? 'Canteen' : 'Quantity Taken', style: const TextStyle(fontWeight: FontWeight.bold))),
-      SizedBox(width: _dailySpacing),
-      SizedBox(width: _dailyColUnit, child: const Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-      SizedBox(width: _dailySpacing),
+      const SizedBox(width: _dailySpacing),
+      const SizedBox(width: _dailyColUnit, child: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+      const SizedBox(width: _dailySpacing),
       if (_isCafeDailyStock) ...[
-        SizedBox(width: _dailyColQty, child: const Text('Main branch', style: TextStyle(fontWeight: FontWeight.bold))),
-        SizedBox(width: _dailySpacing),
-        SizedBox(width: _dailyColUnit, child: const Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-        SizedBox(width: _dailySpacing),
-        SizedBox(width: _dailyColQty, child: const Text('Thanthondrimalai branch', style: TextStyle(fontWeight: FontWeight.bold))),
-        SizedBox(width: _dailySpacing),
-        SizedBox(width: _dailyColUnit, child: const Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-        SizedBox(width: _dailySpacing),
+        const SizedBox(width: _dailyColQty, child: Text('Main branch', style: TextStyle(fontWeight: FontWeight.bold))),
+        const SizedBox(width: _dailySpacing),
+        const SizedBox(width: _dailyColUnit, child: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+        const SizedBox(width: _dailySpacing),
+        const SizedBox(width: _dailyColQty, child: Text('Thanthondrimalai branch', style: TextStyle(fontWeight: FontWeight.bold))),
+        const SizedBox(width: _dailySpacing),
+        const SizedBox(width: _dailyColUnit, child: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+        const SizedBox(width: _dailySpacing),
       ],
-      SizedBox(width: _dailyColReason, child: const Text('Reason', style: TextStyle(fontWeight: FontWeight.bold))),
+      const SizedBox(width: _dailyColReason, child: Text('Reason', style: TextStyle(fontWeight: FontWeight.bold))),
     ];
     return FixedHeaderTable(
       horizontalScrollController: _stockHorizontalScrollController,
@@ -934,17 +940,17 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         final rowCells = <Widget>[
           if (showSectorColumn) ...[
             SizedBox(width: _dailyColSector, child: Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')),
-            SizedBox(width: _dailySpacing),
+            const SizedBox(width: _dailySpacing),
           ],
           SizedBox(width: _dailyColSiNo, child: Text('$siNo')),
-          SizedBox(width: _dailySpacing),
+          const SizedBox(width: _dailySpacing),
           SizedBox(width: _dailyColItemName, child: Text(record['item_name']?.toString() ?? 'N/A')),
-          SizedBox(width: _dailySpacing),
+          const SizedBox(width: _dailySpacing),
           if (showVehicleColumns) ...[
             SizedBox(width: _dailyColVehicleType, child: Text(showVehicleForThisItem ? (record['vehicle_type']?.toString() ?? '') : '')),
-            SizedBox(width: _dailySpacing),
+            const SizedBox(width: _dailySpacing),
             SizedBox(width: _dailyColPartNumber, child: Text(showVehicleForThisItem ? (record['part_number']?.toString() ?? '') : '')),
-            SizedBox(width: _dailySpacing),
+            const SizedBox(width: _dailySpacing),
           ],
           SizedBox(
             width: _dailyColQty,
@@ -960,14 +966,14 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                   )
                 : Text(record['quantity_taken']?.toString() ?? '0'),
           ),
-          SizedBox(width: _dailySpacing),
+          const SizedBox(width: _dailySpacing),
           SizedBox(
             width: _dailyColUnit,
             child: _isEditModeDaily
                 ? ConstrainedBox(
                     constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
                     child: DropdownButtonFormField<String>(
-                      value: _dailyQuantityUnits[key],
+                      initialValue: _dailyQuantityUnits[key],
                       isDense: true,
                       isExpanded: true,
                       decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4)),
@@ -986,7 +992,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                   )
                 : Text(record['unit']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
           ),
-          SizedBox(width: _dailySpacing),
+          const SizedBox(width: _dailySpacing),
         ];
         if (_isCafeDailyStock) {
           rowCells.addAll([
@@ -1004,14 +1010,14 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                     )
                   : Text(record['quantity_taken_main_branch']?.toString() ?? '0'),
             ),
-            SizedBox(width: _dailySpacing),
+            const SizedBox(width: _dailySpacing),
             SizedBox(
               width: _dailyColUnit,
               child: _isEditModeDaily
                   ? ConstrainedBox(
                       constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
                       child: DropdownButtonFormField<String>(
-                        value: _dailyUnitMainBranch[key],
+                        initialValue: _dailyUnitMainBranch[key],
                         isDense: true,
                         isExpanded: true,
                         decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4)),
@@ -1030,7 +1036,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                   )
                   : Text(record['unit_main_branch']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
             ),
-            SizedBox(width: _dailySpacing),
+            const SizedBox(width: _dailySpacing),
             SizedBox(
               width: _dailyColQty,
               child: _isEditModeDaily
@@ -1045,14 +1051,14 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                     )
                   : Text(record['quantity_taken_thanthondrimalai']?.toString() ?? '0'),
             ),
-            SizedBox(width: _dailySpacing),
+            const SizedBox(width: _dailySpacing),
             SizedBox(
               width: _dailyColUnit,
               child: _isEditModeDaily
                   ? ConstrainedBox(
                       constraints: const BoxConstraints(minWidth: 65, maxWidth: 80),
                       child: DropdownButtonFormField<String>(
-                        value: _dailyUnitThanthondrimalai[key],
+                        initialValue: _dailyUnitThanthondrimalai[key],
                         isDense: true,
                         isExpanded: true,
                         decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4)),
@@ -1071,7 +1077,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                   )
                   : Text(record['unit_thanthondrimalai']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: Colors.black)),
             ),
-            SizedBox(width: _dailySpacing),
+            const SizedBox(width: _dailySpacing),
           ]);
         }
         rowCells.add(SizedBox(
@@ -1139,7 +1145,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                   const Icon(Icons.business, size: 18),
                   const SizedBox(width: 4),
                   Text(
-                    _getSectorName(widget.selectedSector) + ' (consolidated)',
+                    '${_getSectorName(widget.selectedSector)} (consolidated)',
                     style: const TextStyle(fontSize: 14),
                   ),
                 ],
@@ -1689,10 +1695,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                 child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
-          SizedBox(width: _overallColItemName, child: const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _overallColItemName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
           if (showVehicleColumns) ...[
-            SizedBox(width: _overallColVehicle, child: const Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
-            SizedBox(width: _overallColPart, child: const Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
+            const SizedBox(width: _overallColVehicle, child: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
+            const SizedBox(width: _overallColPart, child: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
           _headerCell('Remaining Stock\nin gram', Colors.blue, _overallColUnit),
           _headerCell('Remaining Stock\nin kg', Colors.blue, _overallColUnit),
@@ -1864,12 +1870,12 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       headerBuilder: (context) {
         final cells = <Widget>[
           if (showSectorColumn)
-            SizedBox(width: _itemPriceColSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _itemPriceColName, child: const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _itemPriceColQty, child: const Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _itemPriceColUnit, child: const Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _itemPriceColNew, child: const Text('New Price', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _itemPriceColOld, child: const Text('Old Price', style: TextStyle(fontWeight: FontWeight.bold))),
+            const SizedBox(width: _itemPriceColSector, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _itemPriceColName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _itemPriceColQty, child: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _itemPriceColUnit, child: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _itemPriceColNew, child: Text('New Price', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _itemPriceColOld, child: Text('Old Price', style: TextStyle(fontWeight: FontWeight.bold))),
         ];
         return SizedBox(
           height: _itemPriceHeaderHeight,
@@ -1915,7 +1921,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
             width: _itemPriceColUnit,
             child: _isEditModeItemPrice
                 ? DropdownButtonFormField<String>(
-                    value: unitValue != null && _itemPriceUnitOptions.contains(unitValue) ? unitValue : null,
+                    initialValue: unitValue != null && _itemPriceUnitOptions.contains(unitValue) ? unitValue : null,
                     isDense: true,
                     isExpanded: true,
                     decoration: const InputDecoration(

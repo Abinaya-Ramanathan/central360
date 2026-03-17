@@ -491,7 +491,7 @@ class _CreditTabContentState extends State<CreditTabContent> {
     const bold = TextStyle(fontWeight: FontWeight.bold);
     final List<Widget> headerChildren = [];
     void addCol(double w, Widget c) {
-      if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _colSpacing));
+      if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
       headerChildren.add(SizedBox(width: w, child: c));
     }
     if (showSector) addCol(_colSector, const Text('Sector', style: bold));
@@ -514,7 +514,7 @@ class _CreditTabContentState extends State<CreditTabContent> {
         final isEditMode = _editMode[index] == true;
         final List<Widget> rowChildren = [];
         void addCell(double w, Widget c) {
-          if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _colSpacing));
+          if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: _colSpacing));
           rowChildren.add(SizedBox(width: w, child: c));
         }
         if (showSector) addCell(_colSector, Text(_getSectorName(record['sector_code']?.toString())));

@@ -709,15 +709,15 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
       horizontalScrollController: _horizontalScrollController,
       totalWidth: _totalTableWidth,
       headerHeight: _headerHeight,
-      headerBuilder: (context) => Row(
+      headerBuilder: (context) => const Row(
         children: [
-          SizedBox(width: _colProduct, child: const Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colProduct, child: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
           SizedBox(width: _colSpacing),
-          SizedBox(width: _colNum, child: const Text('Morning Production', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colNum, child: Text('Morning Production', style: TextStyle(fontWeight: FontWeight.bold))),
           SizedBox(width: _colSpacing),
-          SizedBox(width: _colNum, child: const Text('Afternoon Production', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colNum, child: Text('Afternoon Production', style: TextStyle(fontWeight: FontWeight.bold))),
           SizedBox(width: _colSpacing),
-          SizedBox(width: _colNum, child: const Text('Evening Production', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colNum, child: Text('Evening Production', style: TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
       rowCount: rowCount,
@@ -732,11 +732,11 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
                   style: const TextStyle(fontStyle: FontStyle.italic),
                 ),
               ),
-              SizedBox(width: _colSpacing),
+              const SizedBox(width: _colSpacing),
               const SizedBox(width: _colNum),
-              SizedBox(width: _colSpacing),
+              const SizedBox(width: _colSpacing),
               const SizedBox(width: _colNum),
-              SizedBox(width: _colSpacing),
+              const SizedBox(width: _colSpacing),
               const SizedBox(width: _colNum),
             ],
           );
@@ -745,11 +745,11 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
         return Row(
           children: [
             SizedBox(width: _colProduct, child: Text(record['product_name']?.toString() ?? '')),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colNum, child: Text('${_parseIntFromDynamic(record['morning_production'])}')),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colNum, child: Text('${_parseIntFromDynamic(record['afternoon_production'])}')),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colNum, child: Text('${_parseIntFromDynamic(record['evening_production'])}')),
           ],
         );

@@ -393,14 +393,14 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                                   return _sectorSortAscendingVehicle ? aName.compareTo(bName) : bName.compareTo(aName);
                                 });
                               }),
-                              child: SizedBox(width: wSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
+                              child: const SizedBox(width: wSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
                             ),
                           if (showSector) const SizedBox(width: sp),
-                          SizedBox(width: wName, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wName, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
-                          SizedBox(width: wModel, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Model', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wModel, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Model', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
-                          SizedBox(width: wRegNo, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Registration Number', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wRegNo, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Registration Number', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
                           _vehicleSortHeader('Permit Date', 'permit', wDate),
                           const SizedBox(width: sp),
@@ -412,7 +412,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                           const SizedBox(width: sp),
                           _vehicleSortHeader('Tax Date', 'tax', wDate),
                           const SizedBox(width: sp),
-                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wAction, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
                         ];
                         return Row(children: headers);
                       },
@@ -488,19 +488,19 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                                   return _sectorSortAscendingDriver ? aName.compareTo(bName) : bName.compareTo(aName);
                                 });
                               }),
-                              child: SizedBox(width: wSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
+                              child: const SizedBox(width: wSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
                             ),
                           if (showSector) const SizedBox(width: sp),
-                          SizedBox(width: wDriverName, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Driver Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wDriverName, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Driver Name', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
-                          SizedBox(width: wLicenseNo, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('License Number', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wLicenseNo, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('License Number', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
                           InkWell(
                             onTap: () => setState(() => _driverSortAscending = !_driverSortAscending),
                             child: SizedBox(width: wExpiry, height: 48, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Expiry Date', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_driverSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])),
                           ),
                           const SizedBox(width: sp),
-                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wAction, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
                         ];
                         return Row(children: headers);
                       },
@@ -608,24 +608,24 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                                   return _sectorSortAscendingService ? aName.compareTo(bName) : bName.compareTo(aName);
                                 });
                               }),
-                              child: SizedBox(width: wSector, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
+                              child: const SizedBox(width: wSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
                             ),
                           if (showSector) const SizedBox(width: sp),
-                          SizedBox(width: wVehicle, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wVehicle, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
-                          SizedBox(width: wModel, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Model', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wModel, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Model', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
-                          SizedBox(width: wPart, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Service Part Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wPart, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Service Part Name', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
                           _serviceSortHeader('Service Date', 'service', wDate),
                           const SizedBox(width: sp),
-                          SizedBox(width: wKms, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Service in Kms', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wKms, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Service in Kms', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
-                          SizedBox(width: wHrs, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Service in Hrs', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wHrs, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Service in Hrs', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
                           _serviceSortHeader('Next Service Date', 'next', wDate),
                           const SizedBox(width: sp),
-                          SizedBox(width: wAction, height: 48, child: const Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
+                          const SizedBox(width: wAction, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold)))),
                         ];
                         return Row(children: headers);
                       },

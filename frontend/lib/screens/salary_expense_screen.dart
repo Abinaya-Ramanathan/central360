@@ -583,15 +583,15 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       horizontalScrollController: _horizontalScrollController,
       totalWidth: _salaryTableTotalWidth,
       headerHeight: _headerHeight,
-      headerBuilder: (context) => Row(
+      headerBuilder: (context) => const Row(
         children: [
-          SizedBox(width: _colName, child: const Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colName, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
           SizedBox(width: _colSpacing),
-          SizedBox(width: _colSalary, child: const Text('Salary Issued', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colSalary, child: Text('Salary Issued', style: TextStyle(fontWeight: FontWeight.bold))),
           SizedBox(width: _colSpacing),
-          SizedBox(width: _colDate, child: const Text('Salary Date', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colDate, child: Text('Salary Date', style: TextStyle(fontWeight: FontWeight.bold))),
           SizedBox(width: _colSpacing),
-          SizedBox(width: _colActions, child: const Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colActions, child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
       rowCount: flatRows.length,
@@ -601,11 +601,11 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
           return Row(
             children: [
               SizedBox(width: _colName, child: Row(children: [const Icon(Icons.add_circle, color: Colors.green, size: 20), const SizedBox(width: 8), Text('Add Entry', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold))])),
-              SizedBox(width: _colSpacing),
-              SizedBox(width: _colSalary, child: const Text('')),
-              SizedBox(width: _colSpacing),
-              SizedBox(width: _colDate, child: const Text('')),
-              SizedBox(width: _colSpacing),
+              const SizedBox(width: _colSpacing),
+              const SizedBox(width: _colSalary, child: Text('')),
+              const SizedBox(width: _colSpacing),
+              const SizedBox(width: _colDate, child: Text('')),
+              const SizedBox(width: _colSpacing),
               SizedBox(width: _colActions, child: IconButton(icon: const Icon(Icons.add, color: Colors.green), tooltip: 'Add New Entry', onPressed: () => _addNewEntryForEmployee(r.employee.id))),
             ],
           );
@@ -615,7 +615,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         return Row(
           children: [
             SizedBox(width: _colName, child: Text(r.employee.name)),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colSalary,
               child: isEditMode
@@ -636,7 +636,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                     )
                   : Text('₹${_parseIntValue(data?['salary_issued'])}'),
             ),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colDate,
               child: isEditMode
@@ -665,7 +665,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                     )
                   : Text(_formatDateForApi(data?['salary_issued_date']) ?? '-', style: const TextStyle(fontSize: 12)),
             ),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colActions,
               child: Row(

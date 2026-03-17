@@ -832,11 +832,11 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       headerHeight: _rentVehicleHeaderHeight,
       headerBuilder: (context) => Material(
         color: Colors.teal.shade100,
-        child: Row(
+        child: const Row(
           children: [
-            SizedBox(width: _rentVehicleColName, child: const Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _rentVehicleColName, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _rentVehicleSpacing),
-            SizedBox(width: _rentVehicleColStatus, child: const Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
+            SizedBox(width: _rentVehicleColStatus, child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
       ),
@@ -848,7 +848,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
         return Row(
           children: [
             SizedBox(width: _rentVehicleColName, child: Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
-            SizedBox(width: _rentVehicleSpacing),
+            const SizedBox(width: _rentVehicleSpacing),
             SizedBox(
               width: _rentVehicleColStatus,
               child: _isEditMode
@@ -894,7 +894,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     const bold = TextStyle(fontWeight: FontWeight.bold);
     final List<Widget> headerChildren = [];
     void addCol(double w, Widget c) {
-      if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _advanceSpacing));
+      if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _advanceSpacing));
       headerChildren.add(SizedBox(width: w, child: c));
     }
     if (showSector) {
@@ -935,7 +935,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       rowBuilder: (context, index) {
         final List<Widget> rowChildren = [];
         void addCell(double w, Widget c) {
-          if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _advanceSpacing));
+          if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: _advanceSpacing));
           rowChildren.add(SizedBox(width: w, child: c));
         }
         if (index == _filteredAdvanceDetails.length) {

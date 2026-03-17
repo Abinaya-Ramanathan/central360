@@ -157,11 +157,11 @@ class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
                           horizontalScrollController: _horizontalScrollController,
                           totalWidth: 420,
                           headerHeight: 48,
-                          headerBuilder: (context) => SizedBox(
+                          headerBuilder: (context) => const SizedBox(
                             height: 48,
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
-                              children: const [
+                              children: [
                                 SizedBox(width: 120, child: Text('Sector Code', style: TextStyle(fontWeight: FontWeight.bold))),
                                 SizedBox(width: 180, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 SizedBox(width: 120, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),

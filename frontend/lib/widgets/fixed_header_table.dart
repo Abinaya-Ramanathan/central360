@@ -12,10 +12,13 @@ class _FixedHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      elevation: 0,
-      child: headerBuilder(context),
+    return SizedBox(
+      height: height,
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        elevation: 0,
+        child: headerBuilder(context),
+      ),
     );
   }
 

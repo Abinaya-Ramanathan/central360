@@ -98,8 +98,8 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
       headerHeight: _headerHeight,
       headerBuilder: (context) => Row(
         children: [
-          SizedBox(width: _colActivityName, child: const Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colSpacing),
+          const SizedBox(width: _colActivityName, child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _colSpacing),
           InkWell(
             onTap: () {
               setState(() {
@@ -112,12 +112,12 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
                   });
               });
             },
-            child: SizedBox(width: _colSector, child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+            child: const SizedBox(width: _colSector, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
           ),
-          SizedBox(width: _colSpacing),
-          SizedBox(width: _colDescription, child: const Text('Description', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colSpacing),
-          SizedBox(width: _colAction, child: const Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _colSpacing),
+          const SizedBox(width: _colDescription, child: Text('Description', style: TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: _colSpacing),
+          const SizedBox(width: _colAction, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
       rowCount: _filteredMiningActivities.length,
@@ -126,9 +126,9 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
         return Row(
           children: [
             SizedBox(width: _colActivityName, child: Text(activity['activity_name']?.toString() ?? 'N/A')),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(width: _colSector, child: Text(_getSectorName(activity['sector_code']?.toString()))),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colDescription,
               child: Text(
@@ -137,7 +137,7 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            SizedBox(width: _colSpacing),
+            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colAction,
               child: Row(

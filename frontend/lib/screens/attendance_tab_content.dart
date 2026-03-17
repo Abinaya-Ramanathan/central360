@@ -451,7 +451,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
     final totalWidth = _attendanceTableWidth(showSectorColumn);
     final List<Widget> headerChildren = [];
     void addCol(double w, Widget c) {
-      if (headerChildren.isNotEmpty) headerChildren.add(SizedBox(width: _colSpacing));
+      if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
       headerChildren.add(SizedBox(width: w, child: c));
     }
     if (showSectorColumn) {
@@ -502,7 +502,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
         };
         final List<Widget> rowChildren = [];
         void addCell(double w, Widget c) {
-          if (rowChildren.isNotEmpty) rowChildren.add(SizedBox(width: _colSpacing));
+          if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: _colSpacing));
           rowChildren.add(SizedBox(width: w, child: c));
         }
         if (showSectorColumn) addCell(_colSector, Text(_getSectorName(employee.sector)));

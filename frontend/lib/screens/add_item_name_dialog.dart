@@ -170,7 +170,7 @@ class _AddItemNameDialogState extends State<AddItemNameDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _selectedSectorCode,
+                initialValue: _selectedSectorCode,
                 decoration: InputDecoration(
                   labelText: 'Sector * (applies to all items)',
                   prefixIcon: const Icon(Icons.business, color: Colors.indigo),

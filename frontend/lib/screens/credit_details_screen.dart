@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../models/sector.dart';
@@ -1150,6 +1151,7 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           // Home icon
           IconButton(
             icon: const Icon(Icons.home),
@@ -1416,7 +1418,8 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                               child: FixedHeaderTable(
                                 horizontalScrollController: _tableHorizontalScrollController,
                                 totalWidth: scrollTotalWidth,
-                                headerHeight: 48,
+                                headerHeight: 52,
+                                rowExtent: 96,
                                 leadingWidth: leadingWidth,
                                 leadingHeaderBuilder: (ctx) {
                                   if (showSector) {

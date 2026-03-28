@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/pdf_generator.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import 'home_screen.dart';
 import 'month_year_picker.dart';
 
@@ -334,7 +335,8 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
     return FixedHeaderTable(
       horizontalScrollController: _dailyTabHorizontalScrollController,
       totalWidth: (sp + wQty + sp + wIncome + sp + wExpense + sp + wAction).toDouble(),
-      headerHeight: 48,
+      headerHeight: 52,
+      rowExtent: 96,
       leadingWidth: wItem,
       leadingHeaderBuilder: (ctx) => Container(
         color: Colors.blue.shade100,
@@ -647,7 +649,8 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
     return FixedHeaderTable(
       horizontalScrollController: _overallTabHorizontalScrollController,
       totalWidth: (sp + wIncome + sp + wExpense).toDouble(),
-      headerHeight: 48,
+      headerHeight: 52,
+      rowExtent: 96,
       leadingWidth: wSector,
       leadingHeaderBuilder: (ctx) => Container(
         color: Colors.blue.shade100,
@@ -724,6 +727,7 @@ class _DailyIncomeExpenseScreenState extends State<DailyIncomeExpenseScreen> wit
           ],
         ),
         actions: [
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           IconButton(
             icon: const Icon(Icons.home),
             tooltip: 'Home',

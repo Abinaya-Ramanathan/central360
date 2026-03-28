@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import 'add_employee_dialog.dart';
 import 'edit_employee_dialog.dart';
 import 'home_screen.dart';
@@ -42,7 +43,8 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   // Horizontal ScrollController for draggable scrollbar
   final ScrollController _horizontalScrollController = ScrollController();
 
-  static const double _headerHeight = 48;
+  static const double _headerHeight = 52;
+  static const double _rowHeight = 96;
   static const double _colSector = 100;
   static const double _colName = 120;
   static const double _colContact = 100;
@@ -180,7 +182,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
           horizontalScrollController: _horizontalScrollController,
           totalWidth: rightTotalWidth,
           headerHeight: _headerHeight,
-          rowExtent: _headerHeight,
+          rowExtent: _rowHeight,
           leadingWidth: leadingWidth,
           leadingHeaderBuilder: (context) {
             if (!showSector) {
@@ -579,6 +581,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
               ),
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           // Home icon
           IconButton(
             icon: const Icon(Icons.home),

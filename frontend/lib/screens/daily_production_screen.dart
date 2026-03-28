@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -38,7 +39,8 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
   // Horizontal ScrollController for draggable scrollbar
   final ScrollController _horizontalScrollController = ScrollController();
 
-  static const double _headerHeight = 48;
+  static const double _headerHeight = 52;
+  static const double _rowHeight = 96;
   static const double _colProduct = 150;
   static const double _colNum = 120;
   static const double _colSpacing = 20;
@@ -555,6 +557,7 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           IconButton(
             icon: const Icon(Icons.home),
             tooltip: 'Home',
@@ -709,7 +712,7 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
       horizontalScrollController: _horizontalScrollController,
       totalWidth: _totalTableWidth - _colProduct - _colSpacing,
       headerHeight: _headerHeight,
-      rowExtent: _headerHeight,
+      rowExtent: _rowHeight,
       leadingWidth: _colProduct,
       leadingHeaderBuilder: (context) => const Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold)),
       leadingRowBuilder: (context, index) {

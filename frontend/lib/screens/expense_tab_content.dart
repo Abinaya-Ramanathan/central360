@@ -183,7 +183,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
       totalWidth: scrollW,
       headerHeight: 48,
       leadingWidth: leadW,
-      rowExtent: 48,
+      rowExtent: 96,
       leadingHeaderBuilder: (ctx) => const SizedBox(
         width: leadW,
         height: 48,
@@ -259,7 +259,7 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
       totalWidth: scrollW,
       headerHeight: 48,
       leadingWidth: leadW,
-      rowExtent: 48,
+      rowExtent: 96,
       leadingHeaderBuilder: (ctx) => SizedBox(
         width: leadW,
         height: 48,

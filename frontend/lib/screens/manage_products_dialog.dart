@@ -248,7 +248,7 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
                           totalWidth: 220,
                           headerHeight: 48,
                           leadingWidth: 180,
-                          rowExtent: 48,
+                          rowExtent: 96,
                           leadingHeaderBuilder: (context) => const Center(
                             child: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),

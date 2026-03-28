@@ -748,6 +748,13 @@ CREATE TABLE IF NOT EXISTS item_prices (
 ALTER TABLE item_names ADD COLUMN IF NOT EXISTS vehicle_type VARCHAR(255);
 ALTER TABLE item_names ADD COLUMN IF NOT EXISTS part_number VARCHAR(255);
 
+-- Per-sector notes (upsert via API only; no delete endpoint)
+CREATE TABLE IF NOT EXISTS sector_notes (
+  sector_code VARCHAR(50) PRIMARY KEY REFERENCES sectors(code) ON DELETE CASCADE,
+  body TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Analyze tables to update statistics for query planner
 ANALYZE employees;
 ANALYZE attendance;

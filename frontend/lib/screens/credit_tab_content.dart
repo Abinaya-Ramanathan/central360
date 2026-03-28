@@ -32,7 +32,8 @@ class _CreditTabContentState extends State<CreditTabContent> {
   final Map<int, Map<String, TextEditingController>> _controllers = {};
   final ScrollController _horizontalScrollController = ScrollController();
 
-  static const double _headerHeight = 48;
+  static const double _headerHeight = 52;
+  static const double _rowHeight = 96;
   static const double _colSector = 100;
   static const double _colName = 150;
   static const double _colPhone = 120;
@@ -510,7 +511,7 @@ class _CreditTabContentState extends State<CreditTabContent> {
       horizontalScrollController: _horizontalScrollController,
       totalWidth: rightTotalWidth,
       headerHeight: _headerHeight,
-      rowExtent: _headerHeight,
+      rowExtent: _rowHeight,
       leadingWidth: leadingWidth,
       leadingHeaderBuilder: (context) => Align(
         alignment: Alignment.centerLeft,

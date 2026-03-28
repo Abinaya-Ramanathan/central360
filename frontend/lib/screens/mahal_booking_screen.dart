@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import '../models/mahal_booking.dart';
 import '../models/catering_details.dart';
 import '../models/expense_details.dart';
@@ -294,6 +295,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                 ],
               ),
             ),
+            SectorNotesAppBarButton(sectorCode: widget.selectedSector),
             IconButton(
               icon: const Icon(Icons.event_note),
               tooltip: 'Fix event dates to match Booking ID',
@@ -621,7 +623,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                       horizontalScrollController: _eventHorizontalScrollController,
                       totalWidth: totalWidth - wId - sp,
                       headerHeight: 48,
-                      rowExtent: 48,
+                      rowExtent: 96,
                       leadingWidth: wId,
                       leadingHeaderBuilder: (ctx) => Align(
                         alignment: Alignment.centerLeft,
@@ -799,7 +801,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                       horizontalScrollController: _cateringHorizontalScrollController,
                       totalWidth: totalWidth - wId - sp,
                       headerHeight: 48,
-                      rowExtent: 48,
+                      rowExtent: 96,
                       leadingWidth: wId,
                       leadingHeaderBuilder: (ctx) => Align(
                         alignment: Alignment.centerLeft,
@@ -889,7 +891,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                       horizontalScrollController: _expenseHorizontalScrollController,
                       totalWidth: totalWidth - wId - sp,
                       headerHeight: 48,
-                      rowExtent: 48,
+                      rowExtent: 96,
                       leadingWidth: wId,
                       leadingHeaderBuilder: (ctx) => Align(
                         alignment: Alignment.centerLeft,
@@ -1341,7 +1343,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                       horizontalScrollController: _vesselHorizontalScrollController,
                       totalWidth: totalWidth - wMahal - sp,
                       headerHeight: 48,
-                      rowExtent: 48,
+                      rowExtent: 96,
                       leadingWidth: wMahal,
                       leadingHeaderBuilder: (ctx) => Align(
                         alignment: Alignment.centerLeft,

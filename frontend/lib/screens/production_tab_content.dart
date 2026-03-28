@@ -598,7 +598,7 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
       totalWidth: scrollWidth,
       headerHeight: _headerHeight,
       leadingWidth: leadW,
-      rowExtent: 56,
+      rowExtent: 96,
       leadingHeaderBuilder: (context) {
         return Material(
           child: SizedBox(

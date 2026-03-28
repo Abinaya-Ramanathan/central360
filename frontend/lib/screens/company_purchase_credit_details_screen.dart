@@ -12,6 +12,7 @@ import '../utils/ui_helpers.dart';
 import '../utils/pdf_generator.dart';
 import '../config/env_config.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -1704,6 +1705,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           IconButton(
             icon: const Icon(Icons.home),
             onPressed: () {
@@ -1849,7 +1851,7 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
       horizontalScrollController: _purchaseHorizontalScrollController,
       totalWidth: scrollTotalWidth,
       headerHeight: 48,
-      rowExtent: 56,
+      rowExtent: 96,
       leadingWidth: leadingWidth,
       leadingHeaderBuilder: (ctx) {
         if (showSector) {

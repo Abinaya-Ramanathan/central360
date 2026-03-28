@@ -9,6 +9,7 @@ import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -495,6 +496,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           IconButton(
             icon: const Icon(Icons.home),
             onPressed: () {
@@ -819,7 +821,8 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     );
   }
 
-  static const double _rentVehicleHeaderHeight = 48;
+  static const double _rentVehicleHeaderHeight = 52;
+  static const double _rentVehicleRowHeight = 96;
   static const double _rentVehicleColName = 150;
   static const double _rentVehicleColStatus = 120;
   static const double _rentVehicleSpacing = 20;
@@ -830,7 +833,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       horizontalScrollController: _rentVehicleHorizontalScrollController,
       totalWidth: _rentVehicleTotalWidth - _rentVehicleColName - _rentVehicleSpacing,
       headerHeight: _rentVehicleHeaderHeight,
-      rowExtent: _rentVehicleHeaderHeight,
+      rowExtent: _rentVehicleRowHeight,
       leadingWidth: _rentVehicleColName,
       leadingHeaderBuilder: (context) => Align(
         alignment: Alignment.centerLeft,
@@ -887,7 +890,8 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
     );
   }
 
-  static const double _advanceHeaderHeight = 48;
+  static const double _advanceHeaderHeight = 52;
+  static const double _advanceRowHeight = 96;
   static const double _advanceColSector = 100;
   static const double _advanceColName = 150;
   static const double _advanceColAmount = 120;
@@ -927,7 +931,7 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       horizontalScrollController: _advanceTableHorizontalScrollController,
       totalWidth: rightTotalWidth,
       headerHeight: _advanceHeaderHeight,
-      rowExtent: _advanceHeaderHeight,
+      rowExtent: _advanceRowHeight,
       leadingWidth: leadingWidth,
       leadingHeaderBuilder: (context) {
         return Align(

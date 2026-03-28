@@ -97,7 +97,7 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
       totalWidth: _scrollWidthTable,
       headerHeight: _headerHeight,
       leadingWidth: _colActivityName,
-      rowExtent: 48,
+      rowExtent: 96,
       leadingHeaderBuilder: (context) => const Center(
         child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold)),
       ),

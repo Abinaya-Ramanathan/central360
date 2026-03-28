@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../config/env_config.dart';
 import '../utils/format_utils.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import 'add_issue_dialog.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -47,7 +48,8 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
   final ScrollController _photoHorizontalScrollController = ScrollController();
   final ScrollController _tableHorizontalScrollController = ScrollController();
 
-  static const double _tableHeaderHeight = 48;
+  static const double _tableHeaderHeight = 52;
+  static const double _tableRowHeight = 96;
   static const double _colSector = 100;
   static const double _colDesc = 200;
   static const double _colDate = 110;
@@ -508,7 +510,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
       horizontalScrollController: _tableHorizontalScrollController,
       totalWidth: rightTotalWidth,
       headerHeight: _tableHeaderHeight,
-      rowExtent: _tableHeaderHeight,
+      rowExtent: _tableRowHeight,
       leadingWidth: leadingWidth,
       leadingHeaderBuilder: (context) {
         return Align(
@@ -695,6 +697,7 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           // Home icon
           IconButton(
             icon: const Icon(Icons.home),

@@ -158,7 +158,7 @@ class _ManageStockItemsDialogState extends State<ManageStockItemsDialog> {
       totalWidth: _scrollWidthTable,
       headerHeight: _headerHeight,
       leadingWidth: _colItemName,
-      rowExtent: 48,
+      rowExtent: 96,
       leadingHeaderBuilder: (context) => const Center(
         child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)),
       ),

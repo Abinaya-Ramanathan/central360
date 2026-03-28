@@ -567,7 +567,8 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
     );
   }
 
-  static const double _headerHeight = 48;
+  static const double _headerHeight = 52;
+  static const double _rowHeight = 96;
   static const double _colName = 150;
   static const double _colDays = 120;
   static const double _colOt = 120;
@@ -580,6 +581,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
       horizontalScrollController: _employeesTableScrollController,
       totalWidth: (_colSpacing + _colDays + _colSpacing + _colOt + _colSpacing + _colSalary).toDouble(),
       headerHeight: _headerHeight,
+      rowExtent: _rowHeight,
       leadingWidth: _colName,
       leadingHeaderBuilder: (context) => Material(
         color: Colors.green.shade100,
@@ -637,6 +639,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
       horizontalScrollController: _rentVehiclesTableScrollController,
       totalWidth: (_colSpacing + _rentColDays).toDouble(),
       headerHeight: _headerHeight,
+      rowExtent: _rowHeight,
       leadingWidth: _rentColName,
       leadingHeaderBuilder: (context) => Material(
         color: Colors.teal.shade100,
@@ -685,6 +688,7 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
       horizontalScrollController: _miningTableScrollController,
       totalWidth: (_colSpacing + _miningColQty).toDouble(),
       headerHeight: _headerHeight,
+      rowExtent: _rowHeight,
       leadingWidth: _miningColName,
       leadingHeaderBuilder: (context) => Material(
         color: Colors.amber.shade100,

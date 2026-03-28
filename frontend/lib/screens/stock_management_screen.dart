@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/sector_service.dart';
@@ -1008,7 +1009,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
 
   // Daily Stock fixed header table column widths (first column fixed: Sector or Item Name; SI.NO removed)
   static const double _dailyColSector = 100;
-  static const double _dailyColItemName = 150;
+  static const double _dailyColItemName = 178;
   static const double _dailyColVehicleType = 100;
   static const double _dailyColPartNumber = 100;
   static const double _dailyColQty = 90;
@@ -1066,7 +1067,8 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       totalWidth: totalWidth,
       headerHeight: _dailyHeaderHeight,
       leadingWidth: leadingWidth,
-      rowExtent: 72,
+      rowExtent: 100,
+      leadingMaxLines: 3,
       leadingHeaderBuilder: (context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Align(
@@ -1082,12 +1084,18 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       leadingRowBuilder: (context, index) {
         final record = data[index];
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Align(
             alignment: Alignment.centerLeft,
             child: showSectorColumn
-                ? Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')
-                : Text(record['item_name']?.toString() ?? 'N/A'),
+                ? Text(
+                    record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '',
+                    softWrap: true,
+                  )
+                : Text(
+                    record['item_name']?.toString() ?? 'N/A',
+                    softWrap: true,
+                  ),
           ),
         );
       },
@@ -1104,7 +1112,15 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         final showVehicleForThisItem = _shouldShowVehicleFieldsForItem(itemSectorCode);
         final rowCells = <Widget>[
           if (showSectorColumn) ...[
-            SizedBox(width: _dailyColItemName, child: Text(record['item_name']?.toString() ?? 'N/A')),
+            SizedBox(
+              width: _dailyColItemName,
+              child: Text(
+                record['item_name']?.toString() ?? 'N/A',
+                softWrap: true,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             const SizedBox(width: _dailySpacing),
           ],
           if (showVehicleColumns) ...[
@@ -1350,6 +1366,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           IconButton(
             icon: const Icon(Icons.home),
             tooltip: 'Home',
@@ -1820,16 +1837,16 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   static const double _overallColPart = 85;
   static const double _overallColUnit = 88;
   static const double _overallHeaderHeight = 72;
-  static const double _overallRowHeight = 48;
+  static const double _overallRowHeight = 96;
 
   static const double _itemPriceColSector = 100;
-  static const double _itemPriceColName = 160;
+  static const double _itemPriceColName = 200;
   static const double _itemPriceColQty = 90;
   static const double _itemPriceColUnit = 70;
   static const double _itemPriceColNew = 100;
   static const double _itemPriceColOld = 100;
   static const double _itemPriceHeaderHeight = 56;
-  static const double _itemPriceRowHeight = 52;
+  static const double _itemPriceRowHeight = 96;
 
   Widget _buildOverallStockTableWithStickyHeader(
     List<Map<String, dynamic>> filteredOverallStock,
@@ -2039,6 +2056,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       headerHeight: _itemPriceHeaderHeight,
       leadingWidth: leadingWidth,
       rowExtent: _itemPriceRowHeight,
+      leadingMaxLines: 3,
       leadingHeaderBuilder: (context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Align(
@@ -2051,12 +2069,12 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       leadingRowBuilder: (context, index) {
         final r = filtered[index];
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Align(
             alignment: Alignment.centerLeft,
             child: showSectorColumn
-                ? Text(_getSectorName(r['sector_code']?.toString()))
-                : Text(r['item_name']?.toString() ?? ''),
+                ? Text(_getSectorName(r['sector_code']?.toString()), softWrap: true)
+                : Text(r['item_name']?.toString() ?? '', softWrap: true),
           ),
         );
       },
@@ -2091,7 +2109,8 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
               width: _itemPriceColName,
               child: Text(
                 r['item_name']?.toString() ?? '',
-                maxLines: 2,
+                softWrap: true,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
             ),

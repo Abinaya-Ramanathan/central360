@@ -6,6 +6,7 @@ import '../services/sector_service.dart';
 import '../models/sector.dart';
 import '../utils/format_utils.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -250,7 +251,7 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
       totalWidth: scrollW,
       headerHeight: 48,
       leadingWidth: leadW,
-      rowExtent: 48,
+      rowExtent: 96,
       leadingHeaderBuilder: (ctx) => const SizedBox(
         width: leadW,
         height: 48,
@@ -702,6 +703,7 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           IconButton(
             icon: const Icon(Icons.home),
             tooltip: 'Home',

@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'month_year_picker.dart';
@@ -36,7 +37,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
   // Horizontal ScrollController for draggable scrollbar
   final ScrollController _horizontalScrollController = ScrollController();
 
-  static const double _headerHeight = 48;
+  static const double _headerHeight = 52;
+  static const double _rowHeight = 96;
   static const double _colName = 120;
   static const double _colSalary = 120;
   static const double _colDate = 120;
@@ -584,7 +586,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       horizontalScrollController: _horizontalScrollController,
       totalWidth: _salaryTableTotalWidth - _colName - _colSpacing,
       headerHeight: _headerHeight,
-      rowExtent: _headerHeight,
+      rowExtent: _rowHeight,
       leadingWidth: leadingWidth,
       leadingHeaderBuilder: (context) => const Text('Name', style: TextStyle(fontWeight: FontWeight.bold)),
       leadingRowBuilder: (context, index) {
@@ -734,6 +736,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           // Home icon
           IconButton(
             icon: const Icon(Icons.home),

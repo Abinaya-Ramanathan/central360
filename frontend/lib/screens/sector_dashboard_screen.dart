@@ -10,6 +10,7 @@ import 'login_screen.dart';
 import 'ingredients_details_screen.dart';
 import '../models/sector.dart';
 import '../services/sector_service.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 
 /// SSC units shown when sector is SSC (Sri Surya Mini Hall / SSMMC removed from this page).
 const sscUnits = ['SSCT', 'CS', 'SSCM'];
@@ -167,6 +168,7 @@ class _SectorDashboardScreenState extends State<SectorDashboardScreen> {
               );
             },
           ),
+          SectorNotesAppBarButton(sectorCode: sectorForScreens),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',

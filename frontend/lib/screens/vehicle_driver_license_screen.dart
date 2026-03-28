@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import '../models/vehicle_license.dart';
 import '../models/driver_license.dart';
 import '../models/engine_oil_service.dart';
@@ -199,6 +200,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                 ],
               ),
             ),
+            SectorNotesAppBarButton(sectorCode: widget.selectedSector),
             IconButton(
               icon: const Icon(Icons.home),
               onPressed: () {
@@ -384,7 +386,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                       horizontalScrollController: _vehicleHorizontalScrollController,
                       totalWidth: scrollTotalWidth,
                       headerHeight: 48,
-                      rowExtent: 56,
+                      rowExtent: 96,
                       leadingWidth: leadingWidth,
                       leadingHeaderBuilder: (ctx) {
                         if (showSector) {
@@ -512,7 +514,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                       horizontalScrollController: _driverHorizontalScrollController,
                       totalWidth: scrollTotalWidth,
                       headerHeight: 48,
-                      rowExtent: 56,
+                      rowExtent: 96,
                       leadingWidth: leadingWidth,
                       leadingHeaderBuilder: (ctx) {
                         if (showSector) {
@@ -659,7 +661,7 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                       horizontalScrollController: _serviceHorizontalScrollController,
                       totalWidth: scrollTotalWidth,
                       headerHeight: 48,
-                      rowExtent: 56,
+                      rowExtent: 96,
                       leadingWidth: leadingWidth,
                       leadingHeaderBuilder: (ctx) {
                         if (showSector) {

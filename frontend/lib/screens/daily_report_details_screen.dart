@@ -6,6 +6,7 @@ import '../models/sector.dart';
 import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 
 class DailyReportDetailsScreen extends StatefulWidget {
   final String username;
@@ -148,6 +149,7 @@ class _DailyReportDetailsScreenState extends State<DailyReportDetailsScreen> {
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           IconButton(
             icon: const Icon(Icons.home),
             onPressed: () {

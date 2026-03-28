@@ -7,6 +7,7 @@ import '../services/sector_service.dart';
 import '../services/auth_service.dart';
 import '../utils/format_utils.dart';
 import '../widgets/fixed_header_table.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -36,7 +37,8 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
   bool _isLoading = false;
   final ScrollController _horizontalScrollController = ScrollController();
 
-  static const double _headerHeight = 48;
+  static const double _headerHeight = 52;
+  static const double _rowHeight = 96;
   static const double _colName = 120;
   static const double _colStatus = 100;
   static const double _colOt = 100;
@@ -437,6 +439,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
               ],
             ),
           ),
+          SectorNotesAppBarButton(sectorCode: widget.selectedSector),
           // Home icon
           IconButton(
             icon: const Icon(Icons.home),
@@ -610,7 +613,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
       horizontalScrollController: _horizontalScrollController,
       totalWidth: totalWidth - _colName - _colSpacing,
       headerHeight: _headerHeight,
-      rowExtent: _headerHeight,
+      rowExtent: _rowHeight,
       leadingWidth: _colName,
       leadingHeaderBuilder: (context) => const Text('Name'),
       leadingRowBuilder: (context, index) {

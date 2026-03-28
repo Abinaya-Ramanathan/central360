@@ -480,7 +480,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
       totalWidth: scrollWidth,
       headerHeight: _headerHeight,
       leadingWidth: leadW,
-      rowExtent: 72,
+      rowExtent: 96,
       leadingHeaderBuilder: (context) => Material(
         color: Colors.blue.shade100,
         child: SizedBox(

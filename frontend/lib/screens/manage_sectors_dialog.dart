@@ -158,7 +158,7 @@ class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
                           totalWidth: 300,
                           headerHeight: 48,
                           leadingWidth: 120,
-                          rowExtent: 48,
+                          rowExtent: 96,
                           leadingHeaderBuilder: (context) => const Center(
                             child: Text('Sector Code', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),

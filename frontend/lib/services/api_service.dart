@@ -150,6 +150,33 @@ class ApiService {
     throw Exception('Failed to load sectors');
   }
 
+  /// Per-sector notes (persisted on server; upsert only, no delete API).
+  static Future<Map<String, dynamic>> getSectorNote(String sectorCode) async {
+    final uri = Uri.parse('$baseUrl/sector-notes/${Uri.encodeComponent(sectorCode)}');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data is Map<String, dynamic>) return data;
+      throw Exception('Invalid sector notes response');
+    }
+    throw Exception('Failed to load sector notes (${response.statusCode})');
+  }
+
+  static Future<Map<String, dynamic>> saveSectorNote(String sectorCode, String body) async {
+    final uri = Uri.parse('$baseUrl/sector-notes/${Uri.encodeComponent(sectorCode)}');
+    final response = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'body': body}),
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data is Map<String, dynamic>) return data;
+      throw Exception('Invalid sector notes response');
+    }
+    throw Exception('Failed to save sector notes (${response.statusCode})');
+  }
+
   static Future<Sector> createSector(Sector sector) async {
     try {
       

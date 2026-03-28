@@ -36,6 +36,7 @@ import ingredientsRouter from './routes/ingredients.routes.js';
 import miningActivitiesRouter from './routes/mining_activities.routes.js';
 import dailyIncomeExpenseRouter from './routes/daily_income_expense.routes.js';
 import appRouter from './routes/app.routes.js';
+import sectorNotesRouter from './routes/sector_notes.routes.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -95,6 +96,7 @@ app.use('/api/v1/ingredients', ingredientsRouter);
 app.use('/api/v1/mining-activities', miningActivitiesRouter);
 app.use('/api/v1/daily-income-expense', dailyIncomeExpenseRouter);
 app.use('/api/v1/app', appRouter);
+app.use('/api/v1/sector-notes', sectorNotesRouter);
 
 export default app;
 

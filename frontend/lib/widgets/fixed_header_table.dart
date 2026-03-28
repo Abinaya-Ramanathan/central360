@@ -56,6 +56,7 @@ class FixedHeaderTable extends StatefulWidget {
     this.leadingHeaderBuilder,
     this.leadingRowBuilder,
     this.rowExtent,
+    this.leadingMaxLines = 3,
   });
 
   final ScrollController horizontalScrollController;
@@ -74,8 +75,11 @@ class FixedHeaderTable extends StatefulWidget {
   final Widget Function(BuildContext context)? leadingHeaderBuilder;
   final Widget Function(BuildContext context, int index)? leadingRowBuilder;
 
-  /// Row height when using a fixed leading column (both sides must match). Default 56.
+  /// Row height when using a fixed leading column (both sides must match). Default 96 when omitted.
   final double? rowExtent;
+
+  /// Max lines for text in the fixed leading column (wrap + ellipsis). Default 3.
+  final int leadingMaxLines;
 
   @override
   State<FixedHeaderTable> createState() => _FixedHeaderTableState();
@@ -144,18 +148,18 @@ class _FixedHeaderTableState extends State<FixedHeaderTable> {
     return Color.alphaBlend(scheme.primary.withValues(alpha: 0.03), base);
   }
 
-  static Widget _wrapLeadingCell(BuildContext context, Widget child) {
+  static Widget _wrapLeadingCell(BuildContext context, Widget child, {int maxLines = 2}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       child: DefaultTextStyle.merge(
         style: theme.textTheme.bodyMedium?.copyWith(
-              height: 1.2,
+              height: 1.25,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.15,
             ) ??
-            const TextStyle(height: 1.2, fontWeight: FontWeight.w600),
-        maxLines: 2,
+            const TextStyle(height: 1.25, fontWeight: FontWeight.w600),
+        maxLines: maxLines,
         overflow: TextOverflow.ellipsis,
         child: child,
       ),
@@ -170,11 +174,11 @@ class _FixedHeaderTableState extends State<FixedHeaderTable> {
     );
   }
 
-  static Widget _wrapLeadingRow(BuildContext context, int index, Widget child) {
+  Widget _wrapLeadingRow(BuildContext context, int index, Widget child) {
     final scheme = Theme.of(context).colorScheme;
     return Material(
       color: _rowBackground(scheme, index, isLeading: true),
-      child: _wrapLeadingCell(context, child),
+      child: _wrapLeadingCell(context, child, maxLines: widget.leadingMaxLines),
     );
   }
 
@@ -187,7 +191,7 @@ class _FixedHeaderTableState extends State<FixedHeaderTable> {
   }
 
   Widget _buildWithLeadingColumn(BuildContext context) {
-    final rowH = widget.rowExtent ?? 56.0;
+    final rowH = widget.rowExtent ?? 96.0;
     final scheme = Theme.of(context).colorScheme;
     final headerBg = _headerColor(scheme);
 
@@ -227,6 +231,7 @@ class _FixedHeaderTableState extends State<FixedHeaderTable> {
                                     ),
                                 child: widget.leadingHeaderBuilder!(context),
                               ),
+                              maxLines: 2,
                             ),
                           ),
                         ),

@@ -12,6 +12,7 @@ import 'add_rent_vehicle_dialog.dart';
 import 'manage_rent_vehicles_dialog.dart';
 import 'add_mining_activity_dialog.dart';
 import 'manage_mining_activities_dialog.dart';
+import '../widgets/sector_notes_app_bar_button.dart';
 
 class NewEntryScreen extends StatefulWidget {
   final String username;
@@ -45,6 +46,9 @@ class _NewEntryScreenState extends State<NewEntryScreen> {
         title: const Text('New Entry'),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
+        actions: [
+          SectorNotesAppBarButton(sectorCode: _selectedSector),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(

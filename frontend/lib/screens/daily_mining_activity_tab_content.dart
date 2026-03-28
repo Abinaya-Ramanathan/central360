@@ -301,7 +301,7 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                           totalWidth: _scrollWidth,
                           headerHeight: _headerHeight,
                           leadingWidth: _colActivityName,
-                          rowExtent: 56,
+                          rowExtent: 96,
                           leadingHeaderBuilder: (context) => const Center(
                             child: Padding(
                               padding: EdgeInsets.symmetric(horizontal: 8),

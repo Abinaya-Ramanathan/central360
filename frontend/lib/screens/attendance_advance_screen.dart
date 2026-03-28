@@ -828,14 +828,25 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   Widget _buildRentVehicleTable() {
     return FixedHeaderTable(
       horizontalScrollController: _rentVehicleHorizontalScrollController,
-      totalWidth: _rentVehicleTotalWidth,
+      totalWidth: _rentVehicleTotalWidth - _rentVehicleColName - _rentVehicleSpacing,
       headerHeight: _rentVehicleHeaderHeight,
+      rowExtent: _rentVehicleHeaderHeight,
+      leadingWidth: _rentVehicleColName,
+      leadingHeaderBuilder: (context) => Align(
+        alignment: Alignment.centerLeft,
+        child: const Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      leadingRowBuilder: (context, index) {
+        final vehicle = _rentVehicles[index];
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Text(vehicle['vehicle_name']?.toString() ?? 'N/A'),
+        );
+      },
       headerBuilder: (context) => Material(
         color: Colors.teal.shade100,
         child: const Row(
           children: [
-            SizedBox(width: _rentVehicleColName, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
-            SizedBox(width: _rentVehicleSpacing),
             SizedBox(width: _rentVehicleColStatus, child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
@@ -847,8 +858,6 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
         final currentStatus = _rentVehicleStatusControllers[vehicleId];
         return Row(
           children: [
-            SizedBox(width: _rentVehicleColName, child: Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
-            const SizedBox(width: _rentVehicleSpacing),
             SizedBox(
               width: _rentVehicleColStatus,
               child: _isEditMode
@@ -887,34 +896,13 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
   Widget _buildAdvanceDetailsTable() {
     final showSector = (widget.selectedSector == null && widget.isAdmin) || widget.includedSectorCodes != null;
     final showBulkColumn = _filteredAdvanceDetails.any((d) => ((d['bulk_advance'] as num?)?.toDouble() ?? 0.0) > 0.01);
-    int colCount = 3;
-    if (showSector) colCount++;
-    if (showBulkColumn) colCount++;
-    double totalWidth = (showSector ? _advanceColSector : 0) + _advanceColName + _advanceColAmount * (showBulkColumn ? 2 : 1) + (colCount - 1) * _advanceSpacing;
+
+    final double leadingWidth = showSector ? _advanceColSector : _advanceColName;
+    final double rightTotalWidth = showSector
+        ? (_advanceColName + _advanceColAmount * (showBulkColumn ? 2 : 1) + (showBulkColumn ? 2 : 1) * _advanceSpacing)
+        : (_advanceColAmount * (showBulkColumn ? 2 : 1) + (showBulkColumn ? 1 : 0) * _advanceSpacing);
+
     const bold = TextStyle(fontWeight: FontWeight.bold);
-    final List<Widget> headerChildren = [];
-    void addCol(double w, Widget c) {
-      if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _advanceSpacing));
-      headerChildren.add(SizedBox(width: w, child: c));
-    }
-    if (showSector) {
-      addCol(_advanceColSector, InkWell(
-        onTap: () {
-          setState(() {
-            _sortAscendingAdvance = !_sortAscendingAdvance;
-            _advanceDetails.sort((a, b) {
-              final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-              final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-              return _sortAscendingAdvance ? aName.compareTo(bName) : bName.compareTo(aName);
-            });
-          });
-        },
-        child: const Text('Sector', style: bold),
-      ));
-    }
-    addCol(_advanceColName, const Text('Employee Name', style: bold));
-    addCol(_advanceColAmount, const Text('Outstanding Advance', style: bold));
-    if (showBulkColumn) addCol(_advanceColAmount, const Text('Bulk Advance', style: bold));
 
     double totalOutstanding = 0.0;
     double totalBulk = 0.0;
@@ -923,35 +911,126 @@ class _AttendanceAdvanceScreenState extends State<AttendanceAdvanceScreen> with 
       totalBulk += (d['bulk_advance'] as num?)?.toDouble() ?? 0.0;
     }
 
+    final List<Widget> rightHeaderChildren = [];
+    void addRightHeaderCell(double w, Widget c) {
+      if (rightHeaderChildren.isNotEmpty) rightHeaderChildren.add(const SizedBox(width: _advanceSpacing));
+      rightHeaderChildren.add(SizedBox(width: w, child: c));
+    }
+
+    if (showSector) {
+      addRightHeaderCell(_advanceColName, const Text('Employee Name', style: bold));
+    }
+    addRightHeaderCell(_advanceColAmount, const Text('Outstanding Advance', style: bold));
+    if (showBulkColumn) addRightHeaderCell(_advanceColAmount, const Text('Bulk Advance', style: bold));
+
     return FixedHeaderTable(
       horizontalScrollController: _advanceTableHorizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: rightTotalWidth,
       headerHeight: _advanceHeaderHeight,
+      rowExtent: _advanceHeaderHeight,
+      leadingWidth: leadingWidth,
+      leadingHeaderBuilder: (context) {
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: !showSector
+              ? const Text('Employee Name', style: bold)
+              : InkWell(
+                  onTap: () {
+                    setState(() {
+                      _sortAscendingAdvance = !_sortAscendingAdvance;
+                      _advanceDetails.sort((a, b) {
+                        final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                        final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                        return _sortAscendingAdvance ? aName.compareTo(bName) : bName.compareTo(aName);
+                      });
+                    });
+                  },
+                  child: const Text('Sector', style: bold),
+                ),
+        );
+      },
+      leadingRowBuilder: (context, index) {
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: index == _filteredAdvanceDetails.length
+              ? (showSector
+                  ? const SizedBox.shrink()
+                  : const Text(
+                      'TOTAL',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ))
+              : (() {
+                  final detail = _filteredAdvanceDetails[index];
+                  return showSector
+                      ? Text(_getSectorName(detail['sector_code']?.toString()))
+                      : Text(detail['employee_name']?.toString() ?? 'N/A');
+                })(),
+        );
+      },
       headerBuilder: (context) => Material(
         color: Colors.green.shade100,
-        child: Row(children: headerChildren),
+        child: Row(children: rightHeaderChildren),
       ),
       rowCount: _filteredAdvanceDetails.length + 1,
       rowBuilder: (context, index) {
         final List<Widget> rowChildren = [];
-        void addCell(double w, Widget c) {
+        void addRightCell(double w, Widget c) {
           if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: _advanceSpacing));
           rowChildren.add(SizedBox(width: w, child: c));
         }
+
         if (index == _filteredAdvanceDetails.length) {
-          if (showSector) addCell(_advanceColSector, const Text(''));
-          addCell(_advanceColName, const Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)));
-          addCell(_advanceColAmount, Text('₹${totalOutstanding.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red.shade700)));
-          if (showBulkColumn) addCell(_advanceColAmount, Text('₹${totalBulk.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue.shade700)));
+          if (showSector) {
+            addRightCell(_advanceColName, const Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)));
+          }
+          addRightCell(
+            _advanceColAmount,
+            Text(
+              '₹${totalOutstanding.toStringAsFixed(2)}',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red.shade700),
+            ),
+          );
+          if (showBulkColumn) {
+            addRightCell(
+              _advanceColAmount,
+              Text(
+                '₹${totalBulk.toStringAsFixed(2)}',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue.shade700),
+              ),
+            );
+          }
           return Material(color: Colors.blue.shade50, child: Row(children: rowChildren));
         }
+
         final detail = _filteredAdvanceDetails[index];
         final outstandingAdvance = (detail['outstanding_advance'] as num?)?.toDouble() ?? 0.0;
         final bulkAdvance = (detail['bulk_advance'] as num?)?.toDouble() ?? 0.0;
-        if (showSector) addCell(_advanceColSector, Text(_getSectorName(detail['sector_code']?.toString())));
-        addCell(_advanceColName, Text(detail['employee_name']?.toString() ?? 'N/A'));
-        addCell(_advanceColAmount, Text('₹${outstandingAdvance.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade700)));
-        if (showBulkColumn) addCell(_advanceColAmount, Text(bulkAdvance > 0.01 ? '₹${bulkAdvance.toStringAsFixed(2)}' : '₹0.00', style: TextStyle(fontWeight: FontWeight.bold, color: bulkAdvance > 0.01 ? Colors.blue.shade700 : Colors.grey)));
+
+        if (showSector) {
+          addRightCell(_advanceColName, Text(detail['employee_name']?.toString() ?? 'N/A'));
+        }
+
+        addRightCell(
+          _advanceColAmount,
+          Text(
+            '₹${outstandingAdvance.toStringAsFixed(2)}',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade700),
+          ),
+        );
+
+        if (showBulkColumn) {
+          addRightCell(
+            _advanceColAmount,
+            Text(
+              bulkAdvance > 0.01 ? '₹${bulkAdvance.toStringAsFixed(2)}' : '₹0.00',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: bulkAdvance > 0.01 ? Colors.blue.shade700 : Colors.grey,
+              ),
+            ),
+          );
+        }
+
         return Row(children: rowChildren);
       },
     );

@@ -89,17 +89,29 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
   static const double _colDescription = 200;
   static const double _colAction = 120;
   static const double _colSpacing = 20;
-  static const double _totalWidth = _colActivityName + _colSector + _colDescription + _colAction + _colSpacing * 3;
+  static const double _scrollWidthTable = _colSector + _colDescription + _colAction + _colSpacing * 2;
 
   Widget _buildMiningActivitiesFixedTable() {
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: _totalWidth,
+      totalWidth: _scrollWidthTable,
       headerHeight: _headerHeight,
+      leadingWidth: _colActivityName,
+      rowExtent: 48,
+      leadingHeaderBuilder: (context) => const Center(
+        child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      leadingRowBuilder: (context, index) {
+        final activity = _filteredMiningActivities[index];
+        return Center(
+          child: Text(
+            activity['activity_name']?.toString() ?? 'N/A',
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      },
       headerBuilder: (context) => Row(
         children: [
-          const SizedBox(width: _colActivityName, child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
-          const SizedBox(width: _colSpacing),
           InkWell(
             onTap: () {
               setState(() {
@@ -125,8 +137,6 @@ class _ManageMiningActivitiesDialogState extends State<ManageMiningActivitiesDia
         final activity = _filteredMiningActivities[index];
         return Row(
           children: [
-            SizedBox(width: _colActivityName, child: Text(activity['activity_name']?.toString() ?? 'N/A')),
-            const SizedBox(width: _colSpacing),
             SizedBox(width: _colSector, child: Text(_getSectorName(activity['sector_code']?.toString()))),
             const SizedBox(width: _colSpacing),
             SizedBox(

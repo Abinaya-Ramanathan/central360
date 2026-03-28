@@ -510,54 +510,56 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
                     )
                   : Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_employees.isNotEmpty)
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_employees.isNotEmpty)
+                              Card(
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: _buildPresentEmployeesTable(),
                               ),
-                              child: _buildPresentEmployeesTable(),
-                            ),
-                          if (_rentVehicles.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                            if (_rentVehicles.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Card(
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: _buildPresentRentVehiclesTable(),
                               ),
-                              child: _buildPresentRentVehiclesTable(),
-                            ),
-                          ],
-                          if (_miningActivities.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(12.0),
-                                    child: Text(
-                                      'Daily Mining Activity',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.amber.shade700,
+                            ],
+                            if (_miningActivities.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Card(
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Text(
+                                        'Daily Mining Activity',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.amber.shade700,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  _buildPresentMiningTable(),
-                                ],
+                                    _buildPresentMiningTable(),
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
         ),
@@ -576,13 +578,20 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
     const totalWidth = _colName + _colSpacing + _colDays + _colSpacing + _colOt + _colSpacing + _colSalary;
     return FixedHeaderTable(
       horizontalScrollController: _employeesTableScrollController,
-      totalWidth: totalWidth.toDouble(),
+      totalWidth: (_colSpacing + _colDays + _colSpacing + _colOt + _colSpacing + _colSalary).toDouble(),
       headerHeight: _headerHeight,
+      leadingWidth: _colName,
+      leadingHeaderBuilder: (context) => Material(
+        color: Colors.green.shade100,
+        child: const SizedBox(
+          width: _colName,
+          child: Align(alignment: Alignment.centerLeft, child: Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
+        ),
+      ),
       headerBuilder: (context) => Material(
         color: Colors.green.shade100,
         child: const Row(
           children: [
-            SizedBox(width: _colName, child: Text('Employee Name', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _colSpacing),
             SizedBox(width: _colDays, child: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _colSpacing),
@@ -593,6 +602,13 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         ),
       ),
       rowCount: _employees.length,
+      leadingRowBuilder: (context, index) {
+        final employee = _employees[index];
+        return SizedBox(
+          width: _colName,
+          child: Text(employee.name),
+        );
+      },
       rowBuilder: (context, index) {
         final employee = _employees[index];
         final presentDays = _presentDaysCount[employee.id] ?? 0;
@@ -600,7 +616,6 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
         final calculatedSalary = presentDays * employee.dailySalary;
         return Row(
           children: [
-            SizedBox(width: _colName, child: Text(employee.name)),
             const SizedBox(width: _colSpacing),
             SizedBox(width: _colDays, child: Text(presentDays.toString(), style: TextStyle(fontWeight: FontWeight.bold, color: presentDays > 0 ? Colors.green.shade700 : Colors.grey))),
             const SizedBox(width: _colSpacing),
@@ -620,26 +635,39 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
   Widget _buildPresentRentVehiclesTable() {
     return FixedHeaderTable(
       horizontalScrollController: _rentVehiclesTableScrollController,
-      totalWidth: _rentTotalWidth,
+      totalWidth: (_colSpacing + _rentColDays).toDouble(),
       headerHeight: _headerHeight,
+      leadingWidth: _rentColName,
+      leadingHeaderBuilder: (context) => Material(
+        color: Colors.teal.shade100,
+        child: const SizedBox(
+          width: _rentColName,
+          child: Align(alignment: Alignment.centerLeft, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
+        ),
+      ),
       headerBuilder: (context) => Material(
         color: Colors.teal.shade100,
         child: const Row(
           children: [
-            SizedBox(width: _rentColName, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _colSpacing),
             SizedBox(width: _rentColDays, child: Text('No.Of.Days.Present', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
       ),
       rowCount: _rentVehicles.length,
+      leadingRowBuilder: (context, index) {
+        final vehicle = _rentVehicles[index];
+        return SizedBox(
+          width: _rentColName,
+          child: Text(vehicle['vehicle_name']?.toString() ?? 'N/A'),
+        );
+      },
       rowBuilder: (context, index) {
         final vehicle = _rentVehicles[index];
         final vehicleId = vehicle['id'] as int;
         final presentDays = _rentVehiclePresentDaysCount[vehicleId] ?? 0.0;
         return Row(
           children: [
-            SizedBox(width: _rentColName, child: Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
             const SizedBox(width: _colSpacing),
             SizedBox(width: _rentColDays, child: Text(presentDays == presentDays.toInt() ? presentDays.toInt().toString() : presentDays.toStringAsFixed(1), style: TextStyle(fontWeight: FontWeight.bold, color: presentDays > 0 ? Colors.teal.shade700 : Colors.grey))),
           ],
@@ -655,26 +683,39 @@ class _PresentDaysCountTabContentState extends State<PresentDaysCountTabContent>
   Widget _buildPresentMiningTable() {
     return FixedHeaderTable(
       horizontalScrollController: _miningTableScrollController,
-      totalWidth: _miningTotalWidth,
+      totalWidth: (_colSpacing + _miningColQty).toDouble(),
       headerHeight: _headerHeight,
+      leadingWidth: _miningColName,
+      leadingHeaderBuilder: (context) => Material(
+        color: Colors.amber.shade100,
+        child: const SizedBox(
+          width: _miningColName,
+          child: Align(alignment: Alignment.centerLeft, child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
+        ),
+      ),
       headerBuilder: (context) => Material(
         color: Colors.amber.shade100,
         child: const Row(
           children: [
-            SizedBox(width: _miningColName, child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
             SizedBox(width: _colSpacing),
             SizedBox(width: _miningColQty, child: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
       ),
       rowCount: _miningActivities.length,
+      leadingRowBuilder: (context, index) {
+        final activity = _miningActivities[index];
+        return SizedBox(
+          width: _miningColName,
+          child: Text(activity['activity_name']?.toString() ?? 'N/A'),
+        );
+      },
       rowBuilder: (context, index) {
         final activity = _miningActivities[index];
         final activityId = activity['id'] as int;
         final totalQuantity = _miningActivityTotals[activityId] ?? 0.0;
         return Row(
           children: [
-            SizedBox(width: _miningColName, child: Text(activity['activity_name']?.toString() ?? 'N/A')),
             const SizedBox(width: _colSpacing),
             SizedBox(width: _miningColQty, child: Text(totalQuantity.toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, color: totalQuantity > 0 ? Colors.amber.shade700 : Colors.grey))),
           ],

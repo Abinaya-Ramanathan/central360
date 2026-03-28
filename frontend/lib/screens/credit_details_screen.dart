@@ -1380,6 +1380,32 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                           final showSector = widget.selectedSector == null && _isAdmin;
                           final colCount = showSector ? 13 : 12;
                           final totalWidth = (showSector ? wSector + colSpace : 0) + wName + wCompanyStaff + wPhone + wAddress + wPurchaseDetails + wCreditAmount + wCreditDate + wAmountSettled + wFullSettlementDate + wPendingAmount + wComments + wAction + (colCount - 1) * colSpace;
+                          final double leadingWidth = showSector ? wSector : wName;
+                          final double scrollTotalWidth = (showSector
+                              ? (wName +
+                                  wCompanyStaff +
+                                  wPhone +
+                                  wAddress +
+                                  wPurchaseDetails +
+                                  wCreditAmount +
+                                  wCreditDate +
+                                  wAmountSettled +
+                                  wFullSettlementDate +
+                                  wPendingAmount +
+                                  wComments +
+                                  wAction)
+                              : (wCompanyStaff +
+                                  wPhone +
+                                  wAddress +
+                                  wPurchaseDetails +
+                                  wCreditAmount +
+                                  wCreditDate +
+                                  wAmountSettled +
+                                  wFullSettlementDate +
+                                  wPendingAmount +
+                                  wComments +
+                                  wAction)) +
+                              (colCount - 1) * colSpace;
                           return Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Card(
@@ -1389,25 +1415,60 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                               ),
                               child: FixedHeaderTable(
                                 horizontalScrollController: _tableHorizontalScrollController,
-                                totalWidth: totalWidth,
+                                totalWidth: scrollTotalWidth,
                                 headerHeight: 48,
+                                leadingWidth: leadingWidth,
+                                leadingHeaderBuilder: (ctx) {
+                                  if (showSector) {
+                                    return InkWell(
+                                      onTap: () => setState(() {
+                                        _sectorSortAscending = !_sectorSortAscending;
+                                        _filteredCreditData.sort((a, b) {
+                                          final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                                          final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                                          return _sectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                                        });
+                                      }),
+                                      child: const SizedBox(
+                                        width: wSector,
+                                        height: 48,
+                                        child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox(
+                                    width: wName,
+                                    height: 48,
+                                    child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  );
+                                },
+                                leadingRowBuilder: (ctx, index) {
+                                  final record = _filteredCreditData[index];
+                                  final isEditMode = _editMode[index] == true;
+                                  return Container(
+                                    color: Colors.blue.shade200,
+                                    child: showSector
+                                        ? SizedBox(
+                                            width: wSector,
+                                            child: Text(_getSectorName(record['sector_code']?.toString())),
+                                          )
+                                        : SizedBox(
+                                            width: wName,
+                                            child: isEditMode && _controllers.containsKey(index)
+                                                ? TextFormField(
+                                                    controller: _controllers[index]!['name'],
+                                                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                                  )
+                                                : Text(record['name']?.toString() ?? ''),
+                                          ),
+                                  );
+                                },
                                 headerBuilder: (ctx) {
                                   final headers = <Widget>[
-                                    if (showSector)
-                                      InkWell(
-                                        onTap: () => setState(() {
-                                          _sectorSortAscending = !_sectorSortAscending;
-                                          _filteredCreditData.sort((a, b) {
-                                            final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                                            final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                                            return _sectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
-                                          });
-                                        }),
-                                        child: const SizedBox(width: wSector, height: 48, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
-                                      ),
-                                    if (showSector) const SizedBox(width: colSpace),
-                                    const SizedBox(width: wName, height: 48, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                     const SizedBox(width: colSpace),
+                                    if (showSector)
+                                      const SizedBox(width: wName, height: 48, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    if (showSector) const SizedBox(width: colSpace),
                                     const SizedBox(width: wCompanyStaff, height: 48, child: Text('Company Staff', style: TextStyle(fontWeight: FontWeight.bold))),
                                     const SizedBox(width: colSpace),
                                     const SizedBox(width: wPhone, height: 48, child: Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -1423,10 +1484,14 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                                         _creditDateSortAscending = !_creditDateSortAscending;
                                         _sortCreditData();
                                       }),
-                                      child: SizedBox(width: wCreditDate, height: 48, child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                        const Text('Credit Date', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        Icon(_creditDateSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
-                                      ])),
+                                      child: SizedBox(
+                                        width: wCreditDate,
+                                        height: 48,
+                                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                          const Text('Credit Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          Icon(_creditDateSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
+                                        ]),
+                                      ),
                                     ),
                                     const SizedBox(width: colSpace),
                                     const SizedBox(width: wAmountSettled, height: 48, child: Text('Amount Settled', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -1446,29 +1511,113 @@ class _CreditDetailsScreenState extends State<CreditDetailsScreen> {
                                   final record = _filteredCreditData[index];
                                   final isEditMode = _editMode[index] == true;
                                   final cells = <Widget>[
-                                    if (showSector) SizedBox(width: wSector, child: Text(_getSectorName(record['sector_code']?.toString()))),
+                                    const SizedBox(width: colSpace),
+                                    if (showSector)
+                                      SizedBox(
+                                        width: wName,
+                                        child: isEditMode && _controllers.containsKey(index)
+                                            ? TextFormField(
+                                                controller: _controllers[index]!['name'],
+                                                decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                              )
+                                            : Text(record['name']?.toString() ?? ''),
+                                      ),
                                     if (showSector) const SizedBox(width: colSpace),
-                                    SizedBox(width: wName, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true)) : Text(record['name']?.toString() ?? '')),
+                                    SizedBox(
+                                      width: wCompanyStaff,
+                                      child: Text(
+                                        (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? 'Yes' : 'No',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1)
+                                              ? Colors.green.shade700
+                                              : Colors.grey,
+                                        ),
+                                      ),
+                                    ),
                                     const SizedBox(width: colSpace),
-                                    SizedBox(width: wCompanyStaff, child: Text((record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? 'Yes' : 'No', style: TextStyle(fontWeight: FontWeight.bold, color: (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? Colors.green.shade700 : Colors.grey))),
+                                    SizedBox(
+                                      width: wPhone,
+                                      child: isEditMode && _controllers.containsKey(index)
+                                          ? TextFormField(
+                                              controller: _controllers[index]!['phone_number'],
+                                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                              keyboardType: TextInputType.phone,
+                                            )
+                                          : Text(record['phone_number']?.toString() ?? 'N/A'),
+                                    ),
                                     const SizedBox(width: colSpace),
-                                    SizedBox(width: wPhone, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['phone_number'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.phone) : Text(record['phone_number']?.toString() ?? 'N/A')),
+                                    SizedBox(
+                                      width: wAddress,
+                                      child: isEditMode && _controllers.containsKey(index)
+                                          ? TextFormField(
+                                              controller: _controllers[index]!['address'],
+                                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                              maxLines: 2,
+                                            )
+                                          : Text(record['address']?.toString() ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    ),
                                     const SizedBox(width: colSpace),
-                                    SizedBox(width: wAddress, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['address'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), maxLines: 2) : Text(record['address']?.toString() ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis)),
+                                    SizedBox(
+                                      width: wPurchaseDetails,
+                                      child: isEditMode && _controllers.containsKey(index)
+                                          ? TextFormField(
+                                              controller: _controllers[index]!['purchase_details'],
+                                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                              maxLines: 2,
+                                            )
+                                          : Text(record['purchase_details']?.toString() ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    ),
                                     const SizedBox(width: colSpace),
-                                    SizedBox(width: wPurchaseDetails, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['purchase_details'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), maxLines: 2) : Text(record['purchase_details']?.toString() ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis)),
-                                    const SizedBox(width: colSpace),
-                                    SizedBox(width: wCreditAmount, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['credit_amount'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))]) : Text(_parseDecimalFromDynamic(record['credit_amount']).toStringAsFixed(2))),
+                                    SizedBox(
+                                      width: wCreditAmount,
+                                      child: isEditMode && _controllers.containsKey(index)
+                                          ? TextFormField(
+                                              controller: _controllers[index]!['credit_amount'],
+                                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                              keyboardType: TextInputType.number,
+                                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                                            )
+                                          : Text(_parseDecimalFromDynamic(record['credit_amount']).toStringAsFixed(2)),
+                                    ),
                                     const SizedBox(width: colSpace),
                                     _buildCreditDateCell(index, record, isEditMode, wCreditDate),
                                     const SizedBox(width: colSpace),
-                                    SizedBox(width: wAmountSettled, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['amount_settled'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))]) : Text(_parseDecimalFromDynamic(record['amount_settled']).toStringAsFixed(2))),
+                                    SizedBox(
+                                      width: wAmountSettled,
+                                      child: isEditMode && _controllers.containsKey(index)
+                                          ? TextFormField(
+                                              controller: _controllers[index]!['amount_settled'],
+                                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                              keyboardType: TextInputType.number,
+                                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                                            )
+                                          : Text(_parseDecimalFromDynamic(record['amount_settled']).toStringAsFixed(2)),
+                                    ),
                                     const SizedBox(width: colSpace),
                                     _buildFullSettlementDateCell(index, record, isEditMode, wFullSettlementDate),
                                     const SizedBox(width: colSpace),
-                                    SizedBox(width: wPendingAmount, child: Text((_parseDecimalFromDynamic(record['credit_amount']) - _parseDecimalFromDynamic(record['amount_settled'])).toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, color: (_parseDecimalFromDynamic(record['credit_amount']) - _parseDecimalFromDynamic(record['amount_settled'])) > 0 ? Colors.red : Colors.green))),
+                                    SizedBox(
+                                      width: wPendingAmount,
+                                      child: Text(
+                                        (_parseDecimalFromDynamic(record['credit_amount']) - _parseDecimalFromDynamic(record['amount_settled'])).toStringAsFixed(2),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: (_parseDecimalFromDynamic(record['credit_amount']) - _parseDecimalFromDynamic(record['amount_settled'])) > 0 ? Colors.red : Colors.green,
+                                        ),
+                                      ),
+                                    ),
                                     const SizedBox(width: colSpace),
-                                    SizedBox(width: wComments, child: isEditMode && _controllers.containsKey(index) ? TextFormField(controller: _controllers[index]!['comments'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), maxLines: 2) : Text(record['comments']?.toString() ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis)),
+                                    SizedBox(
+                                      width: wComments,
+                                      child: isEditMode && _controllers.containsKey(index)
+                                          ? TextFormField(
+                                              controller: _controllers[index]!['comments'],
+                                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                              maxLines: 2,
+                                            )
+                                          : Text(record['comments']?.toString() ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    ),
                                     const SizedBox(width: colSpace),
                                     _buildActionCell(index, isEditMode, wAction),
                                   ];

@@ -245,14 +245,27 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
                         )
                       : FixedHeaderTable(
                           horizontalScrollController: _horizontalScrollController,
-                          totalWidth: 400,
+                          totalWidth: 220,
                           headerHeight: 48,
+                          leadingWidth: 180,
+                          rowExtent: 48,
+                          leadingHeaderBuilder: (context) => const Center(
+                            child: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          leadingRowBuilder: (context, index) {
+                            final product = _filteredProducts[index];
+                            return Center(
+                              child: Text(
+                                product['product_name']?.toString() ?? 'N/A',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          },
                           headerBuilder: (context) => SizedBox(
                             height: 48,
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                const SizedBox(width: 180, child: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 SizedBox(
                                   width: 120,
                                   child: InkWell(
@@ -276,37 +289,33 @@ class _ManageProductsDialogState extends State<ManageProductsDialog> {
                           rowCount: _filteredProducts.length,
                           rowBuilder: (context, index) {
                             final product = _filteredProducts[index];
-                            return SizedBox(
-                              height: 48,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  SizedBox(width: 180, child: Text(product['product_name']?.toString() ?? 'N/A')),
-                                  SizedBox(width: 120, child: Text(_getSectorName(product['sector_code']?.toString()))),
-                                  SizedBox(
-                                    width: 100,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                SizedBox(width: 120, child: Text(_getSectorName(product['sector_code']?.toString()))),
+                                SizedBox(
+                                  width: 100,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                        tooltip: 'Edit',
+                                        onPressed: () => _editProduct(product),
+                                      ),
+                                      if (widget.isMainAdmin)
                                         IconButton(
-                                          icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                          tooltip: 'Edit',
-                                          onPressed: () => _editProduct(product),
-                                        ),
-                                        if (widget.isMainAdmin)
-                                          IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                            tooltip: 'Delete',
-                                            onPressed: () => _deleteProduct(
-                                              product['id'] as int,
-                                              product['product_name']?.toString() ?? 'Product',
-                                            ),
+                                          icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                          tooltip: 'Delete',
+                                          onPressed: () => _deleteProduct(
+                                            product['id'] as int,
+                                            product['product_name']?.toString() ?? 'Product',
                                           ),
-                                      ],
-                                    ),
+                                        ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             );
                           },
                         ),

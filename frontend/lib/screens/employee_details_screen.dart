@@ -51,7 +51,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   static const double _colRole = 80;
   static const double _colSalary = 100;
   static const double _colDate = 100;
-  static const double _colAction = 120;
+  static const double _colAction = 132;
   static const double _colSpacing = 16;
 
   @override
@@ -137,7 +137,8 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   double _employeeTableWidth(bool showSector) {
     double w = _colName + _colContact + _colAddress + _colBank + _colRole + _colSalary * 3 + _colDate + _colAction;
     if (showSector) w += _colSector;
-    final n = showSector ? 10 : 9;
+    // showSector=true adds both a leading Sector column and right-side Name column => 11 total columns.
+    final n = showSector ? 11 : 9;
     return w + (n - 1) * _colSpacing;
   }
 
@@ -166,6 +167,10 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
   Widget _buildEmployeeTable(List<Employee> filteredEmployees) {
     const bold = TextStyle(fontWeight: FontWeight.bold);
     final showSector = widget.selectedSector == null;
+    final leadingWidth = showSector ? _colSector : _colName;
+    // In single-sector mode, keep one extra spacer width on the right side to avoid
+    // edge-case RenderFlex overflow from tight pixel rounding in action rows.
+    final rightTotalWidth = _employeeTableWidth(showSector) - leadingWidth - (showSector ? _colSpacing : 0);
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Card(
@@ -173,16 +178,20 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: FixedHeaderTable(
           horizontalScrollController: _horizontalScrollController,
-          totalWidth: _employeeTableWidth(showSector),
+          totalWidth: rightTotalWidth,
           headerHeight: _headerHeight,
-          headerBuilder: (context) {
-            final List<Widget> headerChildren = [];
-            void addCol(double w, Widget c) {
-              if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
-              headerChildren.add(SizedBox(width: w, child: c));
+          rowExtent: _headerHeight,
+          leadingWidth: leadingWidth,
+          leadingHeaderBuilder: (context) {
+            if (!showSector) {
+              return const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Name', style: bold),
+              );
             }
-            if (showSector) {
-              addCol(_colSector, InkWell(
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: InkWell(
                 onTap: () {
                   setState(() {
                     _sortAscending = !_sortAscending;
@@ -194,18 +203,50 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
                   });
                 },
                 child: const Text('Sector', style: bold),
-              ));
+              ),
+            );
+          },
+          leadingRowBuilder: (context, index) {
+            final isTotalRow = index == filteredEmployees.length;
+            if (isTotalRow) {
+              return Material(
+                color: Colors.blue.shade50,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: showSector
+                      ? const Text('Total', style: bold)
+                      : Text(
+                          'Count: ${_getTotalEmployeeCount(filteredEmployees)}',
+                          style: bold,
+                        ),
+                ),
+              );
             }
-            addCol(_colName, const Text('Name', style: bold));
-            addCol(_colContact, const Text('Contact', style: bold));
-            addCol(_colAddress, const Text('Address', style: bold));
-            addCol(_colBank, const Text('Bank Details', style: bold));
-            addCol(_colRole, const Text('Role', style: bold));
-            addCol(_colSalary, const Text('Daily Salary', style: bold));
-            addCol(_colSalary, const Text('Weekly Salary', style: bold));
-            addCol(_colSalary, const Text('Monthly Salary', style: bold));
-            addCol(_colDate, const Text('Joining Date', style: bold));
-            addCol(_colAction, const Text('Action', style: bold));
+
+            final employee = filteredEmployees[index];
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: showSector ? Text(_getSectorName(employee.sector)) : Text(employee.name),
+            );
+          },
+          headerBuilder: (context) {
+            final List<Widget> headerChildren = [];
+            void addRightCol(double w, Widget c) {
+              if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
+              headerChildren.add(SizedBox(width: w, child: c));
+            }
+            if (showSector) {
+              addRightCol(_colName, const Text('Name', style: bold));
+            }
+            addRightCol(_colContact, const Text('Contact', style: bold));
+            addRightCol(_colAddress, const Text('Address', style: bold));
+            addRightCol(_colBank, const Text('Bank Details', style: bold));
+            addRightCol(_colRole, const Text('Role', style: bold));
+            addRightCol(_colSalary, const Text('Daily Salary', style: bold));
+            addRightCol(_colSalary, const Text('Weekly Salary', style: bold));
+            addRightCol(_colSalary, const Text('Monthly Salary', style: bold));
+            addRightCol(_colDate, const Text('Joining Date', style: bold));
+            addRightCol(_colAction, const Text('Action', style: bold));
             return Material(color: Colors.blue.shade100, child: Row(children: headerChildren));
           },
           rowCount: filteredEmployees.length + 1,
@@ -216,8 +257,9 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
               rowChildren.add(SizedBox(width: w, child: c));
             }
             if (index == filteredEmployees.length) {
-              if (showSector) addCell(_colSector, const Text('Total', style: bold));
-              addCell(_colName, Text('Count: ${_getTotalEmployeeCount(filteredEmployees)}', style: bold));
+              if (showSector) {
+                addCell(_colName, Text('Count: ${_getTotalEmployeeCount(filteredEmployees)}', style: bold));
+              }
               addCell(_colContact, const SizedBox.shrink());
               addCell(_colAddress, const SizedBox.shrink());
               addCell(_colBank, const SizedBox.shrink());
@@ -230,26 +272,49 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
               return Material(color: Colors.blue.shade50, child: Row(children: rowChildren));
             }
             final employee = filteredEmployees[index];
-            if (showSector) addCell(_colSector, Text(_getSectorName(employee.sector)));
-            addCell(_colName, Text(employee.name));
-            addCell(_colContact, Text(employee.contact));
+            if (showSector) addCell(_colName, Text(employee.name, maxLines: 1, overflow: TextOverflow.ellipsis));
+            addCell(_colContact, Text(employee.contact, maxLines: 1, overflow: TextOverflow.ellipsis));
             addCell(_colAddress, SizedBox(width: _colAddress, child: Text(employee.address, overflow: TextOverflow.ellipsis)));
             addCell(_colBank, SizedBox(width: _colBank, child: Text(employee.bankDetails, overflow: TextOverflow.ellipsis)));
-            addCell(_colRole, Text(employee.role));
-            addCell(_colSalary, Text(employee.dailySalary > 0 ? '₹${employee.dailySalary.toStringAsFixed(2)}/day' : '-'));
-            addCell(_colSalary, Text(employee.weeklySalary > 0 ? '₹${employee.weeklySalary.toStringAsFixed(2)}/week' : '-'));
-            addCell(_colSalary, Text(employee.monthlySalary > 0 ? '₹${employee.monthlySalary.toStringAsFixed(2)}/mo' : '-'));
+            addCell(_colRole, Text(employee.role, maxLines: 1, overflow: TextOverflow.ellipsis));
+            addCell(_colSalary, Text(employee.dailySalary > 0 ? '₹${employee.dailySalary.toStringAsFixed(2)}/day' : '-', maxLines: 1, overflow: TextOverflow.ellipsis));
+            addCell(_colSalary, Text(employee.weeklySalary > 0 ? '₹${employee.weeklySalary.toStringAsFixed(2)}/week' : '-', maxLines: 1, overflow: TextOverflow.ellipsis));
+            addCell(_colSalary, Text(employee.monthlySalary > 0 ? '₹${employee.monthlySalary.toStringAsFixed(2)}/mo' : '-', maxLines: 1, overflow: TextOverflow.ellipsis));
             addCell(_colDate, Text(
               employee.joiningDate != null
                   ? '${employee.joiningDate!.year}-${employee.joiningDate!.month.toString().padLeft(2, '0')}-${employee.joiningDate!.day.toString().padLeft(2, '0')}'
                   : employee.joiningYear != null ? employee.joiningYear.toString() : 'N/A',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ));
+            IconButton compactIconButton({
+              required IconData icon,
+              required Color color,
+              required String tooltip,
+              required VoidCallback? onPressed,
+            }) {
+              return IconButton(
+                icon: Icon(icon, color: color, size: 18),
+                tooltip: tooltip,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+                splashRadius: 18,
+                onPressed: onPressed,
+              );
+            }
+
             addCell(_colAction, Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(icon: const Icon(Icons.visibility, color: Colors.green), tooltip: 'View', onPressed: () => _viewEmployee(employee)),
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
+                compactIconButton(
+                  icon: Icons.visibility,
+                  color: Colors.green,
+                  tooltip: 'View',
+                  onPressed: () => _viewEmployee(employee),
+                ),
+                compactIconButton(
+                  icon: Icons.edit,
+                  color: Colors.blue,
                   tooltip: 'Edit',
                   onPressed: () async {
                     final result = await showDialog<Employee>(context: context, builder: (context) => EditEmployeeDialog(employee: employee));
@@ -268,7 +333,12 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
                   },
                 ),
                 if (widget.isMainAdmin)
-                  IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Delete', onPressed: () => _deleteEmployee(employee)),
+                  compactIconButton(
+                    icon: Icons.delete,
+                    color: Colors.red,
+                    tooltip: 'Delete',
+                    onPressed: () => _deleteEmployee(employee),
+                  ),
               ],
             ));
             return Row(children: rowChildren);
@@ -424,6 +494,7 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isNarrow = MediaQuery.of(context).size.width < 900;
     // Filter employees by sector: all if no sector; main+subs if includedSectorCodes set; else exact match
     final sectorFilteredEmployees = widget.selectedSector == null
         ? _filteredEmployees
@@ -449,46 +520,63 @@ class _EmployeeDetailsScreenState extends State<EmployeeDetailsScreen> {
           if (widget.selectedSector != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.business, size: 18),
-                  const SizedBox(width: 4),
-                  Text(
-                    _getSectorName(widget.selectedSector),
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ],
+              child: Tooltip(
+                message: _getSectorName(widget.selectedSector),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.business, size: 18),
+                    if (!isNarrow) const SizedBox(width: 4),
+                    if (!isNarrow)
+                      SizedBox(
+                        width: 120,
+                        child: Text(
+                          _getSectorName(widget.selectedSector),
+                          style: const TextStyle(fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             )
           else
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.business, size: 18),
-                  SizedBox(width: 4),
-                  Text(
-                    'All Sectors',
-                    style: TextStyle(fontSize: 14),
-                  ),
+                  const Icon(Icons.business, size: 18),
+                  if (!isNarrow) const SizedBox(width: 4),
+                  if (!isNarrow)
+                    const Text(
+                      'All Sectors',
+                      style: TextStyle(fontSize: 14),
+                    ),
                 ],
               ),
             ),
           // User icon with username
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.person, size: 20),
-                const SizedBox(width: 4),
-                Text(
-                  widget.username,
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
+            child: Tooltip(
+              message: widget.username,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.person, size: 20),
+                  if (!isNarrow) const SizedBox(width: 4),
+                  if (!isNarrow)
+                    SizedBox(
+                      width: 110,
+                      child: Text(
+                        widget.username,
+                        style: const TextStyle(fontSize: 16),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           // Home icon

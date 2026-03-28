@@ -579,14 +579,30 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
 
   Widget _buildSalaryTable() {
     final flatRows = _getSalaryTableRows();
+    final leadingWidth = _colName;
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: _salaryTableTotalWidth,
+      totalWidth: _salaryTableTotalWidth - _colName - _colSpacing,
       headerHeight: _headerHeight,
+      rowExtent: _headerHeight,
+      leadingWidth: leadingWidth,
+      leadingHeaderBuilder: (context) => const Text('Name', style: TextStyle(fontWeight: FontWeight.bold)),
+      leadingRowBuilder: (context, index) {
+        final r = flatRows[index];
+        if (r.isAddRow) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.add_circle, color: Colors.green, size: 20),
+              SizedBox(width: 8),
+              Text('Add Entry', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            ],
+          );
+        }
+        return Text(r.employee.name);
+      },
       headerBuilder: (context) => const Row(
         children: [
-          SizedBox(width: _colName, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colSpacing),
           SizedBox(width: _colSalary, child: Text('Salary Issued', style: TextStyle(fontWeight: FontWeight.bold))),
           SizedBox(width: _colSpacing),
           SizedBox(width: _colDate, child: Text('Salary Date', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -600,8 +616,6 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         if (r.isAddRow) {
           return Row(
             children: [
-              SizedBox(width: _colName, child: Row(children: [const Icon(Icons.add_circle, color: Colors.green, size: 20), const SizedBox(width: 8), Text('Add Entry', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold))])),
-              const SizedBox(width: _colSpacing),
               const SizedBox(width: _colSalary, child: Text('')),
               const SizedBox(width: _colSpacing),
               const SizedBox(width: _colDate, child: Text('')),
@@ -614,8 +628,6 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         final isEditMode = data?['isEditMode'] == true;
         return Row(
           children: [
-            SizedBox(width: _colName, child: Text(r.employee.name)),
-            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colSalary,
               child: isEditMode

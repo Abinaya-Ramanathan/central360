@@ -376,15 +376,22 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                     const double sp = 16;
                     const double wSector = 100, wName = 120, wModel = 100, wRegNo = 140, wDate = 100, wAction = 120;
                     final showSector = widget.selectedSector == null && _isAdmin;
-                    final totalWidth = (showSector ? wSector + sp : 0) + wName + wModel + wRegNo + wDate * 6 + wAction + (showSector ? 10 : 9) * sp;
+                    final double leadingWidth = showSector ? wSector : wName;
+                    final double scrollTotalWidth = showSector
+                        ? (wName + wModel + wRegNo + wDate * 5 + wAction + 8 * sp)
+                        : (wModel + wRegNo + wDate * 5 + wAction + 7 * sp);
                     return FixedHeaderTable(
                       horizontalScrollController: _vehicleHorizontalScrollController,
-                      totalWidth: totalWidth,
+                      totalWidth: scrollTotalWidth,
                       headerHeight: 48,
-                      headerBuilder: (ctx) {
-                        final headers = <Widget>[
-                          if (showSector)
-                            InkWell(
+                      rowExtent: 56,
+                      leadingWidth: leadingWidth,
+                      leadingHeaderBuilder: (ctx) {
+                        if (showSector) {
+                          return SizedBox(
+                            width: wSector,
+                            height: 48,
+                            child: InkWell(
                               onTap: () => setState(() {
                                 _sectorSortAscendingVehicle = !_sectorSortAscendingVehicle;
                                 sortedLicenses.sort((a, b) {
@@ -393,11 +400,39 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                                   return _sectorSortAscendingVehicle ? aName.compareTo(bName) : bName.compareTo(aName);
                                 });
                               }),
-                              child: const SizedBox(width: wSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    Icon(_sectorSortAscendingVehicle ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
+                                  ],
+                                ),
+                              ),
                             ),
+                          );
+                        }
+                        return SizedBox(
+                          width: wName,
+                          height: 48,
+                          child: const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        );
+                      },
+                      leadingRowBuilder: (ctx, index) {
+                        final license = sortedLicenses[index];
+                        if (showSector) {
+                          return SizedBox(width: wSector, child: Text(_getSectorName(license.sectorCode)));
+                        }
+                        return SizedBox(width: wName, child: Text(license.name));
+                      },
+                      headerBuilder: (ctx) {
+                        final headers = <Widget>[
+                          if (showSector) const SizedBox(width: wName, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold)))),
                           if (showSector) const SizedBox(width: sp),
-                          const SizedBox(width: wName, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          const SizedBox(width: sp),
                           const SizedBox(width: wModel, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Model', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
                           const SizedBox(width: wRegNo, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Registration Number', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -420,10 +455,8 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                       rowBuilder: (ctx, index) {
                         final license = sortedLicenses[index];
                         final cells = <Widget>[
-                          if (showSector) SizedBox(width: wSector, child: Text(_getSectorName(license.sectorCode))),
+                          if (showSector) SizedBox(width: wName, child: Text(license.name)),
                           if (showSector) const SizedBox(width: sp),
-                          SizedBox(width: wName, child: Text(license.name)),
-                          const SizedBox(width: sp),
                           SizedBox(width: wModel, child: Text(license.model)),
                           const SizedBox(width: sp),
                           SizedBox(width: wRegNo, child: Text(license.registrationNumber)),
@@ -471,15 +504,22 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                     const double sp = 16;
                     const double wSector = 100, wDriverName = 140, wLicenseNo = 140, wExpiry = 110, wAction = 120;
                     final showSector = widget.selectedSector == null && _isAdmin;
-                    final totalWidth = (showSector ? wSector + sp : 0) + wDriverName + wLicenseNo + wExpiry + wAction + (showSector ? 4 : 3) * sp;
+                    final double leadingWidth = showSector ? wSector : wDriverName;
+                    final double scrollTotalWidth = showSector
+                        ? (wDriverName + wLicenseNo + wExpiry + wAction + 3 * sp)
+                        : (wLicenseNo + wExpiry + wAction + 2 * sp);
                     return FixedHeaderTable(
                       horizontalScrollController: _driverHorizontalScrollController,
-                      totalWidth: totalWidth,
+                      totalWidth: scrollTotalWidth,
                       headerHeight: 48,
-                      headerBuilder: (ctx) {
-                        final headers = <Widget>[
-                          if (showSector)
-                            InkWell(
+                      rowExtent: 56,
+                      leadingWidth: leadingWidth,
+                      leadingHeaderBuilder: (ctx) {
+                        if (showSector) {
+                          return SizedBox(
+                            width: wSector,
+                            height: 48,
+                            child: InkWell(
                               onTap: () => setState(() {
                                 _sectorSortAscendingDriver = !_sectorSortAscendingDriver;
                                 sortedLicenses.sort((a, b) {
@@ -488,11 +528,33 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                                   return _sectorSortAscendingDriver ? aName.compareTo(bName) : bName.compareTo(aName);
                                 });
                               }),
-                              child: const SizedBox(width: wSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
+                              child: const Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
                             ),
+                          );
+                        }
+                        return SizedBox(
+                          width: wDriverName,
+                          height: 48,
+                          child: const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text('Driver Name', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        );
+                      },
+                      leadingRowBuilder: (ctx, index) {
+                        final license = sortedLicenses[index];
+                        if (showSector) {
+                          return SizedBox(width: wSector, child: Text(_getSectorName(license.sectorCode)));
+                        }
+                        return SizedBox(width: wDriverName, child: Text(license.driverName));
+                      },
+                      headerBuilder: (ctx) {
+                        final headers = <Widget>[
+                          if (showSector) const SizedBox(width: wDriverName, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Driver Name', style: TextStyle(fontWeight: FontWeight.bold)))),
                           if (showSector) const SizedBox(width: sp),
-                          const SizedBox(width: wDriverName, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Driver Name', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          const SizedBox(width: sp),
                           const SizedBox(width: wLicenseNo, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('License Number', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
                           InkWell(
@@ -508,10 +570,8 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                       rowBuilder: (ctx, index) {
                         final license = sortedLicenses[index];
                         final cells = <Widget>[
-                          if (showSector) SizedBox(width: wSector, child: Text(_getSectorName(license.sectorCode))),
+                          if (showSector) SizedBox(width: wDriverName, child: Text(license.driverName)),
                           if (showSector) const SizedBox(width: sp),
-                          SizedBox(width: wDriverName, child: Text(license.driverName)),
-                          const SizedBox(width: sp),
                           SizedBox(width: wLicenseNo, child: Text(license.licenseNumber)),
                           const SizedBox(width: sp),
                           SizedBox(width: wExpiry, child: Text(FormatUtils.formatDateDisplay(license.expiryDate))),
@@ -591,15 +651,22 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                     const double sp = 16;
                     const double wSector = 100, wVehicle = 120, wModel = 90, wPart = 140, wDate = 110, wKms = 100, wHrs = 90, wAction = 120;
                     final showSector = widget.selectedSector == null && _isAdmin;
-                    final totalWidth = (showSector ? wSector + sp : 0) + wVehicle + wModel + wPart + wDate + wKms + wHrs + wDate + wAction + (showSector ? 8 : 7) * sp;
+                    final double leadingWidth = showSector ? wSector : wVehicle;
+                    final double scrollTotalWidth = showSector
+                        ? (wVehicle + wModel + wPart + wDate + wKms + wHrs + wDate + wAction + 7 * sp)
+                        : (wModel + wPart + wDate + wKms + wHrs + wDate + wAction + 6 * sp);
                     return FixedHeaderTable(
                       horizontalScrollController: _serviceHorizontalScrollController,
-                      totalWidth: totalWidth,
+                      totalWidth: scrollTotalWidth,
                       headerHeight: 48,
-                      headerBuilder: (ctx) {
-                        final headers = <Widget>[
-                          if (showSector)
-                            InkWell(
+                      rowExtent: 56,
+                      leadingWidth: leadingWidth,
+                      leadingHeaderBuilder: (ctx) {
+                        if (showSector) {
+                          return SizedBox(
+                            width: wSector,
+                            height: 48,
+                            child: InkWell(
                               onTap: () => setState(() {
                                 _sectorSortAscendingService = !_sectorSortAscendingService;
                                 sortedServices.sort((a, b) {
@@ -608,11 +675,30 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                                   return _sectorSortAscendingService ? aName.compareTo(bName) : bName.compareTo(aName);
                                 });
                               }),
-                              child: const SizedBox(width: wSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
+                              child: const Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
                             ),
+                          );
+                        }
+                        return const SizedBox(
+                          width: wVehicle,
+                          height: 48,
+                          child: Align(alignment: Alignment.centerLeft, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                        );
+                      },
+                      leadingRowBuilder: (ctx, index) {
+                        final service = sortedServices[index];
+                        if (showSector) {
+                          return SizedBox(width: wSector, child: Text(_getSectorName(service.sectorCode)));
+                        }
+                        return SizedBox(width: wVehicle, child: Text(service.vehicleName));
+                      },
+                      headerBuilder: (ctx) {
+                        final headers = <Widget>[
+                          if (showSector) const SizedBox(width: wVehicle, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold)))),
                           if (showSector) const SizedBox(width: sp),
-                          const SizedBox(width: wVehicle, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          const SizedBox(width: sp),
                           const SizedBox(width: wModel, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Model', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
                           const SizedBox(width: wPart, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Service Part Name', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -633,10 +719,8 @@ class _VehicleDriverLicenseScreenState extends State<VehicleDriverLicenseScreen>
                       rowBuilder: (ctx, index) {
                         final service = sortedServices[index];
                         final cells = <Widget>[
-                          if (showSector) SizedBox(width: wSector, child: Text(_getSectorName(service.sectorCode))),
+                          if (showSector) SizedBox(width: wVehicle, child: Text(service.vehicleName)),
                           if (showSector) const SizedBox(width: sp),
-                          SizedBox(width: wVehicle, child: Text(service.vehicleName)),
-                          const SizedBox(width: sp),
                           SizedBox(width: wModel, child: Text(service.model)),
                           const SizedBox(width: sp),
                           SizedBox(width: wPart, child: Text(service.servicePartName)),

@@ -16,12 +16,18 @@ router.post('/generate', async (req, res) => {
       SELECT 
         si.item_name,
         COALESCE(SUM(CAST(ds.quantity_taken AS DECIMAL)), 0) as stocks_used,
+        COALESCE(
+          MAX(NULLIF(ds.unit, '')),
+          MAX(NULLIF(os.unit, '')),
+          '-'
+        ) as unit,
         si.sector_code,
         s.name as sector_name
       FROM stock_items si
       LEFT JOIN daily_stock ds ON si.id = ds.item_id 
         AND ds.stock_date >= $1 
         AND ds.stock_date <= $2
+      LEFT JOIN overall_stock os ON si.id = os.item_id
       JOIN sectors s ON si.sector_code = s.code
       WHERE 1=1
     `;

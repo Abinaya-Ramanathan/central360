@@ -488,26 +488,60 @@ class _CreditTabContentState extends State<CreditTabContent> {
   Widget _buildCreditTable() {
     final showSector = widget.selectedSector == null && widget.isAdmin;
     final totalWidth = _creditTableWidth();
+    final leadingWidth = showSector ? _colSector : _colName;
+    final rightTotalWidth = totalWidth - leadingWidth - _colSpacing;
     const bold = TextStyle(fontWeight: FontWeight.bold);
-    final List<Widget> headerChildren = [];
-    void addCol(double w, Widget c) {
-      if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
-      headerChildren.add(SizedBox(width: w, child: c));
+    final List<Widget> rightHeaderChildren = [];
+    void addRightHeaderCell(double w, Widget c) {
+      if (rightHeaderChildren.isNotEmpty) rightHeaderChildren.add(const SizedBox(width: _colSpacing));
+      rightHeaderChildren.add(SizedBox(width: w, child: c));
     }
-    if (showSector) addCol(_colSector, const Text('Sector', style: bold));
-    addCol(_colName, const Text('Name', style: bold));
-    addCol(_colPhone, const Text('Phone Number', style: bold));
-    addCol(_colAddress, const Text('Address', style: bold));
-    addCol(_colPurchase, const Text('Purchase Details', style: bold));
-    addCol(_colAmount, const Text('Credit Amount', style: bold));
-    addCol(_colAmount, const Text('Amount Settled', style: bold));
-    addCol(_colAction, const Text('Action', style: bold));
+    if (showSector) {
+      addRightHeaderCell(_colName, const Text('Name', style: bold));
+    }
+    addRightHeaderCell(_colPhone, const Text('Phone Number', style: bold));
+    addRightHeaderCell(_colAddress, const Text('Address', style: bold));
+    addRightHeaderCell(_colPurchase, const Text('Purchase Details', style: bold));
+    addRightHeaderCell(_colAmount, const Text('Credit Amount', style: bold));
+    addRightHeaderCell(_colAmount, const Text('Amount Settled', style: bold));
+    addRightHeaderCell(_colAction, const Text('Action', style: bold));
 
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: rightTotalWidth,
       headerHeight: _headerHeight,
-      headerBuilder: (context) => Row(children: headerChildren),
+      rowExtent: _headerHeight,
+      leadingWidth: leadingWidth,
+      leadingHeaderBuilder: (context) => Align(
+        alignment: Alignment.centerLeft,
+        child: showSector
+            ? const Text('Sector', style: bold)
+            : const Text('Name', style: bold),
+      ),
+      leadingRowBuilder: (context, index) {
+        final record = _creditData[index];
+        if (showSector) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Text(_getSectorName(record['sector_code']?.toString())),
+          );
+        }
+        final isEditMode = _editMode[index] == true;
+        final isControllerReady = _controllers.containsKey(index);
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: isEditMode && isControllerReady
+              ? SizedBox(
+                  width: _colName,
+                  child: TextFormField(
+                    controller: _controllers[index]!['name'],
+                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                  ),
+                )
+              : Text(record['name']?.toString() ?? ''),
+        );
+      },
+      headerBuilder: (context) => Row(children: rightHeaderChildren),
       rowCount: _creditData.length,
       rowBuilder: (context, index) {
         final record = _creditData[index];
@@ -517,13 +551,20 @@ class _CreditTabContentState extends State<CreditTabContent> {
           if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: _colSpacing));
           rowChildren.add(SizedBox(width: w, child: c));
         }
-        if (showSector) addCell(_colSector, Text(_getSectorName(record['sector_code']?.toString())));
-        addCell(_colName, isEditMode && _controllers.containsKey(index)
-            ? SizedBox(width: 150, child: TextFormField(
-                controller: _controllers[index]!['name'],
-                decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
-              ))
-            : Text(record['name']?.toString() ?? ''));
+        if (showSector) {
+          addCell(
+            _colName,
+            isEditMode && _controllers.containsKey(index)
+                ? SizedBox(
+                    width: 150,
+                    child: TextFormField(
+                      controller: _controllers[index]!['name'],
+                      decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                    ),
+                  )
+                : Text(record['name']?.toString() ?? ''),
+          );
+        }
         addCell(_colPhone, isEditMode && _controllers.containsKey(index)
             ? SizedBox(width: 150, child: TextFormField(
                 controller: _controllers[index]!['phone_number'],

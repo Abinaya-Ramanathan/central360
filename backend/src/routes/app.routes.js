@@ -10,21 +10,21 @@ router.get('/version', (_req, res) => {
     // TODO: Update these values when releasing a new version
     // You can also read from a config file or environment variables
     const versionInfo = {
-      version: '1.0.27',  // Update this when releasing new version
-      buildNumber: '28',  // Update this when releasing new version
+      version: '1.0.28',
+      buildNumber: '29',
       platforms: {
         windows: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.27/company360-setup.exe',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.28/company360-setup.exe',
           isRequired: false,
         },
         android: {
-          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.27/company360-v1.0.27.apk',
+          downloadUrl: 'https://github.com/Abinaya-Ramanathan/central360/releases/download/v1.0.28/company360-v1.0.28.apk',
           isRequired: false,
         }
       },
-      releaseNotes: 'Fixed header (sticky) on all tables; version 1.0.27. Backend 0.1.13.',
+      releaseNotes: 'Release 1.0.28 (build 28): table UX, PDF statements, backend performance. Backend 0.1.28.',
       isRequired: false,  // Set to true for critical security updates
-      releaseDate: '2025-03-07T00:00:00Z',
+      releaseDate: '2026-03-28T00:00:00Z',
     };
     
     res.json(versionInfo);

@@ -174,26 +174,50 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
   static const double _expenseWSector = 150, _expenseWAmount = 120;
 
   Widget _buildAllSectorsSummaryTable() {
-    const totalWidth = _expenseWSector + _expenseSp + _expenseWAmount;
+    const double leadW = _expenseWSector;
+    const double scrollW = _expenseSp + _expenseWAmount;
     final sortedSectors = _sectorExpenseSummary.isEmpty ? <String>[] : (_sectorExpenseSummary.keys.toList()..sort());
     final rowCount = _sectorExpenseSummary.isEmpty ? 1 : sortedSectors.length + 1;
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: totalWidth.toDouble(),
+      totalWidth: scrollW,
       headerHeight: 48,
+      leadingWidth: leadW,
+      rowExtent: 48,
+      leadingHeaderBuilder: (ctx) => const SizedBox(
+        width: leadW,
+        height: 48,
+        child: Align(alignment: Alignment.centerLeft, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
+      ),
       headerBuilder: (ctx) => const Row(
         children: [
-          SizedBox(width: _expenseWSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold)))),
           SizedBox(width: _expenseSp),
           SizedBox(width: _expenseWAmount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
+      leadingRowBuilder: (ctx, index) {
+        if (_sectorExpenseSummary.isEmpty) {
+          return const SizedBox(
+            width: leadW,
+            child: Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic)),
+          );
+        }
+        if (index == sortedSectors.length) {
+          return Container(
+            color: Colors.purple.shade50,
+            width: leadW,
+            alignment: Alignment.centerLeft,
+            child: const Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          );
+        }
+        final sectorCode = sortedSectors[index];
+        return SizedBox(width: leadW, child: Text(_getSectorName(sectorCode)));
+      },
       rowCount: rowCount,
       rowBuilder: (ctx, index) {
         if (_sectorExpenseSummary.isEmpty) {
           return const Row(
             children: [
-              SizedBox(width: _expenseWSector, child: Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
               SizedBox(width: _expenseSp),
               SizedBox(width: _expenseWAmount),
             ],
@@ -204,7 +228,6 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
             color: Colors.purple.shade50,
             child: Row(
               children: [
-                const SizedBox(width: _expenseWSector, child: Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
                 const SizedBox(width: _expenseSp),
                 SizedBox(width: _expenseWAmount, child: Text(_calculateTotalExpenseForAllSectors().toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple))),
               ],
@@ -214,7 +237,6 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
         final sectorCode = sortedSectors[index];
         return Row(
           children: [
-            SizedBox(width: _expenseWSector, child: Text(_getSectorName(sectorCode))),
             const SizedBox(width: _expenseSp),
             SizedBox(width: _expenseWAmount, child: Text('₹${_sectorExpenseSummary[sectorCode]!.toStringAsFixed(2)}')),
           ],
@@ -227,29 +249,49 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
 
   Widget _buildSingleSectorTable() {
     final showSectorColumn = widget.isAdmin && widget.selectedSector == null;
-    final totalWidth = showSectorColumn
-        ? (_singleWSector + _expenseSp + _singleWItem + _expenseSp + _singleWAmount + _expenseSp + _singleWReason + _expenseSp + _singleWActions)
-        : (_singleWItem + _expenseSp + _singleWAmount + _expenseSp + _singleWReason + _expenseSp + _singleWActions);
+    final double leadW = showSectorColumn ? _singleWSector : _singleWItem;
+    final double scrollW = showSectorColumn
+        ? (_expenseSp + _singleWItem + _expenseSp + _singleWAmount + _expenseSp + _singleWReason + _expenseSp + _singleWActions)
+        : (_expenseSp + _singleWAmount + _expenseSp + _singleWReason + _expenseSp + _singleWActions);
     final rowCount = _expenseData.isEmpty ? 1 : _expenseData.length + 1;
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: totalWidth.toDouble(),
+      totalWidth: scrollW,
       headerHeight: 48,
+      leadingWidth: leadW,
+      rowExtent: 48,
+      leadingHeaderBuilder: (ctx) => SizedBox(
+        width: leadW,
+        height: 48,
+        child: showSectorColumn
+            ? InkWell(
+                onTap: () => setState(() {
+                  _sortAscending = !_sortAscending;
+                  _expenseData.sort((a, b) {
+                    final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                    final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                    return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                  });
+                }),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Icon(_sortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
+                    ],
+                  ),
+                ),
+              )
+            : const Align(alignment: Alignment.centerLeft, child: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold))),
+      ),
       headerBuilder: (ctx) => Row(
         children: [
           if (showSectorColumn) ...[
-            SizedBox(width: _singleWSector, height: 48, child: InkWell(onTap: () => setState(() {
-              _sortAscending = !_sortAscending;
-              _expenseData.sort((a, b) {
-                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
-              });
-            }), child: Align(alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_sortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])))),
+            const SizedBox(width: _singleWItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold)))),
             const SizedBox(width: _expenseSp),
           ],
-          const SizedBox(width: _singleWItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold)))),
-          const SizedBox(width: _expenseSp),
           const SizedBox(width: _singleWAmount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
           const SizedBox(width: _expenseSp),
           const SizedBox(width: _singleWReason, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Reason for Purchase', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -257,14 +299,36 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
           const SizedBox(width: _singleWActions, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
+      leadingRowBuilder: (ctx, index) {
+        if (_expenseData.isEmpty) {
+          return SizedBox(
+            width: leadW,
+            child: const Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic)),
+          );
+        }
+        if (index == _expenseData.length) {
+          return Container(
+            color: Colors.purple.shade50,
+            width: leadW,
+            alignment: Alignment.centerLeft,
+            child: Text(showSectorColumn ? '' : 'Total Expense', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          );
+        }
+        final record = _expenseData[index];
+        return SizedBox(
+          width: leadW,
+          child: Text(showSectorColumn ? _getSectorName(record['sector_code']?.toString()) : (record['item_details']?.toString() ?? '')),
+        );
+      },
       rowCount: rowCount,
       rowBuilder: (ctx, index) {
         if (_expenseData.isEmpty) {
           return Row(
             children: [
-              if (showSectorColumn) ...[const SizedBox(width: _singleWSector), const SizedBox(width: _expenseSp)],
-              const SizedBox(width: _singleWItem, child: Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
-              const SizedBox(width: _expenseSp),
+              if (showSectorColumn) ...[
+                const SizedBox(width: _singleWItem),
+                const SizedBox(width: _expenseSp),
+              ],
               const SizedBox(width: _singleWAmount),
               const SizedBox(width: _expenseSp),
               const SizedBox(width: _singleWReason),
@@ -278,9 +342,10 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
             color: Colors.purple.shade50,
             child: Row(
               children: [
-                if (showSectorColumn) ...[const SizedBox(width: _singleWSector), const SizedBox(width: _expenseSp)],
-                const SizedBox(width: _singleWItem, child: Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-                const SizedBox(width: _expenseSp),
+                if (showSectorColumn) ...[
+                  const SizedBox(width: _singleWItem, child: Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                  const SizedBox(width: _expenseSp),
+                ],
                 SizedBox(width: _singleWAmount, child: Text(_calculateTotalExpense().toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple))),
                 const SizedBox(width: _expenseSp),
                 const SizedBox(width: _singleWReason),
@@ -298,9 +363,10 @@ class _ExpenseTabContentState extends State<ExpenseTabContent> {
         ];
         return Row(
           children: [
-            if (showSectorColumn) ...[SizedBox(width: _singleWSector, child: Text(_getSectorName(record['sector_code']?.toString()))), const SizedBox(width: _expenseSp)],
-            SizedBox(width: _singleWItem, child: Text(record['item_details']?.toString() ?? '')),
-            const SizedBox(width: _expenseSp),
+            if (showSectorColumn) ...[
+              SizedBox(width: _singleWItem, child: Text(record['item_details']?.toString() ?? '')),
+              const SizedBox(width: _expenseSp),
+            ],
             SizedBox(width: _singleWAmount, child: Text(_parseDecimalFromDynamic(record['amount']).toStringAsFixed(2))),
             const SizedBox(width: _expenseSp),
             SizedBox(width: _singleWReason, child: Text(record['reason_for_purchase']?.toString() ?? '')),

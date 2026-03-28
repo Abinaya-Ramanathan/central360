@@ -155,14 +155,22 @@ class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
                         )
                       : FixedHeaderTable(
                           horizontalScrollController: _horizontalScrollController,
-                          totalWidth: 420,
+                          totalWidth: 300,
                           headerHeight: 48,
+                          leadingWidth: 120,
+                          rowExtent: 48,
+                          leadingHeaderBuilder: (context) => const Center(
+                            child: Text('Sector Code', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          leadingRowBuilder: (context, index) {
+                            final sector = _sectors[index];
+                            return Center(child: Text(sector.code));
+                          },
                           headerBuilder: (context) => const SizedBox(
                             height: 48,
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                SizedBox(width: 120, child: Text('Sector Code', style: TextStyle(fontWeight: FontWeight.bold))),
                                 SizedBox(width: 180, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 SizedBox(width: 120, child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
@@ -171,34 +179,30 @@ class _ManageSectorsDialogState extends State<ManageSectorsDialog> {
                           rowCount: _sectors.length,
                           rowBuilder: (context, index) {
                             final sector = _sectors[index];
-                            return SizedBox(
-                              height: 48,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  SizedBox(width: 120, child: Text(sector.code)),
-                                  SizedBox(width: 180, child: Text(sector.name)),
-                                  SizedBox(
-                                    width: 120,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                SizedBox(width: 180, child: Text(sector.name)),
+                                SizedBox(
+                                  width: 120,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                        tooltip: 'Edit',
+                                        onPressed: () => _editSector(sector),
+                                      ),
+                                      if (widget.isMainAdmin)
                                         IconButton(
-                                          icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                          tooltip: 'Edit',
-                                          onPressed: () => _editSector(sector),
+                                          icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                          tooltip: 'Delete',
+                                          onPressed: () => _deleteSector(sector),
                                         ),
-                                        if (widget.isMainAdmin)
-                                          IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                            tooltip: 'Delete',
-                                            onPressed: () => _deleteSector(sector),
-                                          ),
-                                      ],
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             );
                           },
                         ),

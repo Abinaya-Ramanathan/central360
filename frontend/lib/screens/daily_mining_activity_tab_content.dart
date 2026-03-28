@@ -52,7 +52,7 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
   static const double _colSector = 150;
   static const double _colQuantity = 120;
   static const double _colSpacing = 20;
-  static const double _totalWidth = _colActivityName + _colSector + _colQuantity + _colSpacing * 2;
+  static const double _scrollWidth = _colSector + _colQuantity + _colSpacing;
 
   Future<void> _loadSectors() async {
     try {
@@ -298,12 +298,27 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                         ),
                         child: FixedHeaderTable(
                           horizontalScrollController: _horizontalScrollController,
-                          totalWidth: _totalWidth,
+                          totalWidth: _scrollWidth,
                           headerHeight: _headerHeight,
+                          leadingWidth: _colActivityName,
+                          rowExtent: 56,
+                          leadingHeaderBuilder: (context) => const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          leadingRowBuilder: (context, index) {
+                            final activity = _miningActivities[index];
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(activity['activity_name']?.toString() ?? 'N/A', overflow: TextOverflow.ellipsis),
+                              ),
+                            );
+                          },
                           headerBuilder: (context) => const Row(
                             children: [
-                              SizedBox(width: _colActivityName, child: Text('Activity Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                              SizedBox(width: _colSpacing),
                               SizedBox(width: _colSector, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
                               SizedBox(width: _colSpacing),
                               SizedBox(width: _colQuantity, child: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -319,8 +334,6 @@ class _DailyMiningActivityTabContentState extends State<DailyMiningActivityTabCo
                             );
                             return Row(
                               children: [
-                                SizedBox(width: _colActivityName, child: Text(activity['activity_name']?.toString() ?? 'N/A')),
-                                const SizedBox(width: _colSpacing),
                                 SizedBox(width: _colSector, child: Text(_getSectorName(activity['sector_code']?.toString()))),
                                 const SizedBox(width: _colSpacing),
                                 SizedBox(

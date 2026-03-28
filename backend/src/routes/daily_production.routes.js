@@ -26,8 +26,10 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY production_date DESC, product_name';
     const { rows } = await db.query(query, params);
-    const duration = Date.now() - startTime;
-    console.log(`[Performance] Daily production query took ${duration}ms, returned ${rows.length} records`);
+    if (process.env.NODE_ENV === 'development') {
+      const duration = Date.now() - startTime;
+      console.log(`[Performance] Daily production query took ${duration}ms, returned ${rows.length} records`);
+    }
     res.json(rows);
   } catch (err) {
     console.error('Error fetching daily production:', err);

@@ -484,40 +484,87 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
 
   Widget _buildIssuesTable() {
     final showSector = widget.selectedSector == null || widget.includedSectorCodes != null;
+    final leadingWidth = showSector ? _colSector : _colDesc;
     const bold = TextStyle(fontWeight: FontWeight.bold);
     final issues = _issues.where((issue) => issue.id != null).toList();
-    final List<Widget> headerChildren = [];
-    void addCol(double w, Widget c) {
-      if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
-      headerChildren.add(SizedBox(width: w, child: c));
+    final rightTotalWidth = _issuesTableWidth() - leadingWidth - _colSpacing;
+
+    final List<Widget> rightHeaderChildren = [];
+    void addRightHeaderCell(double w, Widget c) {
+      if (rightHeaderChildren.isNotEmpty) rightHeaderChildren.add(const SizedBox(width: _colSpacing));
+      rightHeaderChildren.add(SizedBox(width: w, child: c));
     }
+
     if (showSector) {
-      addCol(_colSector, InkWell(
-        onTap: () {
-          setState(() {
-            _sortAscending = !_sortAscending;
-            _issues.sort((a, b) {
-              final aName = _getSectorName(a.sectorCode).toLowerCase();
-              final bName = _getSectorName(b.sectorCode).toLowerCase();
-              return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
-            });
-          });
-        },
-        child: const Text('Sector', style: bold),
-      ));
+      addRightHeaderCell(_colDesc, const Text('Issue Description', style: bold));
     }
-    addCol(_colDesc, const Text('Issue Description', style: bold));
-    addCol(_colDate, const Text('Date Created', style: bold));
-    addCol(_colStatus, const Text('Status', style: bold));
-    addCol(_colDate, const Text('Date Resolved', style: bold));
-    addCol(_colPhotos, const Text('Photos', style: bold));
-    addCol(_colAction, const Text('Action', style: bold));
+    addRightHeaderCell(_colDate, const Text('Date Created', style: bold));
+    addRightHeaderCell(_colStatus, const Text('Status', style: bold));
+    addRightHeaderCell(_colDate, const Text('Date Resolved', style: bold));
+    addRightHeaderCell(_colPhotos, const Text('Photos', style: bold));
+    addRightHeaderCell(_colAction, const Text('Action', style: bold));
 
     return FixedHeaderTable(
       horizontalScrollController: _tableHorizontalScrollController,
-      totalWidth: _issuesTableWidth(),
+      totalWidth: rightTotalWidth,
       headerHeight: _tableHeaderHeight,
-      headerBuilder: (context) => Row(children: headerChildren),
+      rowExtent: _tableHeaderHeight,
+      leadingWidth: leadingWidth,
+      leadingHeaderBuilder: (context) {
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: showSector
+              ? InkWell(
+                  onTap: () {
+                    setState(() {
+                      _sortAscending = !_sortAscending;
+                      _issues.sort((a, b) {
+                        final aName = _getSectorName(a.sectorCode).toLowerCase();
+                        final bName = _getSectorName(b.sectorCode).toLowerCase();
+                        return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                      });
+                    });
+                  },
+                  child: const Text('Sector', style: bold),
+                )
+              : const Text('Issue Description', style: bold),
+        );
+      },
+      leadingRowBuilder: (context, index) {
+        final issue = issues[index];
+        final issueId = issue.id!;
+        final isEditMode = _editMode[issueId] == true;
+
+        if (showSector) {
+          return isEditMode
+              ? DropdownButton<String>(
+                  value: _editSectorCode[issueId] ?? issue.sectorCode,
+                  items: _sectors.map((s) => DropdownMenuItem<String>(value: s.code, child: Text(s.name))).toList(),
+                  onChanged: (value) => setState(() => _editSectorCode[issueId] = value!),
+                  isExpanded: true,
+                )
+              : Text(_getSectorName(issue.sectorCode));
+        }
+
+        return isEditMode
+            ? SizedBox(
+                width: 200,
+                child: TextFormField(
+                  initialValue: _editIssueDescription[issueId] ?? issue.issueDescription ?? '',
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                  onChanged: (value) => setState(() => _editIssueDescription[issueId] = value),
+                ),
+              )
+            : SizedBox(
+                width: 200,
+                child: Text(issue.issueDescription ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis),
+              );
+      },
+      headerBuilder: (context) => Row(children: rightHeaderChildren),
       rowCount: issues.length,
       rowBuilder: (context, index) {
         final issue = issues[index];
@@ -529,26 +576,21 @@ class _MaintenanceIssueScreenState extends State<MaintenanceIssueScreen> {
           rowChildren.add(SizedBox(width: w, child: c));
         }
         if (showSector) {
-          addCell(_colSector, isEditMode
-              ? DropdownButton<String>(
-                  value: _editSectorCode[issueId] ?? issue.sectorCode,
-                  items: _sectors.map((s) => DropdownMenuItem<String>(value: s.code, child: Text(s.name))).toList(),
-                  onChanged: (value) => setState(() => _editSectorCode[issueId] = value!),
-                  isExpanded: true,
+          addCell(_colDesc, isEditMode
+              ? SizedBox(
+                  width: 200,
+                  child: TextFormField(
+                    initialValue: _editIssueDescription[issueId] ?? issue.issueDescription ?? '',
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                    onChanged: (value) => setState(() => _editIssueDescription[issueId] = value),
+                  ),
                 )
-              : Text(_getSectorName(issue.sectorCode)));
+              : SizedBox(width: 200, child: Text(issue.issueDescription ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis)));
         }
-        addCell(_colDesc, isEditMode
-            ? SizedBox(
-                width: 200,
-                child: TextFormField(
-                  initialValue: _editIssueDescription[issueId] ?? issue.issueDescription ?? '',
-                  maxLines: 3,
-                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
-                  onChanged: (value) => setState(() => _editIssueDescription[issueId] = value),
-                ),
-              )
-            : SizedBox(width: 200, child: Text(issue.issueDescription ?? 'N/A', maxLines: 3, overflow: TextOverflow.ellipsis)));
         addCell(_colDate, isEditMode
             ? InkWell(
                 onTap: () => _selectDateCreated(issueId),

@@ -447,29 +447,25 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
     return w + (n - 1) * _colSpacing;
   }
 
+  double _attendanceLeadingWidth(bool showSectorColumn) =>
+      showSectorColumn ? _colSector : _colName;
+
+  double _attendanceScrollWidth(bool showSectorColumn) {
+    final full = _attendanceTableWidth(showSectorColumn);
+    return full - _attendanceLeadingWidth(showSectorColumn) - _colSpacing;
+  }
+
   Widget _buildAttendanceTable(bool showSectorColumn) {
-    final totalWidth = _attendanceTableWidth(showSectorColumn);
+    final scrollWidth = _attendanceScrollWidth(showSectorColumn);
+    final leadW = _attendanceLeadingWidth(showSectorColumn);
     final List<Widget> headerChildren = [];
     void addCol(double w, Widget c) {
       if (headerChildren.isNotEmpty) headerChildren.add(const SizedBox(width: _colSpacing));
       headerChildren.add(SizedBox(width: w, child: c));
     }
     if (showSectorColumn) {
-      addCol(_colSector, InkWell(
-        onTap: () {
-          setState(() {
-            _sortAscending = !_sortAscending;
-            _employees.sort((a, b) {
-              final aName = _getSectorName(a.sector).toLowerCase();
-              final bName = _getSectorName(b.sector).toLowerCase();
-              return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
-            });
-          });
-        },
-        child: const Text('Sector'),
-      ));
+      addCol(_colName, const Text('Name'));
     }
-    addCol(_colName, const Text('Name'));
     addCol(_colStatus, const Text('Status'));
     addCol(_colOt, const Text('OT in Hours'));
     addCol(_colMoney, const Text('Outstanding Advance'));
@@ -481,8 +477,45 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
 
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: scrollWidth,
       headerHeight: _headerHeight,
+      leadingWidth: leadW,
+      rowExtent: 72,
+      leadingHeaderBuilder: (context) => Material(
+        color: Colors.blue.shade100,
+        child: SizedBox(
+          width: leadW,
+          child: showSectorColumn
+              ? InkWell(
+                  onTap: () {
+                    setState(() {
+                      _sortAscending = !_sortAscending;
+                      _employees.sort((a, b) {
+                        final aName = _getSectorName(a.sector).toLowerCase();
+                        final bName = _getSectorName(b.sector).toLowerCase();
+                        return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                      });
+                    });
+                  },
+                  child: const Align(alignment: Alignment.centerLeft, child: Text('Sector')),
+                )
+              : const Align(alignment: Alignment.centerLeft, child: Text('Name')),
+        ),
+      ),
+      leadingRowBuilder: (context, index) {
+        final employee = _employees[index];
+        return Material(
+          child: SizedBox(
+            width: leadW,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: showSectorColumn
+                  ? Text(_getSectorName(employee.sector))
+                  : Text(employee.name),
+            ),
+          ),
+        );
+      },
       headerBuilder: (context) => Material(
         color: Colors.blue.shade100,
         child: Row(children: headerChildren),
@@ -505,8 +538,7 @@ class _AttendanceTabContentState extends State<AttendanceTabContent> {
           if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: _colSpacing));
           rowChildren.add(SizedBox(width: w, child: c));
         }
-        if (showSectorColumn) addCell(_colSector, Text(_getSectorName(employee.sector)));
-        addCell(_colName, Text(employee.name));
+        if (showSectorColumn) addCell(_colName, Text(employee.name));
         addCell(_colStatus, widget.isEditMode
             ? DropdownButton<String>(
                 value: data['status'],

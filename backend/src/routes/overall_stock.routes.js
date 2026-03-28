@@ -3,6 +3,28 @@ import db from '../db.js';
 
 const router = Router();
 
+/** Cached once per process: avoids repeated information_schema hits on every list request */
+let overallStockSchemaPromise = null;
+async function getOverallStockSchema() {
+  if (!overallStockSchemaPromise) {
+    overallStockSchemaPromise = (async () => {
+      const { rows } = await db.query(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'overall_stock'
+          AND column_name IN ('remaining_stock_boxes', 'new_stock_boxes', 'is_minimum_stock')
+      `);
+      const names = new Set(rows.map((r) => r.column_name));
+      return {
+        hasBoxesColumns: names.has('remaining_stock_boxes') && names.has('new_stock_boxes'),
+        hasMinStockColumn: names.has('is_minimum_stock'),
+      };
+    })();
+  }
+  return overallStockSchemaPromise;
+}
+
 // Get overall stock records
 router.get('/', async (req, res) => {
   try {
@@ -10,14 +32,7 @@ router.get('/', async (req, res) => {
     const params = [];
     let paramCount = 1;
 
-    // Check if boxes columns exist in the database
-    const columnCheck = await db.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'overall_stock' 
-      AND column_name IN ('remaining_stock_boxes', 'new_stock_boxes')
-    `);
-    const hasBoxesColumns = columnCheck.rows.length === 2;
+    const { hasBoxesColumns, hasMinStockColumn } = await getOverallStockSchema();
 
     // Build the daily_stock join condition (no date/month filtering for overall stock)
     let dailyStockJoinCondition = 'os.item_id = ds.item_id';
@@ -67,10 +82,7 @@ router.get('/', async (req, res) => {
     }
     
     query += `, os.created_at, os.updated_at, os.new_stock_date`;
-    const hasMinStockColumn = await db.query(`
-      SELECT 1 FROM information_schema.columns WHERE table_name = 'overall_stock' AND column_name = 'is_minimum_stock'
-    `);
-    if (hasMinStockColumn.rows.length > 0) {
+    if (hasMinStockColumn) {
       query += `, os.is_minimum_stock`;
     }
     query += `, si.id, si.item_name, si.sector_code, si.vehicle_type, si.part_number, s.code, s.name 
@@ -178,11 +190,8 @@ router.patch('/:id/minimum', async (req, res) => {
       return res.status(400).json({ message: 'Invalid id' });
     }
     const flag = is_minimum_stock === true || is_minimum_stock === 'true';
-    const colCheck = await db.query(`
-      SELECT column_name FROM information_schema.columns 
-      WHERE table_name = 'overall_stock' AND column_name = 'is_minimum_stock'
-    `);
-    if (colCheck.rows.length === 0) {
+    const { hasMinStockColumn } = await getOverallStockSchema();
+    if (!hasMinStockColumn) {
       return res.status(500).json({ message: 'Column is_minimum_stock does not exist. Run migration.' });
     }
     const result = await db.query(

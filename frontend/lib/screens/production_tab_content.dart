@@ -579,13 +579,68 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
     return widths.reduce((a, b) => a + b) + (widths.length - 1) * _colSpacing;
   }
 
+  double _productionLeadingWidth(bool showSectorColumn) =>
+      showSectorColumn ? _colSector : _colProductName;
+
+  double _getProductionScrollWidth(bool showSectorColumn) {
+    final full = _getProductionTableWidth(showSectorColumn);
+    final lead = _productionLeadingWidth(showSectorColumn);
+    if (full <= lead) return full;
+    return full - lead - _colSpacing;
+  }
+
   Widget _buildProductionTable(bool showSectorColumn) {
-    final totalWidth = _getProductionTableWidth(showSectorColumn);
+    final scrollWidth = _getProductionScrollWidth(showSectorColumn);
+    final leadW = _productionLeadingWidth(showSectorColumn);
     const bold = TextStyle(fontWeight: FontWeight.bold);
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: scrollWidth,
       headerHeight: _headerHeight,
+      leadingWidth: leadW,
+      rowExtent: 56,
+      leadingHeaderBuilder: (context) {
+        return Material(
+          child: SizedBox(
+            width: leadW,
+            child: showSectorColumn
+                ? InkWell(
+                    onTap: () {
+                      setState(() {
+                        _sortAscending = !_sortAscending;
+                        _filteredProductionData.sort((a, b) {
+                          final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                          final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                          return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                        });
+                      });
+                    },
+                    child: const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Sector', style: bold),
+                    ),
+                  )
+                : const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Product Name', style: bold),
+                  ),
+          ),
+        );
+      },
+      leadingRowBuilder: (context, index) {
+        final record = _filteredProductionData[index];
+        return Material(
+          child: SizedBox(
+            width: leadW,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: showSectorColumn
+                  ? Text(_getSectorName(record['sector_code']?.toString()))
+                  : Text(record['product_name']?.toString() ?? ''),
+            ),
+          ),
+        );
+      },
       headerBuilder: (context) {
         final List<Widget> headerChildren = [];
         void addCol(double w, Widget c) {
@@ -593,21 +648,8 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
           headerChildren.add(SizedBox(width: w, child: c));
         }
         if (showSectorColumn) {
-          addCol(_colSector, InkWell(
-            onTap: () {
-              setState(() {
-                _sortAscending = !_sortAscending;
-                _filteredProductionData.sort((a, b) {
-                  final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                  final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                  return _sortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
-                });
-              });
-            },
-            child: const Text('Sector', style: bold),
-          ));
+          addCol(_colProductName, const Text('Product Name', style: bold));
         }
-        addCol(_colProductName, const Text('Product Name', style: bold));
         addCol(_colNum, Text(_isCanteenStore ? 'Overall Production' : 'Morning Production', style: bold));
         if (_isCafeProduction) addCol(_colUnit, const Text('Unit', style: bold));
         addCol(_colNum, Text(_isCanteenStore ? 'Sent to Mainbranch' : 'Afternoon Production', style: bold));
@@ -668,8 +710,9 @@ class _ProductionTabContentState extends State<ProductionTabContent> {
             ),
           );
         }
-        if (showSectorColumn) addCell(_colSector, Text(_getSectorName(record['sector_code']?.toString())));
-        addCell(_colProductName, Text(record['product_name']?.toString() ?? ''));
+        if (showSectorColumn) {
+          addCell(_colProductName, Text(record['product_name']?.toString() ?? ''));
+        }
         addCell(_colNum, _isEditModeProduction && _morningControllers.containsKey(controllerKey)
             ? SizedBox(width: 70, child: TextField(
                 controller: _morningControllers[controllerKey],

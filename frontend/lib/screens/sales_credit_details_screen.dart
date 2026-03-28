@@ -1185,7 +1185,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
         localSavedDate = part.length >= 10 ? part.substring(0, 10) : part;
       }
       final expectedDate = saleDateToUse.length >= 10 ? saleDateToUse.substring(0, 10) : saleDateToUse;
-
+      
       // Reload data to reflect the updated sale_date
       await _loadSalesData();
       await _loadCreditData();
@@ -1452,12 +1452,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                       ),
                     )
                   : Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                          padding: const EdgeInsets.all(16.0),
+                          child: Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                         child: _buildSalesFixedHeaderTable(),
                       ),
                     ),
@@ -1474,25 +1474,70 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     final totalWidth = showSector
         ? (_salesWSector + _salesSp + _salesWName + _salesSp + _salesWCompany + _salesSp + _salesWContact + _salesSp + _salesWAddr + _salesSp + _salesWProduct + _salesSp + _salesWQty + _salesSp + _salesWAmt + _salesSp + _salesWCredit + _salesSp + _salesWAction)
         : (_salesWName + _salesSp + _salesWCompany + _salesSp + _salesWContact + _salesSp + _salesWAddr + _salesSp + _salesWProduct + _salesSp + _salesWQty + _salesSp + _salesWAmt + _salesSp + _salesWCredit + _salesSp + _salesWAction);
+    final double leadingWidth = showSector ? _salesWSector : _salesWName;
+    final double scrollTotalWidth = totalWidth - leadingWidth - _salesSp;
     return FixedHeaderTable(
       horizontalScrollController: _salesHorizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: scrollTotalWidth,
       headerHeight: 48,
+      rowExtent: 56,
+      leadingWidth: leadingWidth,
+      leadingHeaderBuilder: (ctx) {
+        if (showSector) {
+          return SizedBox(
+            width: _salesWSector,
+            height: 48,
+            child: InkWell(
+              onTap: () => setState(() {
+                                              _salesSectorSortAscending = !_salesSectorSortAscending;
+                                              _salesData.sort((a, b) {
+                                                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                                                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                  return _salesSectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                });
+              }),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Icon(_salesSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
+                                      ],
+                                    ),
+                                  ),
+            ),
+          );
+        }
+        return const SizedBox(
+          width: _salesWName,
+          height: 48,
+          child: Align(alignment: Alignment.centerLeft, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
+        );
+      },
+      leadingRowBuilder: (ctx, index) {
+        final record = _salesData[index];
+        if (showSector) {
+          return SizedBox(width: _salesWSector, child: Text(_getSectorName(record['sector_code']?.toString())));
+        }
+                                final isEditMode = _editModeSales[index] == true;
+        return SizedBox(
+          width: _salesWName,
+          child: isEditMode && _controllersSales.containsKey(index)
+                                          ? SizedBox(
+                                              width: 150,
+                                              child: TextFormField(
+                                                controller: _controllersSales[index]!['name'],
+                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                              ),
+                                            )
+                                          : Text(record['name']?.toString() ?? ''),
+        );
+      },
       headerBuilder: (ctx) => Row(
         children: [
-          if (showSector) ...[
-            SizedBox(width: _salesWSector, height: 48, child: InkWell(onTap: () => setState(() {
-              _salesSectorSortAscending = !_salesSectorSortAscending;
-              _salesData.sort((a, b) {
-                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                return _salesSectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
-              });
-            }), child: Align(alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_salesSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])))),
-            const SizedBox(width: _salesSp),
-          ],
-          const SizedBox(width: _salesWName, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold)))),
-          const SizedBox(width: _salesSp),
+          if (showSector) const SizedBox(width: _salesWName, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+          if (showSector) const SizedBox(width: _salesSp),
           const SizedBox(width: _salesWCompany, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Company Staff', style: TextStyle(fontWeight: FontWeight.bold)))),
           const SizedBox(width: _salesSp),
           const SizedBox(width: _salesWContact, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Contact Number', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -1520,12 +1565,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     final isEditMode = _editModeSales[index] == true;
     final showSector = (widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null;
     final cells = <Widget>[
-      if (showSector) ...[
-        SizedBox(width: _salesWSector, child: Text(_getSectorName(record['sector_code']?.toString()))),
-        const SizedBox(width: _salesSp),
-      ],
-      SizedBox(width: _salesWName, child: isEditMode && _controllersSales.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersSales[index]!['name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['name']?.toString() ?? '')),
-      const SizedBox(width: _salesSp),
+      if (showSector) SizedBox(width: _salesWName, child: isEditMode && _controllersSales.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersSales[index]!['name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['name']?.toString() ?? '')),
+      if (showSector) const SizedBox(width: _salesSp),
       SizedBox(width: _salesWCompany, child: isEditMode && _controllersSales.containsKey(index) ? SizedBox(width: 120, child: DropdownButton<bool>(value: _companyStaffValues[index] ?? (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1), isExpanded: true, items: const [DropdownMenuItem<bool>(value: false, child: Text('No')), DropdownMenuItem<bool>(value: true, child: Text('Yes'))], onChanged: (value) => setState(() => _companyStaffValues[index] = value ?? false))) : Text((record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? 'Yes' : 'No', style: TextStyle(fontWeight: FontWeight.bold, color: (record['company_staff'] == true || record['company_staff'] == 'true' || record['company_staff'] == 1) ? Colors.green.shade700 : Colors.grey))),
       const SizedBox(width: _salesSp),
       SizedBox(width: _salesWContact, child: isEditMode && _controllersSales.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersSales[index]!['contact_number'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.phone)) : Text(record['contact_number']?.toString() ?? 'N/A')),
@@ -1553,25 +1594,70 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     final totalWidth = showSector
         ? (_purchaseWSector + _purchaseSp + _purchaseWItem + _purchaseSp + _purchaseWShop + _purchaseSp + _purchaseWDetails + _purchaseSp + _purchaseWAmount + _purchaseSp + _purchaseWCredit + _purchaseSp + _purchaseWBill + _purchaseSp + _purchaseWAction)
         : (_purchaseWItem + _purchaseSp + _purchaseWShop + _purchaseSp + _purchaseWDetails + _purchaseSp + _purchaseWAmount + _purchaseSp + _purchaseWCredit + _purchaseSp + _purchaseWBill + _purchaseSp + _purchaseWAction);
+    final double leadingWidth = showSector ? _purchaseWSector : _purchaseWItem;
+    final double scrollTotalWidth = totalWidth - leadingWidth - _purchaseSp;
     return FixedHeaderTable(
       horizontalScrollController: _purchaseHorizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: scrollTotalWidth,
       headerHeight: 48,
+      rowExtent: 56,
+      leadingWidth: leadingWidth,
+      leadingHeaderBuilder: (ctx) {
+        if (showSector) {
+          return SizedBox(
+            width: _purchaseWSector,
+            height: 48,
+            child: InkWell(
+              onTap: () => setState(() {
+                _purchasesSectorSortAscending = !_purchasesSectorSortAscending;
+                _purchaseData.sort((a, b) {
+                  final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                  final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                  return _purchasesSectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                });
+              }),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Icon(_purchasesSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+        return const SizedBox(
+          width: _purchaseWItem,
+          height: 48,
+          child: Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+        );
+      },
+      leadingRowBuilder: (ctx, index) {
+        final record = _purchaseData[index];
+        if (showSector) {
+          return SizedBox(width: _purchaseWSector, child: Text(_getSectorName(record['sector_code']?.toString())));
+        }
+        final isEditMode = _editModePurchase[index] == true;
+        return SizedBox(
+          width: _purchaseWItem,
+          child: isEditMode && _controllersPurchase.containsKey(index)
+                                          ? SizedBox(
+                                              width: 150,
+                                              child: TextFormField(
+                    controller: _controllersPurchase[index]!['item_name'],
+                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                  ),
+                )
+              : Text(record['item_name']?.toString() ?? ''),
+        );
+      },
       headerBuilder: (ctx) => Row(
         children: [
-          if (showSector) ...[
-            SizedBox(width: _purchaseWSector, height: 48, child: InkWell(onTap: () => setState(() {
-              _purchasesSectorSortAscending = !_purchasesSectorSortAscending;
-              _purchaseData.sort((a, b) {
-                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                return _purchasesSectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
-              });
-            }), child: Align(alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_purchasesSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])))),
-            const SizedBox(width: _purchaseSp),
-          ],
-          const SizedBox(width: _purchaseWItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)))),
-          const SizedBox(width: _purchaseSp),
+          if (showSector) const SizedBox(width: _purchaseWItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+          if (showSector) const SizedBox(width: _purchaseSp),
           const SizedBox(width: _purchaseWShop, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Shop Name', style: TextStyle(fontWeight: FontWeight.bold)))),
           const SizedBox(width: _purchaseSp),
           const SizedBox(width: _purchaseWDetails, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -1597,12 +1683,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     final photos = purchaseId != null ? (_purchasePhotos[purchaseId] ?? []) : <Map<String, dynamic>>[];
     final showSector = (widget.selectedSector == null && _isAdmin) || widget.includedSectorCodes != null;
     final cells = <Widget>[
-      if (showSector) ...[
-        SizedBox(width: _purchaseWSector, child: Text(_getSectorName(record['sector_code']?.toString()))),
-        const SizedBox(width: _purchaseSp),
-      ],
-      SizedBox(width: _purchaseWItem, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersPurchase[index]!['item_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['item_name']?.toString() ?? '')),
-      const SizedBox(width: _purchaseSp),
+      if (showSector) SizedBox(width: _purchaseWItem, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersPurchase[index]!['item_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['item_name']?.toString() ?? '')),
+      if (showSector) const SizedBox(width: _purchaseSp),
       SizedBox(width: _purchaseWShop, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersPurchase[index]!['shop_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['shop_name']?.toString() ?? '')),
       const SizedBox(width: _purchaseSp),
       SizedBox(width: _purchaseWDetails, child: SizedBox(width: 200, child: isEditMode && _controllersPurchase.containsKey(index) ? TextFormField(controller: _controllersPurchase[index]!['purchase_details'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), maxLines: 2) : Text(record['purchase_details']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis))),
@@ -1636,18 +1718,50 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
     final totalWidth = showSectorColumn
         ? (_summaryWSector + _summarySp + _summaryWSales + _summarySp + _summaryWCreditGiven + _summarySp + _summaryWCreditRecv + _summarySp + _summaryWPurchaseExp + _summarySp + _summaryWPurchaseCredit + _summarySp + _summaryWCreditPaid)
         : (_summaryWSales + _summarySp + _summaryWCreditGiven + _summarySp + _summaryWCreditRecv + _summarySp + _summaryWPurchaseExp + _summarySp + _summaryWPurchaseCredit + _summarySp + _summaryWCreditPaid);
+    final double leadingWidth = showSectorColumn ? _summaryWSector : _summaryWSales;
+    final double scrollTotalWidth = totalWidth - leadingWidth - _summarySp;
     return FixedHeaderTable(
       horizontalScrollController: _summaryHorizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: scrollTotalWidth,
       headerHeight: 48,
+      rowExtent: 56,
+      leadingWidth: leadingWidth,
+      leadingHeaderBuilder: (ctx) {
+        if (showSectorColumn) {
+          return const SizedBox(
+            width: _summaryWSector,
+            height: 48,
+            child: Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
+          );
+        }
+        return const SizedBox(
+          width: _summaryWSales,
+          height: 48,
+          child: Align(alignment: Alignment.centerLeft, child: Text('Sales Income', style: TextStyle(fontWeight: FontWeight.bold))),
+        );
+      },
+      leadingRowBuilder: (ctx, index) {
+        if (showSectorColumn) {
+          if (index < sectorEntries.length) {
+            return SizedBox(width: _summaryWSector, child: Text(_getSectorName(sectorEntries[index].key)));
+          }
+          return const SizedBox(
+            width: _summaryWSector,
+            child: Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          );
+        }
+        return SizedBox(
+          width: _summaryWSales,
+          child: Text(
+            '₹${totalSalesIncome.toStringAsFixed(2)}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        );
+      },
       headerBuilder: (ctx) => Row(
         children: [
-          if (showSectorColumn) ...[
-            const SizedBox(width: _summaryWSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
-            const SizedBox(width: _summarySp),
-          ],
-          const SizedBox(width: _summaryWSales, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sales Income', style: TextStyle(fontWeight: FontWeight.bold)))),
-          const SizedBox(width: _summarySp),
+          if (showSectorColumn) const SizedBox(width: _summaryWSales, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sales Income', style: TextStyle(fontWeight: FontWeight.bold)))),
+          if (showSectorColumn) const SizedBox(width: _summarySp),
           const SizedBox(width: _summaryWCreditGiven, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Credit Given', style: TextStyle(fontWeight: FontWeight.bold)))),
           const SizedBox(width: _summarySp),
           const SizedBox(width: _summaryWCreditRecv, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Credit Received', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -1668,8 +1782,6 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
             color: null,
             child: Row(
               children: [
-                SizedBox(width: _summaryWSector, child: Text(_getSectorName(entry.key))),
-                const SizedBox(width: _summarySp),
                 SizedBox(width: _summaryWSales, child: Text('₹${data['salesIncome']!.toStringAsFixed(2)}')),
                 const SizedBox(width: _summarySp),
                 SizedBox(width: _summaryWCreditGiven, child: Text('₹${data['salesCredit']!.toStringAsFixed(2)}')),
@@ -1689,12 +1801,8 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           color: Colors.blue.shade50,
           child: Row(
             children: [
-              if (showSectorColumn) ...[
-                const SizedBox(width: _summaryWSector, child: Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-                const SizedBox(width: _summarySp),
-              ],
-              SizedBox(width: _summaryWSales, child: Text('₹${totalSalesIncome.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-              const SizedBox(width: _summarySp),
+              if (showSectorColumn) SizedBox(width: _summaryWSales, child: Text('₹${totalSalesIncome.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+              if (showSectorColumn) const SizedBox(width: _summarySp),
               SizedBox(width: _summaryWCreditGiven, child: Text('₹${totalSalesCredit.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
               const SizedBox(width: _summarySp),
               SizedBox(width: _summaryWCreditRecv, child: Text('₹${totalCreditReceived.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
@@ -3147,12 +3255,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
                       ),
                     )
                   : Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                          padding: const EdgeInsets.all(16.0),
+                          child: Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                         child: _buildPurchaseFixedHeaderTable(),
                       ),
                     ),
@@ -4402,12 +4510,7 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
       List<Map<String, dynamic>> dataToUse = _filteredCreditData.isNotEmpty 
           ? _filteredCreditData 
           : _creditData;
-      
-      print('Download PDF: _filteredCreditData.length = ${_filteredCreditData.length}');
-      print('Download PDF: _creditData.length = ${_creditData.length}');
-      print('Download PDF: dataToUse.length = ${dataToUse.length}');
-      print('Download PDF: _balancePayments.length = ${_balancePayments.length}');
-      
+
       if (dataToUse.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -4912,12 +5015,12 @@ class _SalesCreditDetailsScreenState extends State<SalesCreditDetailsScreen> wit
           child: _isLoadingSummary
               ? const Center(child: CircularProgressIndicator())
               : Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                      padding: const EdgeInsets.all(16.0),
+                      child: Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                     child: _buildSummaryFixedHeaderTable(
                       showSectorColumn: showSectorColumn,
                       sectorData: sectorData,

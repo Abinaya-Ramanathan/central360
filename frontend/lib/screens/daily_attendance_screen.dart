@@ -608,14 +608,19 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
     final totalWidth = _dailyAttendanceTableWidth();
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: totalWidth - _colName - _colSpacing,
       headerHeight: _headerHeight,
+      rowExtent: _headerHeight,
+      leadingWidth: _colName,
+      leadingHeaderBuilder: (context) => const Text('Name'),
+      leadingRowBuilder: (context, index) {
+        final employee = _employees[index];
+        return Text(employee.name);
+      },
       headerBuilder: (context) => Material(
         color: Colors.blue.shade100,
         child: const Row(
           children: [
-            SizedBox(width: _colName, child: Text('Name')),
-            SizedBox(width: _colSpacing),
             SizedBox(width: _colStatus, child: Text('Status')),
             SizedBox(width: _colSpacing),
             SizedBox(width: _colOt, child: Text('OT in Hours')),
@@ -640,8 +645,6 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
         };
         return Row(
           children: [
-            SizedBox(width: _colName, child: Text(employee.name)),
-            const SizedBox(width: _colSpacing),
             SizedBox(
               width: _colStatus,
               child: _isEditMode

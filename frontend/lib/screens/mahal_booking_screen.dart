@@ -619,17 +619,47 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     const totalWidth = wId + wMahal + wDate + wTiming + wEventName + wClient + wPh1 + wPh2 + wAddr + wFood + wStatus + wDetails + wSettlement + wAction + (colCount - 1) * sp;
                     return FixedHeaderTable(
                       horizontalScrollController: _eventHorizontalScrollController,
-                      totalWidth: totalWidth,
+                      totalWidth: totalWidth - wId - sp,
                       headerHeight: 48,
+                      rowExtent: 48,
+                      leadingWidth: wId,
+                      leadingHeaderBuilder: (ctx) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: const Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      leadingRowBuilder: (ctx, index) {
+                        if (index == sortedEvents.length) {
+                          return Container(
+                            color: Colors.blue.shade50,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Total (${filteredEvents.where((e) => e.bookingId != null).length})',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                            ),
+                          );
+                        }
+                        final event = sortedEvents[index];
+                        return _buildEventDataRow(event, leadingOnly: true);
+                      },
                       headerBuilder: (ctx) => Row(
                         children: [
-                          const SizedBox(width: wId, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          const SizedBox(width: sp),
                           const SizedBox(width: wMahal, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Mahal Detail', style: TextStyle(fontWeight: FontWeight.bold)))),
                           const SizedBox(width: sp),
                           InkWell(
                             onTap: () => setState(() => _sortByDateDesc = !_sortByDateDesc),
-                            child: SizedBox(width: wDate, height: 48, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Event Date', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_sortByDateDesc ? Icons.arrow_downward : Icons.arrow_upward, size: 16)])),
+                            child: SizedBox(
+                              width: wDate,
+                              height: 48,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('Event Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  Icon(_sortByDateDesc ? Icons.arrow_downward : Icons.arrow_upward, size: 16),
+                                ],
+                              ),
+                            ),
                           ),
                           const SizedBox(width: sp),
                           const SizedBox(width: wTiming, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Event Timing', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -662,8 +692,6 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                             color: Colors.blue.shade50,
                             child: Row(
                               children: [
-                                SizedBox(width: wId, child: Text('Total (${filteredEvents.where((e) => e.bookingId != null).length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-                                const SizedBox(width: sp),
                                 const SizedBox(width: wMahal), const SizedBox(width: sp),
                                 const SizedBox(width: wDate), const SizedBox(width: sp),
                                 const SizedBox(width: wTiming), const SizedBox(width: sp),
@@ -693,7 +721,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
     );
   }
 
-  Widget _buildEventDataRow(MahalBooking event) {
+  Widget _buildEventDataRow(MahalBooking event, {bool leadingOnly = false}) {
     const double sp = 12;
     const double wId = 100, wMahal = 120, wDate = 110, wTiming = 90, wEventName = 110, wClient = 120, wPh1 = 100, wPh2 = 100, wAddr = 150, wFood = 90, wStatus = 90, wDetails = 200, wSettlement = 150, wAction = 160;
     final isSelected = event.bookingId == _selectedBookingId;
@@ -729,7 +757,7 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
     ];
     return Container(
       color: isSelected ? Colors.yellow.shade100 : null,
-      child: Row(children: cells),
+      child: leadingOnly ? cells.first : Row(children: cells.sublist(2)),
     );
   }
 
@@ -769,12 +797,23 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     const totalWidth = wId + wLoc + wCount + wMenu * 3 + wCount * 2 + wAction + 8 * sp;
                     return FixedHeaderTable(
                       horizontalScrollController: _cateringHorizontalScrollController,
-                      totalWidth: totalWidth,
+                      totalWidth: totalWidth - wId - sp,
                       headerHeight: 48,
+                      rowExtent: 48,
+                      leadingWidth: wId,
+                      leadingHeaderBuilder: (ctx) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: const Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      leadingRowBuilder: (ctx, index) {
+                        final catering = filteredCatering[index];
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(catering.bookingId, style: const TextStyle(color: Colors.black87)),
+                        );
+                      },
                       headerBuilder: (ctx) => const Row(
                         children: [
-                          SizedBox(width: wId, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
                           SizedBox(width: wLoc, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Delivery Location', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
                           SizedBox(width: wCount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Morning Food Count', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -797,8 +836,6 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                         final catering = filteredCatering[index];
                         return Row(
                           children: [
-                            SizedBox(width: wId, child: Text(catering.bookingId, style: const TextStyle(color: Colors.black87))),
-                            const SizedBox(width: sp),
                             SizedBox(width: wLoc, child: Text(catering.deliveryLocation ?? 'N/A', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87))),
                             const SizedBox(width: sp),
                             SizedBox(width: wCount, child: Text(catering.morningFoodCount.toString(), style: const TextStyle(color: Colors.black87))),
@@ -850,13 +887,33 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     final widths = [wId, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wNum, wDetails, wNum, wAction];
                     return FixedHeaderTable(
                       horizontalScrollController: _expenseHorizontalScrollController,
-                      totalWidth: totalWidth,
+                      totalWidth: totalWidth - wId - sp,
                       headerHeight: 48,
+                      rowExtent: 48,
+                      leadingWidth: wId,
+                      leadingHeaderBuilder: (ctx) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: const Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      leadingRowBuilder: (ctx, index) {
+                        final expense = filteredExpense[index];
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(expense.bookingId, style: const TextStyle(color: Colors.black87)),
+                        );
+                      },
                       headerBuilder: (ctx) => Row(
                         children: [
-                          for (var i = 0; i < labels.length; i++) ...[
-                            if (i > 0) const SizedBox(width: sp),
-                            SizedBox(width: widths[i], height: 48, child: Align(alignment: Alignment.centerLeft, child: Text(labels[i], style: const TextStyle(fontWeight: FontWeight.bold)))),
+                          for (var i = 1; i < labels.length; i++) ...[
+                            if (i > 1) const SizedBox(width: sp),
+                            SizedBox(
+                              width: widths[i],
+                              height: 48,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(labels[i], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ),
                           ],
                         ],
                       ),
@@ -865,8 +922,6 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                         final expense = filteredExpense[index];
                         return Row(
                           children: [
-                            SizedBox(width: wId, child: Text(expense.bookingId, style: const TextStyle(color: Colors.black87))),
-                            const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.masterSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
                             const SizedBox(width: sp),
                             SizedBox(width: wNum, child: Text(expense.cookingHelperSalary.toStringAsFixed(2), style: const TextStyle(color: Colors.black87))),
@@ -1284,12 +1339,45 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                     const totalWidth = wMahal + wItem + wCount + wAction + 3 * sp;
                     return FixedHeaderTable(
                       horizontalScrollController: _vesselHorizontalScrollController,
-                      totalWidth: totalWidth,
+                      totalWidth: totalWidth - wMahal - sp,
                       headerHeight: 48,
+                      rowExtent: 48,
+                      leadingWidth: wMahal,
+                      leadingHeaderBuilder: (ctx) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: const Text('Mahal Detail', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      leadingRowBuilder: (ctx, index) {
+                        final vessel = filteredVessels[index];
+                        final id = vessel['id'] as int;
+                        final isEditing = _editModeVessels[id] == true;
+                        final controllers = _vesselControllers[id] ?? {};
+                        return SizedBox(
+                          width: wMahal,
+                          child: isEditing
+                              ? DropdownButtonFormField<String>(
+                                  initialValue: controllers['mahal_detail'] as String? ?? vessel['mahal_detail'] as String,
+                                  decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                                  items: [
+                                    const DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
+                                    const DropdownMenuItem(value: 'Thirukampuliyur Minihall', child: Text('Thirukampuliyur Minihall')),
+                                    const DropdownMenuItem(value: 'Thirukampuliyur Big Hall', child: Text('Thirukampuliyur Big Hall')),
+                                    ..._customMahalDetails.map((detail) => DropdownMenuItem(value: detail, child: Text(detail))),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      setState(() {
+                                        if (!_vesselControllers.containsKey(id)) _vesselControllers[id] = {};
+                                        _vesselControllers[id]!['mahal_detail'] = value;
+                                      });
+                                    }
+                                  },
+                                )
+                              : Text(vessel['mahal_detail'] as String),
+                        );
+                      },
                       headerBuilder: (ctx) => const Row(
                         children: [
-                          SizedBox(width: wMahal, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Mahal Detail', style: TextStyle(fontWeight: FontWeight.bold)))),
-                          SizedBox(width: sp),
                           SizedBox(width: wItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)))),
                           SizedBox(width: sp),
                           SizedBox(width: wCount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Count', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -1305,27 +1393,6 @@ class _MahalBookingScreenState extends State<MahalBookingScreen> with SingleTick
                         final controllers = _vesselControllers[id] ?? {};
                         return Row(
                           children: [
-                            SizedBox(width: wMahal, child: isEditing
-                                ? DropdownButtonFormField<String>(
-                                    initialValue: controllers['mahal_detail'] as String? ?? vessel['mahal_detail'] as String,
-                                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
-                                    items: [
-                                      const DropdownMenuItem(value: 'Thanthondrimalai Mini hall', child: Text('Thanthondrimalai Mini hall')),
-                                      const DropdownMenuItem(value: 'Thirukampuliyur Minihall', child: Text('Thirukampuliyur Minihall')),
-                                      const DropdownMenuItem(value: 'Thirukampuliyur Big Hall', child: Text('Thirukampuliyur Big Hall')),
-                                      ..._customMahalDetails.map((detail) => DropdownMenuItem(value: detail, child: Text(detail))),
-                                    ],
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setState(() {
-                                          if (!_vesselControllers.containsKey(id)) _vesselControllers[id] = {};
-                                          _vesselControllers[id]!['mahal_detail'] = value;
-                                        });
-                                      }
-                                    },
-                                  )
-                                : Text(vessel['mahal_detail'] as String)),
-                            const SizedBox(width: sp),
                             SizedBox(width: wItem, child: isEditing
                                 ? TextFormField(controller: controllers['item_name'] as TextEditingController?, decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))
                                 : Text(vessel['item_name'] as String)),

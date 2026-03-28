@@ -707,12 +707,23 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
     final rowCount = _productionData.isEmpty ? 1 : _productionData.length;
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: _totalTableWidth,
+      totalWidth: _totalTableWidth - _colProduct - _colSpacing,
       headerHeight: _headerHeight,
+      rowExtent: _headerHeight,
+      leadingWidth: _colProduct,
+      leadingHeaderBuilder: (context) => const Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold)),
+      leadingRowBuilder: (context, index) {
+        if (_productionData.isEmpty) {
+          return Text(
+            widget.selectedSector == null ? 'Please select a sector from Home page' : 'No products available for this sector',
+            style: const TextStyle(fontStyle: FontStyle.italic),
+          );
+        }
+        final record = _productionData[index];
+        return Text(record['product_name']?.toString() ?? '');
+      },
       headerBuilder: (context) => const Row(
         children: [
-          SizedBox(width: _colProduct, child: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colSpacing),
           SizedBox(width: _colNum, child: Text('Morning Production', style: TextStyle(fontWeight: FontWeight.bold))),
           SizedBox(width: _colSpacing),
           SizedBox(width: _colNum, child: Text('Afternoon Production', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -725,14 +736,6 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
         if (_productionData.isEmpty) {
           return Row(
             children: [
-              SizedBox(
-                width: _colProduct,
-                child: Text(
-                  widget.selectedSector == null ? 'Please select a sector from Home page' : 'No products available for this sector',
-                  style: const TextStyle(fontStyle: FontStyle.italic),
-                ),
-              ),
-              const SizedBox(width: _colSpacing),
               const SizedBox(width: _colNum),
               const SizedBox(width: _colSpacing),
               const SizedBox(width: _colNum),
@@ -744,8 +747,6 @@ class _DailyProductionScreenState extends State<DailyProductionScreen> {
         final record = _productionData[index];
         return Row(
           children: [
-            SizedBox(width: _colProduct, child: Text(record['product_name']?.toString() ?? '')),
-            const SizedBox(width: _colSpacing),
             SizedBox(width: _colNum, child: Text('${_parseIntFromDynamic(record['morning_production'])}')),
             const SizedBox(width: _colSpacing),
             SizedBox(width: _colNum, child: Text('${_parseIntFromDynamic(record['afternoon_production'])}')),

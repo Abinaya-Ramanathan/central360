@@ -1843,25 +1843,70 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
     final totalWidth = showSector
         ? (_companyPurchaseWSector + _companyPurchaseSp + _companyPurchaseWItem + _companyPurchaseSp + _companyPurchaseWShop + _companyPurchaseSp + _companyPurchaseWDetails + _companyPurchaseSp + _companyPurchaseWAmount + _companyPurchaseSp + _companyPurchaseWPaid + _companyPurchaseSp + _companyPurchaseWCredit + _companyPurchaseSp + _companyPurchaseWBill + _companyPurchaseSp + _companyPurchaseWAction)
         : (_companyPurchaseWItem + _companyPurchaseSp + _companyPurchaseWShop + _companyPurchaseSp + _companyPurchaseWDetails + _companyPurchaseSp + _companyPurchaseWAmount + _companyPurchaseSp + _companyPurchaseWPaid + _companyPurchaseSp + _companyPurchaseWCredit + _companyPurchaseSp + _companyPurchaseWBill + _companyPurchaseSp + _companyPurchaseWAction);
+    final double leadingWidth = showSector ? _companyPurchaseWSector : _companyPurchaseWItem;
+    final double scrollTotalWidth = totalWidth - leadingWidth - _companyPurchaseSp;
     return FixedHeaderTable(
       horizontalScrollController: _purchaseHorizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: scrollTotalWidth,
       headerHeight: 48,
+      rowExtent: 56,
+      leadingWidth: leadingWidth,
+      leadingHeaderBuilder: (ctx) {
+        if (showSector) {
+          return SizedBox(
+            width: _companyPurchaseWSector,
+            height: 48,
+            child: InkWell(
+              onTap: () => setState(() {
+                _purchasesSectorSortAscending = !_purchasesSectorSortAscending;
+                _purchaseData.sort((a, b) {
+                  final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
+                  final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
+                  return _purchasesSectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
+                });
+              }),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Icon(_purchasesSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+        return const SizedBox(
+          width: _companyPurchaseWItem,
+          height: 48,
+          child: Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+        );
+      },
+      leadingRowBuilder: (ctx, index) {
+        final record = _purchaseData[index];
+        if (showSector) {
+          return SizedBox(width: _companyPurchaseWSector, child: Text(_getSectorName(record['sector_code']?.toString())));
+        }
+        final isEditMode = _editModePurchase[index] == true;
+        return SizedBox(
+          width: _companyPurchaseWItem,
+          child: isEditMode && _controllersPurchase.containsKey(index)
+              ? SizedBox(
+                  width: 150,
+                  child: TextFormField(
+                    controller: _controllersPurchase[index]!['item_name'],
+                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                  ),
+                )
+              : Text(record['item_name']?.toString() ?? ''),
+        );
+      },
       headerBuilder: (ctx) => Row(
         children: [
-          if (showSector) ...[
-            SizedBox(width: _companyPurchaseWSector, height: 48, child: InkWell(onTap: () => setState(() {
-              _purchasesSectorSortAscending = !_purchasesSectorSortAscending;
-              _purchaseData.sort((a, b) {
-                final aName = _getSectorName(a['sector_code']?.toString()).toLowerCase();
-                final bName = _getSectorName(b['sector_code']?.toString()).toLowerCase();
-                return _purchasesSectorSortAscending ? aName.compareTo(bName) : bName.compareTo(aName);
-              });
-            }), child: Align(alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)), Icon(_purchasesSectorSortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])))),
-            const SizedBox(width: _companyPurchaseSp),
-          ],
-          const SizedBox(width: _companyPurchaseWItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)))),
-          const SizedBox(width: _companyPurchaseSp),
+          if (showSector) const SizedBox(width: _companyPurchaseWItem, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)))),
+          if (showSector) const SizedBox(width: _companyPurchaseSp),
           const SizedBox(width: _companyPurchaseWShop, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Shop Name', style: TextStyle(fontWeight: FontWeight.bold)))),
           const SizedBox(width: _companyPurchaseSp),
           const SizedBox(width: _companyPurchaseWDetails, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Purchase Details', style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -1889,12 +1934,8 @@ class _CompanyPurchaseCreditDetailsScreenState extends State<CompanyPurchaseCred
     final photos = purchaseId != null ? (_purchasePhotos[purchaseId] ?? []) : <Map<String, dynamic>>[];
     final showSector = widget.selectedSector == null && _isAdmin;
     final cells = <Widget>[
-      if (showSector) ...[
-        SizedBox(width: _companyPurchaseWSector, child: Text(_getSectorName(record['sector_code']?.toString()))),
-        const SizedBox(width: _companyPurchaseSp),
-      ],
-      SizedBox(width: _companyPurchaseWItem, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersPurchase[index]!['item_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['item_name']?.toString() ?? '')),
-      const SizedBox(width: _companyPurchaseSp),
+      if (showSector) SizedBox(width: _companyPurchaseWItem, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersPurchase[index]!['item_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['item_name']?.toString() ?? '')),
+      if (showSector) const SizedBox(width: _companyPurchaseSp),
       SizedBox(width: _companyPurchaseWShop, child: isEditMode && _controllersPurchase.containsKey(index) ? SizedBox(width: 150, child: TextFormField(controller: _controllersPurchase[index]!['shop_name'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))) : Text(record['shop_name']?.toString() ?? '')),
       SizedBox(width: _companyPurchaseWDetails, child: SizedBox(width: 200, child: isEditMode && _controllersPurchase.containsKey(index) ? TextFormField(controller: _controllersPurchase[index]!['purchase_details'], decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true), maxLines: 2) : Text(record['purchase_details']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis))),
       const SizedBox(width: _companyPurchaseSp),

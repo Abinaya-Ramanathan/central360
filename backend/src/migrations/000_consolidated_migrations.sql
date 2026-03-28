@@ -1,9 +1,11 @@
 -- ============================================
 -- Central360 Consolidated Database Migrations
 -- ============================================
--- This file contains all database migrations consolidated into a single file
--- Includes: Complete schema, default data, and all incremental updates
--- Last updated: Includes all features through migration 055
+-- CANONICAL bootstrap for new databases: run from backend —
+--   npm run migrate
+--   (runs 000_consolidated_migrations.sql by default; see run_migration.js)
+-- Files under migrations/archive/ are historical reference only.
+-- Last updated: 2026-03-28 (aligned with app 1.0.28)
 -- ============================================
 
 -- ============================================

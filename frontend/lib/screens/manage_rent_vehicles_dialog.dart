@@ -242,14 +242,27 @@ class _ManageRentVehiclesDialogState extends State<ManageRentVehiclesDialog> {
                         )
                       : FixedHeaderTable(
                           horizontalScrollController: _horizontalScrollController,
-                          totalWidth: 400,
+                          totalWidth: 220,
                           headerHeight: 48,
+                          leadingWidth: 180,
+                          rowExtent: 48,
+                          leadingHeaderBuilder: (context) => const Center(
+                            child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          leadingRowBuilder: (context, index) {
+                            final vehicle = _filteredVehicles[index];
+                            return Center(
+                              child: Text(
+                                vehicle['vehicle_name']?.toString() ?? 'N/A',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          },
                           headerBuilder: (context) => SizedBox(
                             height: 48,
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                const SizedBox(width: 180, child: Text('Vehicle Name', style: TextStyle(fontWeight: FontWeight.bold))),
                                 SizedBox(
                                   width: 120,
                                   child: InkWell(
@@ -273,37 +286,33 @@ class _ManageRentVehiclesDialogState extends State<ManageRentVehiclesDialog> {
                           rowCount: _filteredVehicles.length,
                           rowBuilder: (context, index) {
                             final vehicle = _filteredVehicles[index];
-                            return SizedBox(
-                              height: 48,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  SizedBox(width: 180, child: Text(vehicle['vehicle_name']?.toString() ?? 'N/A')),
-                                  SizedBox(width: 120, child: Text(_getSectorName(vehicle['sector_code']?.toString()))),
-                                  SizedBox(
-                                    width: 100,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                SizedBox(width: 120, child: Text(_getSectorName(vehicle['sector_code']?.toString()))),
+                                SizedBox(
+                                  width: 100,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                        tooltip: 'Edit',
+                                        onPressed: () => _editVehicle(vehicle),
+                                      ),
+                                      if (widget.isMainAdmin)
                                         IconButton(
-                                          icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                                          tooltip: 'Edit',
-                                          onPressed: () => _editVehicle(vehicle),
-                                        ),
-                                        if (widget.isMainAdmin)
-                                          IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                            tooltip: 'Delete',
-                                            onPressed: () => _deleteVehicle(
-                                              vehicle['id'] as int,
-                                              vehicle['vehicle_name']?.toString() ?? 'Vehicle',
-                                            ),
+                                          icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                          tooltip: 'Delete',
+                                          onPressed: () => _deleteVehicle(
+                                            vehicle['id'] as int,
+                                            vehicle['vehicle_name']?.toString() ?? 'Vehicle',
                                           ),
-                                      ],
-                                    ),
+                                        ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             );
                           },
                         ),

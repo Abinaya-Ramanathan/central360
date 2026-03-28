@@ -6,12 +6,8 @@ import db from '../db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const migrationFile = process.argv[2];
-
-if (!migrationFile) {
-  console.error('Usage: node run_migration.js <migration_file>');
-  process.exit(1);
-}
+// Default: single consolidated schema bootstrap (see 000_consolidated_migrations.sql)
+const migrationFile = process.argv[2] || '000_consolidated_migrations.sql';
 
 const migrationPath = path.join(__dirname, migrationFile);
 

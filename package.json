@@ -1,0 +1,6 @@
+{
+  "name": "central360",
+  "version": "1.0.28",
+  "private": true,
+  "description": "Central360 monorepo (Flutter frontend + Node backend)"
+}

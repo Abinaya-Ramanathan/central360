@@ -702,6 +702,14 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     return double.tryParse(s) ?? 0;
   }
 
+  static double _parseNumber(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    final s = v.toString().trim();
+    if (s.isEmpty) return 0;
+    return double.tryParse(s) ?? 0;
+  }
+
   bool _dailyStockRowHasValue(Map<String, dynamic> r) {
     final q = _parseQty(r['quantity_taken']);
     if (q > 0) return true;
@@ -758,14 +766,30 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     if (result != null && mounted) {
       try {
         setState(() => _isLoading = true);
-        final statement = await ApiService.generateStockStatement(
-          fromDate: result['from_date'] as String,
-          toDate: result['to_date'] as String,
-          sector: result['sector'] as String?,
-        );
-        
-        if (mounted) {
-          await _showStatementPDF(statement, result['from_date'] as String, result['to_date'] as String);
+        final fromDate = result['from_date'] as String;
+        final toDate = result['to_date'] as String;
+        final sector = result['sector'] as String?;
+
+        // Production tab needs production-specific statement output.
+        if (_tabController.index == 0) {
+          final productionSummary = await _buildProductionStatementSummary(
+            fromDate: fromDate,
+            toDate: toDate,
+            sector: sector,
+          );
+          if (mounted) {
+            await _showProductionStatementPDF(productionSummary, fromDate, toDate);
+          }
+        } else {
+          final statement = await ApiService.generateStockStatement(
+            fromDate: fromDate,
+            toDate: toDate,
+            sector: sector,
+          );
+
+          if (mounted) {
+            await _showStatementPDF(statement, fromDate, toDate);
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -779,6 +803,121 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         }
       }
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _buildProductionStatementSummary({
+    required String fromDate,
+    required String toDate,
+    required String? sector,
+  }) async {
+    final from = DateTime.parse(fromDate);
+    final to = DateTime.parse(toDate);
+    if (to.isBefore(from)) return [];
+
+    final Map<String, double> totalsByProduct = {};
+    DateTime d = from;
+    while (!d.isAfter(to)) {
+      final dateStr = DateFormat('yyyy-MM-dd').format(d);
+      final rows = await ApiService.getDailyProduction(date: dateStr);
+      for (final r in rows) {
+        final rowSector = (r['sector_code']?.toString() ?? '').trim();
+        if (sector != null && sector.isNotEmpty && rowSector.toUpperCase() != sector.toUpperCase()) {
+          continue;
+        }
+        final itemName = (r['product_name']?.toString() ?? '').trim();
+        if (itemName.isEmpty) continue;
+
+        // Prefer explicit overall field for canteen/store rows, else sum shifts.
+        final overall = _parseNumber(r['stock_in_canteen']) > 0
+            ? _parseNumber(r['stock_in_canteen'])
+            : (_parseNumber(r['morning_production']) +
+                _parseNumber(r['afternoon_production']) +
+                _parseNumber(r['evening_production']));
+
+        totalsByProduct[itemName] = (totalsByProduct[itemName] ?? 0) + overall;
+      }
+      d = d.add(const Duration(days: 1));
+    }
+
+    final summary = totalsByProduct.entries
+        .map((e) => {'item_name': e.key, 'overall_count': e.value})
+        .toList()
+      ..sort((a, b) => (a['item_name'] as String).toLowerCase().compareTo((b['item_name'] as String).toLowerCase()));
+    return summary;
+  }
+
+  Future<void> _showProductionStatementPDF(
+    List<Map<String, dynamic>> data,
+    String fromDate,
+    String toDate,
+  ) async {
+    final pdf = pw.Document();
+    final sectorName = widget.selectedSector == null ? 'All Sectors' : _getSectorName(widget.selectedSector);
+    final totalCount = data.fold<double>(0, (sum, r) => sum + _parseNumber(r['overall_count']));
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Production Statement', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              pw.Text('Date Range: $fromDate to $toDate'),
+              pw.SizedBox(height: 4),
+              pw.Text('Sector: $sectorName'),
+              pw.SizedBox(height: 12),
+              pw.Text(
+                'Overall Production Count: ${totalCount.toStringAsFixed(2)}',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 12),
+              pw.Table(
+                border: pw.TableBorder.all(),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(3),
+                  1: pw.FlexColumnWidth(2),
+                },
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFE3F2FD)),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text('Item Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text('Overall Production Count', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  ...data.map(
+                    (item) => pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(item['item_name']?.toString() ?? ''),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(_parseNumber(item['overall_count']).toStringAsFixed(2)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
   }
 
   Future<void> _showStatementPDF(List<Map<String, dynamic>> data, String fromDate, String toDate) async {
@@ -815,6 +954,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Unit', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
                         child: pw.Text('Stocks Used', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       ),
                     ],
@@ -828,6 +971,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(4),
                         child: pw.Text(item['item_name']?.toString() ?? ''),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(item['unit']?.toString() ?? '-'),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(4),
@@ -859,9 +1006,8 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           widget.includedSectorCodes!.isNotEmpty &&
           widget.includedSectorCodes!.every((c) => _cafeSectorCodes.contains(c)));
 
-  // Daily Stock fixed header table column widths
+  // Daily Stock fixed header table column widths (first column fixed: Sector or Item Name; SI.NO removed)
   static const double _dailyColSector = 100;
-  static const double _dailyColSiNo = 50;
   static const double _dailyColItemName = 150;
   static const double _dailyColVehicleType = 100;
   static const double _dailyColPartNumber = 100;
@@ -872,13 +1018,12 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
   static const double _dailyHeaderHeight = 56;
 
   Widget _buildDailyStockFixedTable(List<Map<String, dynamic>> data, bool showSectorColumn, bool showVehicleColumns) {
-    final baseWidth = (showSectorColumn ? _dailyColSector + _dailySpacing : 0) +
-        _dailyColSiNo + _dailySpacing + _dailyColItemName + _dailySpacing +
+    final leadingWidth = showSectorColumn ? _dailyColSector : _dailyColItemName;
+    final totalWidth = (showSectorColumn ? _dailyColItemName + _dailySpacing : 0) +
         (showVehicleColumns ? _dailyColVehicleType + _dailySpacing + _dailyColPartNumber + _dailySpacing : 0) +
         _dailyColQty + _dailySpacing + _dailyColUnit + _dailySpacing +
         (_isCafeDailyStock ? (_dailyColQty + _dailySpacing + _dailyColUnit + _dailySpacing + _dailyColQty + _dailySpacing + _dailyColUnit + _dailySpacing) : 0) +
         _dailyColReason;
-    final totalWidth = baseWidth;
     void sectorSort() {
       setState(() {
         _sortAscendingDaily = !_sortAscendingDaily;
@@ -891,13 +1036,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     }
     final headerCells = <Widget>[
       if (showSectorColumn) ...[
-        InkWell(onTap: sectorSort, child: const SizedBox(width: _dailyColSector, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)))),
+        const SizedBox(width: _dailyColItemName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
         const SizedBox(width: _dailySpacing),
       ],
-      const SizedBox(width: _dailyColSiNo, child: Text('SI.NO', style: TextStyle(fontWeight: FontWeight.bold))),
-      const SizedBox(width: _dailySpacing),
-      const SizedBox(width: _dailyColItemName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-      const SizedBox(width: _dailySpacing),
       if (showVehicleColumns) ...[
         const SizedBox(width: _dailyColVehicleType, child: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
         const SizedBox(width: _dailySpacing),
@@ -924,12 +1065,36 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
       horizontalScrollController: _stockHorizontalScrollController,
       totalWidth: totalWidth,
       headerHeight: _dailyHeaderHeight,
+      leadingWidth: leadingWidth,
+      rowExtent: 72,
+      leadingHeaderBuilder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: showSectorColumn
+              ? InkWell(
+                  onTap: sectorSort,
+                  child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                )
+              : const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ),
+      leadingRowBuilder: (context, index) {
+        final record = data[index];
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: showSectorColumn
+                ? Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')
+                : Text(record['item_name']?.toString() ?? 'N/A'),
+          ),
+        );
+      },
       headerBuilder: (context) => Row(children: headerCells),
       rowCount: data.length,
       rowBuilder: (context, index) {
-        final entry = data.asMap().entries.elementAt(index);
-        final siNo = entry.key + 1;
-        final record = entry.value;
+        final record = data[index];
         final id = record['id'] as int;
         final itemId = record['item_id'] as int;
         final key = '${itemId}_$id';
@@ -939,13 +1104,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         final showVehicleForThisItem = _shouldShowVehicleFieldsForItem(itemSectorCode);
         final rowCells = <Widget>[
           if (showSectorColumn) ...[
-            SizedBox(width: _dailyColSector, child: Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')),
+            SizedBox(width: _dailyColItemName, child: Text(record['item_name']?.toString() ?? 'N/A')),
             const SizedBox(width: _dailySpacing),
           ],
-          SizedBox(width: _dailyColSiNo, child: Text('$siNo')),
-          const SizedBox(width: _dailySpacing),
-          SizedBox(width: _dailyColItemName, child: Text(record['item_name']?.toString() ?? 'N/A')),
-          const SizedBox(width: _dailySpacing),
           if (showVehicleColumns) ...[
             SizedBox(width: _dailyColVehicleType, child: Text(showVehicleForThisItem ? (record['vehicle_type']?.toString() ?? '') : '')),
             const SizedBox(width: _dailySpacing),
@@ -1675,27 +1836,51 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     bool showSectorColumn,
     bool showVehicleColumns,
   ) {
-    double totalWidth = _overallColItemName + _overallColUnit * 10;
-    if (showSectorColumn) totalWidth += _overallColSector;
-    if (showVehicleColumns) totalWidth += _overallColVehicle + _overallColPart;
+    final leadingWidth = showSectorColumn ? _overallColSector : _overallColItemName;
+    double scrollWidth = _overallColUnit * 10;
+    if (showSectorColumn) scrollWidth += _overallColItemName;
+    if (showVehicleColumns) scrollWidth += _overallColVehicle + _overallColPart;
 
     return FixedHeaderTable(
       horizontalScrollController: _overallStockHorizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: scrollWidth,
       headerHeight: _overallHeaderHeight,
+      leadingWidth: leadingWidth,
+      rowExtent: _overallRowHeight,
+      leadingHeaderBuilder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: showSectorColumn
+              ? InkWell(
+                  onTap: () {
+                    setState(() => _sortAscendingOverall = !_sortAscendingOverall);
+                  },
+                  child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
+                )
+              : const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ),
+      leadingRowBuilder: (context, index) {
+        final record = filteredOverallStock[index];
+        final isMinimumStock = record['is_minimum_stock'] == true;
+        final rowColor = isMinimumStock ? Colors.red.shade100 : Colors.blue.shade50;
+        return GestureDetector(
+          onSecondaryTapDown: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
+          onLongPressStart: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
+          child: Container(
+            color: rowColor,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            alignment: Alignment.centerLeft,
+            child: showSectorColumn
+                ? Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? '')
+                : Text(record['item_name']?.toString() ?? 'N/A'),
+          ),
+        );
+      },
       headerBuilder: (context) {
         final cells = <Widget>[
-          if (showSectorColumn)
-            SizedBox(
-              width: _overallColSector,
-              child: InkWell(
-                onTap: () {
-                  setState(() => _sortAscendingOverall = !_sortAscendingOverall);
-                },
-                child: const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          const SizedBox(width: _overallColItemName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          if (showSectorColumn) const SizedBox(width: _overallColItemName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
           if (showVehicleColumns) ...[
             const SizedBox(width: _overallColVehicle, child: Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold))),
             const SizedBox(width: _overallColPart, child: Text('Part Number', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -1733,7 +1918,7 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         final cells = <Widget>[
           if (showSectorColumn)
             SizedBox(
-              width: _overallColSector,
+              width: _overallColItemName,
               child: GestureDetector(
                 onSecondaryTapDown: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
                 onLongPressStart: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
@@ -1741,23 +1926,10 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                   color: rowColor,
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                   alignment: Alignment.centerLeft,
-                  child: Text(record['sector_name']?.toString() ?? record['sector_code']?.toString() ?? ''),
+                  child: Text(record['item_name']?.toString() ?? 'N/A'),
                 ),
               ),
             ),
-          SizedBox(
-            width: _overallColItemName,
-            child: GestureDetector(
-              onSecondaryTapDown: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
-              onLongPressStart: (d) => _showOverallStockContextMenu(context, d.globalPosition, record),
-              child: Container(
-                color: rowColor,
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                alignment: Alignment.centerLeft,
-                child: Text(record['item_name']?.toString() ?? 'N/A'),
-              ),
-            ),
-          ),
           if (showVehicleColumns) ...[
             SizedBox(
               width: _overallColVehicle,
@@ -1787,12 +1959,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
           _overallCell(record['new_stock_pieces']?.toString() ?? '0', Colors.green.shade50, rowColor, _overallNewStockPiecesControllers[key]),
           _overallCell(record['new_stock_boxes']?.toString() ?? '0', Colors.green.shade50, rowColor, _overallNewStockBoxesControllers[key]),
         ];
-        return SizedBox(
-          height: _overallRowHeight,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: cells,
-          ),
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: cells,
         );
       },
     );
@@ -1860,18 +2029,40 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
     if (filtered.isEmpty) {
       return const Center(child: Text('No matching items'));
     }
-    final totalWidth = showSectorColumn
-        ? (_itemPriceColSector + _itemPriceColName + _itemPriceColQty + _itemPriceColUnit + _itemPriceColNew + _itemPriceColOld)
-        : (_itemPriceColName + _itemPriceColQty + _itemPriceColUnit + _itemPriceColNew + _itemPriceColOld);
+    final leadingWidth = showSectorColumn ? _itemPriceColSector : _itemPriceColName;
+    final scrollWidth = showSectorColumn
+        ? (_itemPriceColName + _itemPriceColQty + _itemPriceColUnit + _itemPriceColNew + _itemPriceColOld)
+        : (_itemPriceColQty + _itemPriceColUnit + _itemPriceColNew + _itemPriceColOld);
     return FixedHeaderTable(
       horizontalScrollController: _itemPriceHorizontalScrollController,
-      totalWidth: totalWidth,
+      totalWidth: scrollWidth,
       headerHeight: _itemPriceHeaderHeight,
+      leadingWidth: leadingWidth,
+      rowExtent: _itemPriceRowHeight,
+      leadingHeaderBuilder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: showSectorColumn
+              ? const Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))
+              : const Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ),
+      leadingRowBuilder: (context, index) {
+        final r = filtered[index];
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: showSectorColumn
+                ? Text(_getSectorName(r['sector_code']?.toString()))
+                : Text(r['item_name']?.toString() ?? ''),
+          ),
+        );
+      },
       headerBuilder: (context) {
         final cells = <Widget>[
-          if (showSectorColumn)
-            const SizedBox(width: _itemPriceColSector, child: Text('Sector', style: TextStyle(fontWeight: FontWeight.bold))),
-          const SizedBox(width: _itemPriceColName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
+          if (showSectorColumn) const SizedBox(width: _itemPriceColName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
           const SizedBox(width: _itemPriceColQty, child: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold))),
           const SizedBox(width: _itemPriceColUnit, child: Text('Unit', style: TextStyle(fontWeight: FontWeight.bold))),
           const SizedBox(width: _itemPriceColNew, child: Text('New Price', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -1893,16 +2084,17 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
         final unitValue = _itemPriceUnitValues[itemNameId];
         final newCtrl = _itemPriceNewPriceControllers[itemNameId];
         final oldCtrl = _itemPriceOldPriceControllers[itemNameId];
+        // Scroll row must match [scrollWidth]: sector/name are only in [leadingRowBuilder].
         final cells = <Widget>[
           if (showSectorColumn)
             SizedBox(
-              width: _itemPriceColSector,
-              child: Text(_getSectorName(r['sector_code']?.toString())),
+              width: _itemPriceColName,
+              child: Text(
+                r['item_name']?.toString() ?? '',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          SizedBox(
-            width: _itemPriceColName,
-            child: Text(r['item_name']?.toString() ?? ''),
-          ),
           SizedBox(
             width: _itemPriceColQty,
             child: _isEditModeItemPrice && qCtrl != null
@@ -1982,12 +2174,9 @@ class _StockManagementScreenState extends State<StockManagementScreen> with Sing
                 : Text(r['old_price']?.toString() ?? ''),
           ),
         ];
-        return SizedBox(
-          height: _itemPriceRowHeight,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: cells,
-          ),
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: cells,
         );
       },
     );

@@ -11,8 +11,10 @@ router.get('/', async (req, res) => {
     const { rows } = await db.query(
       'SELECT id, name, contact, contact2, address, bank_details, sector, role, daily_salary, weekly_salary, monthly_salary, joining_date, joining_year FROM employees ORDER BY name ASC'
     );
-    const queryTime = Date.now() - startTime;
-    console.log(`[Performance] Employees query took ${queryTime}ms, returned ${rows.length} records`);
+    if (process.env.NODE_ENV === 'development') {
+      const queryTime = Date.now() - startTime;
+      console.log(`[Performance] Employees query took ${queryTime}ms, returned ${rows.length} records`);
+    }
     res.json(rows);
   } catch (err) {
     console.error('Error fetching employees:', err);
@@ -30,8 +32,10 @@ router.get('/sector/:sectorCode', async (req, res) => {
       'SELECT id, name, contact, contact2, address, bank_details, sector, role, daily_salary, weekly_salary, monthly_salary, joining_date, joining_year FROM employees WHERE sector = $1 ORDER BY name ASC',
       [sectorCode]
     );
-    const queryTime = Date.now() - startTime;
-    console.log(`[Performance] Employees by sector query took ${queryTime}ms, returned ${rows.length} records`);
+    if (process.env.NODE_ENV === 'development') {
+      const queryTime = Date.now() - startTime;
+      console.log(`[Performance] Employees by sector query took ${queryTime}ms, returned ${rows.length} records`);
+    }
     res.json(rows);
   } catch (err) {
     console.error('Error fetching employees by sector:', err);

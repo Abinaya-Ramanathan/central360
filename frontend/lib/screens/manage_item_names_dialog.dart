@@ -83,17 +83,29 @@ class _ManageItemNamesDialogState extends State<ManageItemNamesDialog> {
   static const double _colPartNumber = 120;
   static const double _colAction = 120;
   static const double _colSpacing = 20;
-  static const double _totalWidth = _colItemName + _colSector + _colVehicleType + _colPartNumber + _colAction + _colSpacing * 4;
+  static const double _scrollWidthTable = _colSector + _colVehicleType + _colPartNumber + _colAction + _colSpacing * 3;
 
   Widget _buildItemNamesFixedTable() {
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: _totalWidth,
+      totalWidth: _scrollWidthTable,
       headerHeight: _headerHeight,
+      leadingWidth: _colItemName,
+      rowExtent: 48,
+      leadingHeaderBuilder: (context) => const Center(
+        child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      leadingRowBuilder: (context, index) {
+        final item = _filteredItems[index];
+        return Center(
+          child: Text(
+            item['item_name']?.toString() ?? 'N/A',
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      },
       headerBuilder: (context) => Row(
         children: [
-          const SizedBox(width: _colItemName, child: Text('Item Name', style: TextStyle(fontWeight: FontWeight.bold))),
-          const SizedBox(width: _colSpacing),
           InkWell(
             onTap: () {
               setState(() {
@@ -123,8 +135,6 @@ class _ManageItemNamesDialogState extends State<ManageItemNamesDialog> {
         final showVehicleFields = sectorCode == 'SSEW';
         return Row(
           children: [
-            SizedBox(width: _colItemName, child: Text(item['item_name']?.toString() ?? 'N/A')),
-            const SizedBox(width: _colSpacing),
             SizedBox(width: _colSector, child: Text(_getSectorName(sectorCode))),
             const SizedBox(width: _colSpacing),
             SizedBox(width: _colVehicleType, child: Text(showVehicleFields ? (item['vehicle_type']?.toString() ?? '') : '')),

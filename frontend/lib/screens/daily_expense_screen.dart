@@ -241,26 +241,50 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
   static const double _allSectorsWSector = 150, _allSectorsWAmount = 120;
 
   Widget _buildAllSectorsSummaryTable() {
-    const totalWidth = _allSectorsWSector + _allSectorsSp + _allSectorsWAmount;
+    const double leadW = _allSectorsWSector;
+    const double scrollW = _allSectorsSp + _allSectorsWAmount;
     final sortedSectors = _sectorExpenseSummary.isEmpty ? <String>[] : (_sectorExpenseSummary.keys.toList()..sort());
     final rowCount = _sectorExpenseSummary.isEmpty ? 1 : sortedSectors.length + 1;
     return FixedHeaderTable(
       horizontalScrollController: _horizontalScrollController,
-      totalWidth: totalWidth.toDouble(),
+      totalWidth: scrollW,
       headerHeight: 48,
+      leadingWidth: leadW,
+      rowExtent: 48,
+      leadingHeaderBuilder: (ctx) => const SizedBox(
+        width: leadW,
+        height: 48,
+        child: Align(alignment: Alignment.centerLeft, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold))),
+      ),
       headerBuilder: (ctx) => const Row(
         children: [
-          SizedBox(width: _allSectorsWSector, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Sector Name', style: TextStyle(fontWeight: FontWeight.bold)))),
           SizedBox(width: _allSectorsSp),
           SizedBox(width: _allSectorsWAmount, height: 48, child: Align(alignment: Alignment.centerLeft, child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
+      leadingRowBuilder: (ctx, index) {
+        if (_sectorExpenseSummary.isEmpty) {
+          return const SizedBox(
+            width: leadW,
+            child: Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic)),
+          );
+        }
+        if (index == sortedSectors.length) {
+          return Container(
+            color: Colors.purple.shade50,
+            width: leadW,
+            alignment: Alignment.centerLeft,
+            child: const Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          );
+        }
+        final sectorCode = sortedSectors[index];
+        return SizedBox(width: leadW, child: Text(_getSectorName(sectorCode)));
+      },
       rowCount: rowCount,
       rowBuilder: (ctx, index) {
         if (_sectorExpenseSummary.isEmpty) {
           return const Row(
             children: [
-              SizedBox(width: _allSectorsWSector, child: Text('No expense data available', style: TextStyle(fontStyle: FontStyle.italic))),
               SizedBox(width: _allSectorsSp),
               SizedBox(width: _allSectorsWAmount),
             ],
@@ -271,7 +295,6 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
             color: Colors.purple.shade50,
             child: Row(
               children: [
-                const SizedBox(width: _allSectorsWSector, child: Text('Total Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
                 const SizedBox(width: _allSectorsSp),
                 SizedBox(width: _allSectorsWAmount, child: Text('₹${_calculateTotalExpenseForAllSectors().toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purple))),
               ],
@@ -281,7 +304,6 @@ class _DailyExpenseScreenState extends State<DailyExpenseScreen> {
         final sectorCode = sortedSectors[index];
         return Row(
           children: [
-            SizedBox(width: _allSectorsWSector, child: Text(_getSectorName(sectorCode))),
             const SizedBox(width: _allSectorsSp),
             SizedBox(width: _allSectorsWAmount, child: Text('₹${_sectorExpenseSummary[sectorCode]!.toStringAsFixed(2)}')),
           ],
